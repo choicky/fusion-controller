@@ -86,7 +86,8 @@ Every orderly stop in the run delivered a real `GenerateConsoleCtrlEvent(CTRL_BR
 | input-method profile | `%APPDATA%\Fcitx5\config\fcitx5\profile` |
 | pinyin addon config (scheme, `PageSize`, options) | `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` |
 | learning (user dictionary / history) | `%APPDATA%\Fcitx5\pinyin\user.dict`, `user.history` |
-| data root / cache | `%APPDATA%\Fcitx5\data`, `%LOCALAPPDATA%\Fcitx5\cache` |
+| data root | `%APPDATA%\Fcitx5\data` (resolved by Fcitx; not created in this run) |
+| cache | `%LOCALAPPDATA%\Fcitx5\cache` (resolved by Fcitx; not created in this run) |
 
 ## B5 — no learning in password/private fields (source argument, unchanged)
 
