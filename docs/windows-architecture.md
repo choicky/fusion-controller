@@ -547,7 +547,8 @@ Stage 5    Composition / candidate UI                         VERIFIED / COMPLET
            PR #11 与 PR #12 均已合并，canonical `main` `0f724af` 的 tree = 经评审与 exact-HEAD
            Notepad A–E smoke 的 `670dfc0`；controller PR #29 已合并；未主张项与 DEFER 项见 §25）
 Stage 6    Packaging / release / soak                       PLAN PROPOSED — 未接受；WP1 已合并并在其范围内收口；
-           WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)）；后续工作包未授权（`docs/windows-stage6-plan.md`）
+           WP2、WP3 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)、U1；WP3 运行于新 runtime
+           `runtime-wp3-20261018`）；后续工作包未授权（`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`）
 P0-A / P0-B / P0-D 仍 OPEN（§24）
 ```
 
@@ -778,13 +779,13 @@ gate 记录的范围内；fusion-windows PR #11 与 PR #12 均已合并）。** 
   `FusionTsf.dll` 加重建的 Host/runtime，是该组合的兼容性证据，不是整套新构建二进制的 smoke。未修改 `cmake/patches` 或固定版本；fusion-windows
   PR #13 仅修正一个早于 Stage 5 的测试判定。证据与处置见 `docs/windows-stage6-plan.md` R1–R3。
 
-**下一阶段：Stage 6 — Packaging / release / soak（PLAN PROPOSED，未接受；WP1 已合并收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)）；后续工作包未授权）。** 唯一的 Stage 6
+**下一阶段：Stage 6 — Packaging / release / soak（PLAN PROPOSED，未接受；WP1 已合并收口；WP2、WP3 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)、U1）；后续工作包未授权）。** 唯一的 Stage 6
 规划位置是 `docs/windows-stage6-plan.md`：提议的目标场景（Pinyin 与 Shuangpin、Fcitx 学习的持久化为目标要求）、过渡期
 测试产物的限制与排除项、发现登记表、P0 子问题与故障恢复取证、待所有者决定的事项、有序工作包与门；每个工作包须
 另有明确的执行指令才可开始。该计划不是 Accepted Decision，不改变本文的 OPEN/UNFROZEN 项，也不复制上表；其输入包括
 多应用 out-of-process 兼容性验证债（§25 Stage 4 收口、§18）、上表以 Stage 6 为 trigger 的 DEFER 项（如精确 caret
 锚定）、上面的 pinned-runtime 发现核验（已由 WP1 完成），以及安装/注册/签名/soak/阈值测量（§21、§25 Stage 4"不属于"条款）。
-WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）；后续工作包仍须各自的明确授权，U1、U2、U4、U6、U7 仍待决定。
+WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）。WP3 亦已在其范围内收口：选择只经 Fcitx 既有配置文件，存储落在 Fcitx 标准每用户路径，学习与选项跨重启持久（B3a–B3g、Notepad A–E 通过，候选 `a720319`，运行于新 runtime `runtime-wp3-20261018`；WP2 结论仍取自已记录的 `runtime-wp1-20261017`，未在新 runtime 上复跑），已知限制为无热键切换（R19）、强制终止丢失未保存改动、登出/关机保存取决于启动方式（R26）（`docs/windows-stage6-wp3.md`）；后续工作包仍须各自的明确授权，U2、U4、U6、U7 仍待决定。
 
 **暂不应做：** freeze final wire protocol；freeze permanent identifiers；freeze recovery/timing thresholds；freeze
 未决 Host topology；无证据即冻结 §16 candidate renderer 的进程/位置；借其他阶段的工作偷跑 P0-A / P0-B 的最终
