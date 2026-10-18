@@ -440,7 +440,9 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 **P0-D 仍然 OPEN 的部分：** 上述只是 §3 目标场景内的已实现基线，不是 Host topology 的冻结。High IL、x86/x64 混合、
 AppContainer/LPAC、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
 都仍未取证；每个被解除的排除项都需要自己的证据。计划任务/停止事件/pipe 的“单用户 × 单会话”范围意味着多交互用户
-机器需要按用户安装。
+机器**当前不受支持**：任务名 `FusionHost` 是全局的，第二个账户安装会覆盖第一个账户的任务（R32，Hypothesis，
+CONDITIONAL；候选修法是按 SID 的每用户任务名）。以*另一个*管理员账户提权的安装器也打不开属主的停止事件——它如实
+报告，而不是杀进程。
 
 ## 15. Backend policy
 
