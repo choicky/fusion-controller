@@ -11,7 +11,7 @@ walkthrough dry run are complete on the branch head below. The lifecycle evidenc
 | item | value |
 |---|---|
 | fusion-windows base | `572fdb9` (PR #16 merge, `main`) |
-| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection) |
+| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher) |
 | Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `8C341D17B1DE7CD708A030E724C60D1274BAA7C322EAF5D5AE41341E5BDAF141`, `FusionTsf.dll` `22D41116DECAD2E7A30A46B44E675CDF36FEACB4D2B50191F5593BDFA0AB0EB9`, `FusionFcitxHost.dll` `01AA0CF48B501832C66D0D4FB35688C3C0FEB40A58A849EBA0E0F7D19963D3D9` |
 | runtime | `runtime-wp3-20261018` (Debug + Release), rebuilt on this machine from the WP3 pins — fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB` |
 | changed files | 12 (`CMakeLists.txt`, `README.md`, `src/host/main.cpp`, `src/host/host_server.{hpp,cpp}`, `tests/stage4a_ipc.cpp`, `tools/fcitx/build-native.ps1`, `tools/package/{build-package,install,uninstall,host-state,verify-wp4}.ps1`) |
@@ -174,16 +174,16 @@ clean. (See environment fact 4 for why the formatter check is scoped to the chan
 
 ## B2 — packages (measured)
 
-Both packages were built from the same commit `faeb266` with `tools/package/build-package.ps1`; full manifests are in
-`b2-manifests.txt`.
+Both packages were built from the same commit `b050292` (the branch head) with `tools/package/build-package.ps1`; full
+manifests are in `b2-manifests.txt`.
 
 | item | wp4.1 | wp4.2 |
 |---|---|---|
-| file | `fusion-0.0.0-wp4.1+faeb266.zip` | `fusion-0.0.0-wp4.2+faeb266.zip` |
-| zip SHA-256 | `94854AA0201CB7587B490F1DAEA247372EF5AA3D348ABAD9DF0B1978013F6A5C` | `1E34D1874B121B420FF19063E3B73C41FAC988E154C4CD69DA7BFEE01A7DAD0B` |
-| size | 39 457 424 B | 39 457 426 B |
+| file | `fusion-0.0.0-wp4.1+b050292.zip` | `fusion-0.0.0-wp4.2+b050292.zip` |
+| zip SHA-256 | `913F998582402F7456837366AAD5C6B66C823CB33F66EB20739DE0F456248C08` | `6509805BC5A78EEA8FA913EC687FC9B7407F5331D870B75341A8411B54955A486` |
+| size | 39 457 418 B | 39 457 420 B |
 | files / uncompressed | 101 / 53 109 154 B | 101 / 53 109 154 B |
-| source commit | `faeb266517f4c33d6a496054aea43a58b7a54041` (clean) | same |
+| source commit | `b0502921b110af8137e136968851602455c242b8` (clean) | same |
 | runtime | `runtime-wp3-20261018` | same |
 
 The only difference between the two packages is the version string, so the two zips differ in hash and bytes while
@@ -199,10 +199,17 @@ are as specified in the WP4 instruction; step (c) ends the run and asks the owne
 `-Resume`.
 
 **Dry run (done).** With `-DryRun` the script read both packages, extracted them, recorded the pre-run snapshot
-(`wp4-run-20261018-100135/snapshots/01-before.txt`), printed step (a)'s prompt and stopped before any elevated action.
+(`wp4-run-20261018-100735/snapshots/01-before.txt`), printed step (a)'s prompt and stopped before any elevated action.
 The snapshot shows: install root absent, no task, no Host, the development registration at
 `evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, and the first-run
 `%APPDATA%\Fcitx5` from environment fact 2.
+
+**Harness defect found and fixed before the owner run** (`b050292`): the script launched its elevated steps through
+`Start-Process`, which builds an environment dictionary and fails when both `http_proxy` and `HTTP_PROXY` are defined —
+it would have stopped the walkthrough at its first elevated action. The launcher now uses `ProcessStartInfo` with
+`UseShellExecute` + `runas`. The dry run above is the post-fix run; the packages were rebuilt from `b050292` so that
+"the packages come from the PR head" stays true (the packaged files are unchanged; only `package.json`'s source commit
+differs, which is why the zip hashes changed).
 
 **Pending.** B3a–B3f, B4 (Notepad A–E on the installed wp4.2) and the per-step results are not recorded here. Until the
 owner runs the script, WP4 is not closed: the exit gate needs that evidence.
@@ -230,6 +237,6 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A3 runtime location and DLL dependencies | `a3-smoke.txt`, `a3-smoke-host-stderr.log` |
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
-| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+faeb266.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
-| B3 dry run | `wp4-run-20261018-100135\verify-wp4.log`, `wp4-run-20261018-100135\snapshots\01-before.txt` |
+| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+b050292.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
+| B3 dry run | `wp4-run-20261018-100735\verify-wp4.log`, `wp4-run-20261018-100735\snapshots\01-before.txt` |
 | runtime product | `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018\` (Debug + Release) |
