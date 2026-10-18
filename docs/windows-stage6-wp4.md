@@ -11,30 +11,48 @@ walkthrough dry run are complete on the branch head below. The lifecycle evidenc
 | item | value |
 |---|---|
 | fusion-windows base | `572fdb9` (PR #16 merge, `main`) |
-| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode) |
-| Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `8C341D17B1DE7CD708A030E724C60D1274BAA7C322EAF5D5AE41341E5BDAF141`, `FusionTsf.dll` `22D41116DECAD2E7A30A46B44E675CDF36FEACB4D2B50191F5593BDFA0AB0EB9`, `FusionFcitxHost.dll` `01AA0CF48B501832C66D0D4FB35688C3C0FEB40A58A849EBA0E0F7D19963D3D9` |
-| runtime | `runtime-wp3-20261018` (Debug + Release), rebuilt on this machine from the WP3 pins — fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB` |
-| changed files | 12 (`CMakeLists.txt`, `README.md`, `src/host/main.cpp`, `src/host/host_server.{hpp,cpp}`, `tests/stage4a_ipc.cpp`, `tools/fcitx/build-native.ps1`, `tools/package/{build-package,install,uninstall,host-state,verify-wp4}.ps1`) |
+| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace) |
+| machine | **5700X** (this WP4 work, its packages and the walkthrough). WP1–WP3 work and evidence, including the WP3 walkthrough and the original `runtime-wp3-20261018` binaries, were produced on the owner's **7700** |
+| Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2`, `FusionTsf.dll` `FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9`, `FusionFcitxHost.dll` `B1F3A8A34664F988CD2CE35D39CE9648BE07A7D31B38B579F0DC38BDF63F085F` |
+| runtime | `runtime-wp3-20261018`, **5700X rebuild** (Debug + Release) — same pins as the 7700 build: fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB`. **Not byte-identical to the 7700 build** (see the machine section below) |
+| changed files | 13 (`CMakeLists.txt`, `README.md`, `src/host/main.cpp`, `src/host/host_server.{hpp,cpp}`, `tests/stage4a_ipc.cpp`, `tools/fcitx/build-native.ps1`, `tools/package/{build-package,install,uninstall,host-state,verify-wp4}.ps1`) |
+
+### Machines and the two `runtime-wp3-20261018` builds
+
+The runtime directory keeps its name because its CMake package files carry absolute paths, but the name alone is not an
+identity. There are two builds from the same pins:
+
+| | WP3 (owner's **7700**) | WP4 (this **5700X**) |
+|---|---|---|
+| source pins | fcitx5 `a7f2528` + `fcitx5-msvc.patch`; chinese-addons `61474bd` + `chinese-addons-msvc.patch`; libime `171edcf`; vcpkg `20ceb8ad` | identical |
+| `FusionHost.exe` (candidate) | `6B74E700749A93651FCED28CBB452AF79962A3736B814649A9981A67D3737637` | `BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2` |
+| `FusionTsf.dll` (candidate) | `A0C13C0AC580869D4BD9E39CFA4A2EC6550240A3374B602217032E770C41BD80` | `FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9` |
+| runtime DLL hashes | not recorded in the WP3 record | in the 5700X package manifests (`b2-manifests.txt`, `package.json`) |
+
+The candidate binaries differ for two reasons that must not be conflated: WP4 changed the Host (windowless mode, stop
+event, session-end handling), and the two builds were produced on different machines. Nothing in this record, the plan,
+the architecture text or `package.json` claims byte identity with the WP3 build; `package.json` now records
+`builtOn` and `runtime.machine` and states that the runtime is a rebuild from the WP3 pins.
 
 ### Environment facts that differ from the WP3 record
 
 Recorded because they bound what these results mean, not as product decisions:
 
-1. **The runtime directory did not exist.** `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018` was absent
-   at WP4 start (only an older Debug-only prefix from the WP1 era remained). The runtime was therefore rebuilt from
-   the same pinned sources and patches with `tools/fcitx/build-native.ps1` into that exact directory. Source identity
-   is identical to WP3's record; binary hashes are this machine's build and are recorded above, not inherited.
-2. **No WP3 user data was present.** `%APPDATA%\Fcitx5` did not exist before the WP4 run. The A1 console check (below)
-   ran without `FUSION_FCITX_SKIP_USER_PATH` and created a first-run default configuration plus an empty user
-   dictionary at 09:59. That is recorded as an unintended touch of real user data by a WP4 check (no pre-existing data
-   was modified or removed), and it is the state the walkthrough's "before" snapshot contains. Step (a)'s "existing
-   user data is reused" therefore means "the first-run default configuration is reused", not WP3 learning.
-3. **`reg.exe` is blocked** by this machine's Security Center program blacklist, so `VsDevCmd.bat` cannot detect the
+1. **The runtime directory did not exist on the 5700X.** `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018`
+   was absent at WP4 start (only an older Debug-only prefix from the WP1 era remained). The runtime was therefore
+   rebuilt on the 5700X from the same pinned sources and patches with `tools/fcitx/build-native.ps1` into that exact
+   directory. Source identity matches WP3's record; the binaries are the 5700X build recorded above, not WP3's.
+2. **No WP3 user data was present on the 5700X.** `%APPDATA%\Fcitx5` did not exist before the WP4 run. The A1 console
+   check (below) ran without `FUSION_FCITX_SKIP_USER_PATH` and created a first-run default configuration plus an empty
+   user dictionary at 09:59. That is recorded as an unintended touch of real user data by a WP4 check (no pre-existing
+   data was modified or removed), and it is the state the walkthrough's "before" snapshot contains. Step (a) therefore
+   expects the Pinyin default with no WP3 learning to reuse.
+3. **`reg.exe` is blocked on the 5700X** by its Security Center program blacklist, so `VsDevCmd.bat` cannot detect the
    Windows SDK and produces `LIB`/`INCLUDE` without SDK paths (link fails with `LNK1104: kernel32.lib`). The build was
    driven by a local wrapper outside the repository that supplies the SDK `INCLUDE`/`LIB`/`PATH` and then calls the
    repository script unmodified. This is a machine condition, not a repository change.
-4. **clang-format available is 23.1.3** (WP3 used 22.1.3). It reports formatting differences in files this WP did not
-   touch (`src/tsf/service.hpp`, `src/tsf/diag.cpp`), so the check was scoped to the files this WP changed.
+4. **clang-format available on the 5700X is 23.1.3** (WP3 used 22.1.3). It reports formatting differences in files this
+   WP did not touch (`src/tsf/service.hpp`, `src/tsf/diag.cpp`), so the check was scoped to the files this WP changed.
 
 ## A1 — windowless by default, console mode kept
 
@@ -56,7 +74,7 @@ contains `Save before exiting...` followed by the addon unloads and `shutting do
 
 | mechanism | what it does |
 |---|---|
-| hidden top-level window (`WS_POPUP`, `WS_EX_TOOLWINDOW`, not `HWND_MESSAGE`) | receives `WM_QUERYENDSESSION` / `WM_ENDSESSION`, requests the stop and waits, bounded at 4 s (the console path's bound), for the ordered shutdown; `WM_ENDSESSION` with `wparam == FALSE` (cancelled) does nothing |
+| hidden top-level window (`WS_POPUP`, `WS_EX_TOOLWINDOW`, not `HWND_MESSAGE`) | `WM_QUERYENDSESSION` answers TRUE and stops nothing; `WM_ENDSESSION` with `wParam` TRUE requests the stop and waits, bounded at 4 s (the console path's bound), for the ordered shutdown; `WM_ENDSESSION` with `wParam` FALSE does nothing |
 | named stop event `Local\FusionHost-stop-<user SID>-<session id>` | created by the Host before the backend exists, with the pipe's own user-only DACL; `install.ps1` / `uninstall.ps1` open and signal it instead of terminating the process |
 | console control handler | unchanged, console mode only |
 
@@ -65,6 +83,13 @@ All three paths only *request* the stop. `main()` remains the single thread that
 stop-event waiter is one thread that waits on the stop event and the exit signal and never drains, joins or touches the
 backend. The window lives on its own thread so the accept loop keeps running on the main thread; `WM_CLOSE` ends it
 after the exit signal is set.
+
+**A cancelled logoff must not stop the Host** (review finding, fixed before the walkthrough). A logoff or shutdown can
+still be cancelled *after* `WM_QUERYENDSESSION` — an application asks to save and the user cancels. Requesting the
+stop from the query would leave the session running with no Host until the next logon. The decision now lives in
+`fusion::ipc::SessionEndHandler` (host_server), separate from the window procedure so it can be driven without a real
+session end: the query only answers TRUE, and only `WM_ENDSESSION(TRUE)` — the session is really ending — requests the
+stop and waits. The walkthrough's step (c2) checks the product behaviour by cancelling a real logoff.
 
 Fail-closed choices: a Host that cannot create the stop event, or (windowless) cannot create the session-end window,
 refuses to run — otherwise it could be neither stopped orderly nor save on logoff (R26).
@@ -157,15 +182,21 @@ is still owned and the backend untouched until the owning thread runs `stop()` �
 is destroyed exactly once and never during a call. "The stop event is refused to another principal" is not tested: it
 needs a second token, which this scope does not have.
 
+`stage4a wp4sessionend` (registered as `stage4a_ipc_wp4sessionend`): drives the session-end decision without a real
+session end. `WM_QUERYENDSESSION` returns TRUE and requests nothing; `WM_ENDSESSION(FALSE)` (a cancelled logoff)
+requests nothing; `WM_ENDSESSION(TRUE)` requests the stop exactly once and waits for the exit, bounded (measured
+against a 300 ms bound); with the exit already signalled the same call returns immediately. A real session end is still
+only exercised by the walkthrough's step (c) and step (c2).
+
 ## B1 — builds and tests (measured)
 
-Every tree configured fresh in a `chcp 65001` console against `runtime-wp3-20261018`:
+Every tree configured fresh in a `chcp 65001` console against the 5700X `runtime-wp3-20261018`:
 
 | tree | build | CTest |
 |---|---|---|
-| Mock-only Debug | 0 | **70/70** |
-| Debug + real Fcitx | 0 | **78/78** |
-| Release + real Fcitx | 0 | **78/78** |
+| Mock-only Debug | 0 | **71/71** |
+| Debug + real Fcitx | 0 | **79/79** |
+| Release + real Fcitx | 0 | **79/79** |
 
 `stage4a_ipc_integration` is the operator-driven mode that requires an already-running Host; the suites above use its
 documented `FUSION_STAGE4A_SKIP_INTEGRATION=1` switch, and the mode was run separately against a started Release Host
@@ -174,32 +205,48 @@ clean. (See environment fact 4 for why the formatter check is scoped to the chan
 
 ## B2 — packages (measured)
 
-Both packages were built from the same commit `8b0d9ec` (the branch head) with `tools/package/build-package.ps1`; full
-manifests are in `b2-manifests.txt`.
+Both packages were built from the same commit `0d1a1c4` (the branch head) with `tools/package/build-package.ps1`; full
+manifests are in `b2-manifests.txt`. The manifest records `builtOn: 5700X`, `runtime.machine: 5700X` and the note that
+the runtime is a rebuild from the WP3 pins.
 
 | item | wp4.1 | wp4.2 |
 |---|---|---|
-| file | `fusion-0.0.0-wp4.1+8b0d9ec.zip` | `fusion-0.0.0-wp4.2+8b0d9ec.zip` |
-| zip SHA-256 | `948060B352C401F6A699164BC90DBFD03AB258BD1AD823A368CF8B7AAE2EAF15` | `06191720A3C3F01D36A57187784057EE3ED965DE49ECE2DA5E073CB28F4128C4` |
-| size | 39 457 489 B | 39 457 489 B |
-| files / uncompressed | 101 / 53 109 426 B | 101 / 53 109 426 B |
-| source commit | `8b0d9ec630581b2ca306d4199c7ea34cd23c2e72` (clean) | same |
-| runtime | `runtime-wp3-20261018` | same |
+| file | `fusion-0.0.0-wp4.1+0d1a1c4.zip` | `fusion-0.0.0-wp4.2+0d1a1c4.zip` |
+| zip SHA-256 | `5C377C565833ECC70C12EDC73D0430339E4B9D3E154DF71F389B00BCB23F3FB6` | `98442DEB25A3B8D27E70F34787FC86DDA4B86DFB9481DAC9E59925910DC11AE85` |
+| size | 39 458 262 B | 39 458 261 B |
+| files / uncompressed | 101 / 53 111 474 B | 101 / 53 111 474 B |
+| source commit | `0d1a1c484da5ca3ecd7b675bc28c7d912027e7b7` (clean) | same |
+| runtime | `runtime-wp3-20261018` (5700X rebuild) | same |
 
 The only difference between the two packages is the version string, so the two zips differ in hash and bytes while
 their binaries are identical — which is what an upgrade of the same commit is supposed to exercise.
 
 ## B3/B4 — owner walkthrough (NOT RUN)
 
-`tools/package/verify-wp4.ps1` performs every action itself and accepts only Enter / y / n. It records, before and after
-each step, the install root, the HKLM/HKCU `CTF\TIP` and COM keys, the scheduled task, running `FusionHost` processes
+`tools/package/verify-wp4.ps1` performs every action itself; the owner never edits a file or types a command. Prompts
+accept Enter / y / n, or the one short answer a prompt asks for (a pinyin string, a rank such as `5→1`), and every
+answer is written to the run log — a reported observation is never reduced to "Enter". Before and after each step it
+records the install root, the HKLM/HKCU `CTF\TIP` and COM keys, the scheduled task, running `FusionHost` processes
 (path, user, integrity, session), `%APPDATA%\Fcitx5` (count/size and size+mtime+hash of the key files) and the machine
-and user `PATH`. It records the development registration found before the run and restores it at the end. Steps (a)–(f)
-are as specified in the WP4 instruction; step (c) ends the run and asks the owner to sign out and re-run with
-`-Resume`.
+and user `PATH`. It records the development registration found before the run and restores it at the end.
+
+| step | what the owner does | what the script records |
+|---|---|---|
+| a | allow UAC, then type `nihao` + Space in Notepad | install exit code, Host pid/session/user/integrity, `你好` yes/no, "Pinyin default, no WP3 learning" yes/no |
+| b | nothing (the script starts the task again and `FusionHost.exe` directly) | Host count after each attempt, the direct start's exit code and stderr, typing still works |
+| c | type a pinyin string, select a candidate, report the rank change; then sign out | Host running before the learning prompt, the pinyin string, `before→after` ranks, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
+| c (resume) | sign in, type the same string again, report the rank | one Host, its identity, typing works, the current rank, whether the learning survived |
+| c2 | leave an unsaved Notepad, start a logoff, **cancel** it | Host pid before and after, "still the same Host", typing still works |
+| d | keep a Notepad open, allow UAC for the upgrade, then check both Notepads and Notepad A–E | old Host's orderly stop, new Host path, whether the wp4.1 directory was removed, behaviour of the old and the new Notepad, A–E answers |
+| e | allow UAC for the uninstall | exit code, no TIP/COM/task/Host, install root, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
+| f | close every Notepad, allow UAC twice | reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left |
+| end | — | the development registration restored and re-snapshotted |
+
+The learning used by steps (c)/(d) is produced inside the walkthrough with the Host already running (step (c) refuses
+to continue if no Host is running), so the owner is never asked to do something the machine cannot do at that moment.
 
 **Dry run (done).** With `-DryRun` the script read both packages, extracted them, recorded the pre-run snapshot
-(`wp4-run-20261018-101055/snapshots/01-before.txt`), printed step (a)'s prompt and stopped before any elevated action.
+(`wp4-run-20261018-112047/snapshots/01-before.txt`), printed step (a)'s prompt and stopped before any elevated action.
 The snapshot shows: install root absent, no task, no Host, the development registration at
 `evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, and the first-run
 `%APPDATA%\Fcitx5` from environment fact 2.
@@ -242,6 +289,6 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A3 runtime location and DLL dependencies | `a3-smoke.txt`, `a3-smoke-host-stderr.log` |
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
-| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+8b0d9ec.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
-| B3 dry run | `wp4-run-20261018-101055\verify-wp4.log`, `wp4-run-20261018-101055\snapshots\01-before.txt` |
+| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+0d1a1c4.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
+| B3 dry run | `wp4-run-20261018-112047\verify-wp4.log`, `wp4-run-20261018-112047\snapshots\01-before.txt` |
 | runtime product | `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018\` (Debug + Release) |

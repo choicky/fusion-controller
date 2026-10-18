@@ -432,7 +432,8 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 保存由隐藏的**顶层**窗口的 `WM_QUERYENDSESSION`/`WM_ENDSESSION` 触发（message-only 窗口收不到会话结束广播），
 在 4 s 界限内等待既有的有序关闭（request stop → stop → shutdown_backend → Fcitx save）；安装/升级/卸载通过
 `Local\FusionHost-stop-<user SID>-<session id>` 命名停止事件（与 pipe、HostClaim 相同的 user-only DACL）请求同一
-有序停止，而不是终止进程。三条路径都只**请求**停止，`main()` 仍是唯一执行有序关闭的线程，`HostClaim` 持有到进程
+有序停止，而不是终止进程；`WM_QUERYENDSESSION` 只回答 TRUE 而不停止任何东西（注销仍可能被取消），只有
+`WM_ENDSESSION(TRUE)` 才请求停止。三条路径都只**请求**停止，`main()` 仍是唯一执行有序关闭的线程，`HostClaim` 持有到进程
 退出；`one Host per user × session` 的权威仍是 `HostClaim`，不是任务设置。开发/测试用的控制台模式（`--console`，
 含 control handler）保留。证据与边界见 `docs/windows-stage6-wp4.md`；U2 (a)（登录 Run 项）未实现，其缺口已记录。
 
@@ -564,8 +565,9 @@ Stage 5    Composition / candidate UI                         VERIFIED / COMPLET
            Notepad A–E smoke 的 `670dfc0`；controller PR #29 已合并；未主张项与 DEFER 项见 §25）
 Stage 6    Packaging / release / soak                       PLAN PROPOSED — 未接受；WP1 已合并并在其范围内收口；
            WP2、WP3 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)、U1；WP3 运行于新 runtime
-           `runtime-wp3-20261018`）；WP4 已实现并在本地验证（U2 (b) Accepted 2026-10-18；B1 70/70 Mock-only、
-           78/78 Debug、78/78 Release；两个测试包；A1–A6 与走查试运行见 `docs/windows-stage6-wp4.md`），
+           `runtime-wp3-20261018`）；WP4 已在 5700X 上实现并本地验证（U2 (b) Accepted 2026-10-18；B1 71/71 Mock-only、
+           79/79 Debug、79/79 Release；两个测试包；A1–A6 与走查试运行见 `docs/windows-stage6-wp4.md`；
+           该机的 runtime-wp3-20261018 是按 WP3 pins 重建的 5700X 版本，与 7700 构建非字节相同），
            但**所有者走查 B3/B4 未运行**，故 WP4 未收口；后续工作包未授权
            （`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`、`docs/windows-stage6-wp4.md`）
 P0-A / P0-B / P0-D 仍 OPEN（§24）
