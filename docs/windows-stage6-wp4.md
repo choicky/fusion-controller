@@ -4,18 +4,19 @@ Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7
 
 **Result: WP4 is implemented and locally verified; the owner walkthrough (B3/B4) is pending.** B1, B2 and the
 walkthrough dry run are complete on the branch head below. The lifecycle evidence that requires an interactive owner
-(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. Two owner attempts
-aborted in step (a) and are recorded below as **invalid, not results**: `wp4-run-20261018-115501` (the walkthrough
-quoted a parameter *name*) and `wp4-run-20261018-124402` (install.ps1 read `$LASTEXITCODE` after a `.ps1` call and
-aborted a *successful* registration). Both defects are fixed, the package scripts were audited line by line, and the
-whole non-elevated span is proven; the rerun is pending.
+(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. Three owner attempts
+are recorded below: `wp4-run-20261018-115501` (the walkthrough quoted a parameter *name*), `wp4-run-20261018-124402`
+(install.ps1 read `$LASTEXITCODE` after a `.ps1` call and aborted a *successful* registration) and
+`wp4-run-20261018-170730` (**step (a) installed and asserted correctly for the first time**, then aborted on a Notepad
+check that inspected the launcher process instead of the window's). All three are harness defects, all three are fixed,
+and each fix is proven without UAC; the rerun is pending.
 
 ## Candidate, runtime and tooling identities
 
 | item | value |
 |---|---|
 | fusion-windows base | `572fdb9` (PR #16 merge, `main`) |
-| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace), `53597d7` (harness fix after the 11:55 abort), `f63aa4f` (skip the Notepad check when an earlier assertion failed), `ae54e70` (elevated-path fix + full script audit), `2a8b0bb` (forward `-TranscriptPath` to the launched script) |
+| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace), `53597d7` (harness fix after the 11:55 abort), `f63aa4f` (skip the Notepad check when an earlier assertion failed), `ae54e70` (elevated-path fix + full script audit), `2a8b0bb` (forward `-TranscriptPath` to the launched script), `97f90f7` (check the Notepad window's process, not the launcher's PID) |
 | machine | **5700X** (this WP4 work, its packages and the walkthrough). WP1–WP3 work and evidence, including the WP3 walkthrough and the original `runtime-wp3-20261018` binaries, were produced on the owner's **7700** |
 | Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2`, `FusionTsf.dll` `FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9`, `FusionFcitxHost.dll` `B1F3A8A34664F988CD2CE35D39CE9648BE07A7D31B38B579F0DC38BDF63F085F` |
 | runtime | `runtime-wp3-20261018`, **5700X rebuild** (Debug + Release) — same pins as the 7700 build: fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB`. **Not byte-identical to the 7700 build** (see the machine section below) |
@@ -263,7 +264,7 @@ and user `PATH`. It records the development registration found before the run an
 
 | step | what the owner does | what the script records |
 |---|---|---|
-| a | allow UAC, close every Notepad, type `nihao` + Space in the Notepad the script opened | install exit code (fatal if non-zero), Host pid/session/user/integrity, HKLM/HKCU registration, the Notepad's loaded DLL + hash, `你好` yes/no, "Pinyin default, no WP3 learning" yes/no |
+| a | allow UAC, close every Notepad, check the taskbar input indicator (Win+Space only if Fusion is not already selected), type a few letters in the Notepad the script opened, press Enter | install exit code (fatal if non-zero), Host pid/session/user/integrity, HKLM/HKCU registration, which Notepad process was checked and why (window owner vs launcher), its loaded DLL + hash, `你好` yes/no, "Pinyin default, no WP3 learning" yes/no |
 | b | nothing (the script starts the task again and `FusionHost.exe` directly) | Host count after each attempt, the direct start's exit code and stderr, typing still works |
 | c | type a pinyin string, select a candidate, report the rank change; then sign out | Host running before the learning prompt, the pinyin string, `before→after` ranks, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
 | c (resume) | sign in, close every Notepad, type the same string in the Notepad the script opened, report the rank | the same assertions as step a, typing works, the current rank, whether the learning survived |
@@ -458,6 +459,76 @@ is a machine change); the audit above is the substitute.
 task, no `FusionHost`, `%APPDATA%\Fcitx5` the same five files with the same sizes, mtimes (09:59:09) and hashes. The only
 residue of the 12:44 run is the version directory it left, recorded in the pre-run snapshot below.
 
+### The 17:07 run — step (a) installed, aborted on the Notepad check (harness defect)
+
+`wp4-run-20261018-170730` is the first attempt in which **the install itself succeeded end to end**:
+
+| observation | evidence |
+|---|---|
+| `install.ps1` exit 0 | `verify-wp4.log`: `[a] install.ps1 退出码 => 0`; its own transcript `install-0.0.0-wp4.1+2a8b0bb.log` |
+| files installed | `C:\Program Files\Fcitx5 Fusion\0.0.0-wp4.1+2a8b0bb\`, 102 files |
+| the leftover `0d1a1c4` directory was removed as an older, unused version | `[a] 安装后是否清掉了旧版本目录 => leftover-before=0.0.0-wp4.1+0d1a1c4 still-present=none` |
+| registration | `HKLM=C:\Program Files\Fcitx5 Fusion\0.0.0-wp4.1+2a8b0bb\bin\FusionTsf.dll`, `HKCU=(none)` |
+| Host | `pid=3528 path=…\0.0.0-wp4.1+2a8b0bb\bin\FusionHost.exe integrity=medium session=1 user=5700X\choicky` |
+| task | `FusionHost`, `choicky`, `Interactive`, `Limited`, `IgnoreNew`, `PT0S` |
+| then | `[a] 断言：记事本模块 => pid=10648 loaded= …` and `ABORT … detail=Notepad: FusionTsf.dll is not loaded in the process` (exit 8) |
+| abort cleanup | Host stopped through its own stop event (`signalled=True exited=True after 124 ms`), development registration restored (`register.ps1` exit 0) |
+
+**Root cause: the process inspected was the launcher, not the window owner.** On this machine `notepad.exe` is the
+packaged Windows 11 Notepad (tabs), and `Process.Start('notepad.exe')` returns an app-execution-alias launcher that
+hands the window to another process and exits. Measured twice, read-only:
+
+| launch | `Process.Start` PID | alive after 2 s | window owner |
+|---|---|---|---|
+| probe 1 | 42868 | **no** (dead within 1 s) | pid 7508, `C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_11.2607.14.0_x64__8wekyb3d8bbwe\Notepad\Notepad.exe`, class `Notepad`, title `无标题 - Notepad`, foreground |
+| probe 2 | 45008 | yes (the launcher lingers) | pid 7508 again — the packaged app opens a **tab** in the existing process, so no new window is created |
+
+In both cases `Test-NotepadLoadedDll` on the launcher PID reports `FusionTsf.dll is not loaded in the process` — it never
+had it. The check could therefore never pass on this machine, whatever the installed TIP did. A profile name or a
+description ("Fusion Stage 3B") would not have told us that; the module path and hash do.
+
+**Fix** (`97f90f7`, harness only — no C++/CMake, and neither changed file is inside the package, so the `2a8b0bb`
+packages stay valid and were not rebuilt):
+
+1. `Get-NotepadWindows` enumerates visible top-level windows (`EnumWindows`) and keeps the `Notepad` window class,
+   mapping each to its owning process (id, image path, title, start time). The title fallback requires a `- Notepad`
+   suffix, so another editor called `Notepad--` can never be chosen.
+2. `Resolve-NotepadWindow` picks the newest visible window, preferring one created at or after the launch, and waits
+   for it, bounded (15 s).
+3. `Start-NotepadForCheck` returns **both** PIDs and states which one owns the window, so the log says why a process
+   was inspected and a launcher that exits is no longer a failure.
+4. `Test-InstalledTipInUse` checks the window owner; the reused-PID retry path rebuilds the same object shape (a
+   `Process` has `MainWindowTitle`, not `Title` — reading `.Title` there would have thrown under strict mode).
+5. The "not loaded" prompt now gives the owner the order that works: check the taskbar input indicator first, press
+   Win+Space **only** if Fusion is not already selected (it cycles), type a few letters in that Notepad, then press
+   Enter. Step (d) resolves the pre-upgrade Notepad the same way instead of taking the first `notepad` process.
+
+**Proof without UAC** (`proof-notepad-owner.txt`, `notepad-topology.txt`), with the development DLL registered and the
+owner typing in a Notepad window:
+
+| check | result |
+|---|---|
+| window owner resolution | pid 21668, `…\WindowsApps\Microsoft.WindowsNotepad_11.2607.14.0_x64__8wekyb3d8bbwe\Notepad\Notepad.exe`, title `*你好 - Notepad` |
+| modules of that process | `FusionTsf.dll` and `FusionFcitxHost.dll` loaded from `evidence\…-v2\deployment\bin\` |
+| pass case (expected = that development DLL) | `ok=True`, loaded path identical, sha256 `03DEDD4CB251D82D4E6B674449067D763E1D6E0D266913EB75856B6F09935B92` |
+| fail case (expected = the installed wp4.1 DLL) | `ok=False`, `loaded …evidence\…-v2…, expected …\0.0.0-wp4.1+2a8b0bb\bin\FusionTsf.dll` |
+| old behaviour (launcher PID) | `ok=False`, `FusionTsf.dll is not loaded in the process` — the 17:07 failure |
+
+The development DLL is what is registered right now **because the abort cleanup restored it**; that is also why the
+owner saw Chinese input but no candidate popup. The installed TIP plus the Host (the state that shows the popup) is
+step (a)'s own subject, and the next run asserts it on the right process.
+
+**Owner observation for R15 (evidence only).** In the 17:07 run, with the *installed* TIP and the Host running, the
+owner reports that Chinese input worked **and the candidate popup was visible** in the Notepad window at 175 % display
+scaling on a single monitor — something the development DLL never showed. That is evidence against R15's "tiny or
+misplaced above 100 %" hypothesis at 175 %/one monitor, but it does not close R15: WP6 still owes 100 % and 150 % and a
+two-monitor check, and "visible" is not "correctly positioned".
+
+**Residue of this abort.** Unlike the earlier runs it leaves a working install: the version directory, the logon task
+and the development registration all remain (the cleanup stops the Host and restores registration only). The next run's
+step (a) installs over the same version directory and refreshes the task, and step (e) uninstalls. Recorded as a known
+limit below rather than cleaned up by hand.
+
 **Pending.** B3a–B3f, B4 (Notepad A–E on the installed wp4.2) and the per-step results are not recorded here. Until the
 owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 
@@ -468,6 +539,9 @@ owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 - An install that fails after the copy leaves its version directory behind (the 12:44 run did). It is harmless — a later
   install merges over it and uninstall removes it — but "install root absent" is then no longer true before the next run;
   the walkthrough records the directories it finds.
+- An aborted walkthrough does not uninstall: the cleanup stops the Host and restores the development registration only,
+  so a version directory and the logon task stay until the next run's step (a) or step (e). The 17:07 abort left exactly
+  that (installed `0.0.0-wp4.1+2a8b0bb`, task `FusionHost` last result 0, no Host, development DLL registered).
 - Nothing restarts the Host after a crash, and an alive-but-unhealthy Host is not restarted (WP5/U7).
 - The task, pipe, claim and stop event are single user × session; a machine with several interactive users needs the
   install per user, and an installer elevated as a *different* administrator cannot open the owner's stop event (it
@@ -488,9 +562,12 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
 | B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+2a8b0bb.zip`, `b2-manifests.txt` (UTF-8 copy `b2-manifests-utf8.txt`), `package-wp4.{1,2}.log` |
-| B3 dry run (post-fix) | `wp4-run-20261018-165349\verify-wp4.log`, `wp4-run-20261018-165349\snapshots\01-before.txt` |
+| B3 dry run (post-fix) | `wp4-run-20261018-172101\verify-wp4.log`, `wp4-run-20261018-172101\snapshots\01-before.txt` |
 | B3 aborted run 11:55 (invalid) | `wp4-run-20261018-115501\verify-wp4.log`, `install-wp4.1.log`, `elevated-install-wp4.1.ps1`, `snapshots\02-after-install-wp4.1.txt` |
 | B3 aborted run 12:44 (invalid) | `wp4-run-20261018-124402\verify-wp4.log`, `install-wp4.1.log` (the `$LASTEXITCODE` failure), `snapshots\*` |
+| B3 aborted run 17:07 (install OK, Notepad check invalid) | `wp4-run-20261018-170730\verify-wp4.log`, `install-0.0.0-wp4.1+2a8b0bb.log`, `snapshots\*` |
+| Notepad topology probe | `notepad-topology.txt`, `probe-notepad-topology.ps1` |
+| Notepad resolution proof (pass/fail, on the owner's window) | `proof-notepad-owner.txt`, `check-owner-notepad.ps1` |
 | harness proof without UAC (round 2) | `harness-proof.txt` |
 | script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
 | script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |
