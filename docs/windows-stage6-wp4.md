@@ -311,8 +311,10 @@ exercises **version-directory switching, not a binary change** — that is exact
 | f | **PASS** | the reinstall succeeded **while the wp4.2 directory was held by `explorer`** (hash-skip copy), task Running, Host 14940; the uninstall stopped it, `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` were deleted, registration and task removed |
 | end | **PASS** | development registration restored (`register.ps1` exit 0); HKCU enable flag back to 1 |
 
-**(c) harness note.** The prompted word `shuangpin` was already rank 1 on this machine, so the owner substituted `shi`:
-4th candidate before learning, rank 1 after learning, still rank 1 after sign-out/sign-in.
+**(c) harness note.** The prompted word `shuangpin` was already rank 1 on this machine, so the owner substituted `shi`.
+Provenance of the ranks: the owner reports `shi` was 4th before learning and 1st after learning, and still 1st after
+sign-out/sign-in; the script's rank prompt (example `5→1`) recorded only `1` in `verify-wp4.log`, so the `4→1` pair is
+the owner's report, not the log's.
 
 **(c2) what is and is not covered.** The product behaviour under test — a cancelled logoff must leave the same Host
 running — is covered **only by the `stage4a wp4sessionend` unit test**. The walkthrough has no product-path evidence for
@@ -334,12 +336,14 @@ it; the blocker was hosted in a terminal-owned process, which the sign-out kille
   punctuation") was wrong — a harness follow-up, not a product result.
 
 **Leftover after the run.** `C:\Program Files\Fcitx5 Fusion\` remains with both version directories because shell and
-browser processes still hold the DLLs; the owner removes it manually after a restart. That is the documented behaviour
-of R28 — report the holders, remove after sign-out — not a defect.
+browser processes still hold the DLLs; it is to be removed after a restart (manually, because step (f) already removed
+the task and the registration). That is the documented behaviour of R28 — report the holders, remove after sign-out —
+not a defect.
 
 ### Harness follow-ups (known, not fixed)
 
 1. **(c)** the prompted word may already be rank 1 — it was here (`shuangpin`), and the owner had to substitute `shi`.
+   The rank prompt also accepts a single number, so a before→after pair is not enforced.
 2. **(c2)** a blocker hosted in a terminal-owned PowerShell process is killed at sign-out, so Cancel has no effect.
 3. **(d)** question C's wording is wrong: `;` is the QuickPhrase trigger, not punctuation.
 4. **(d)** R18 makes "new Notepad" questions fail unless the IME is opened with Ctrl+Space, and the harness does not tell
@@ -758,7 +762,8 @@ WP8), and §8.1 of the plan points here.
   protocol changes**: an upgrade that changed `protocol_version` would leave those processes on the old DLL and unable
   to use the new Host until sign-out (fail open), so such a change needs a sign-out requirement or a compatibility
   window (R28). The walkthrough left exactly that: both version directories remained (holders `firefox`, Notepad,
-  `explorer`) and the owner removed `C:\Program Files\Fcitx5 Fusion\` manually after a restart.
+  `explorer`), and `C:\Program Files\Fcitx5 Fusion\` is to be removed after a restart (manually, because step (f)
+  already removed the task and the registration).
 - An install that fails after the copy leaves its version directory behind (the 12:44 run did). It is harmless — a later
   install merges over it and uninstall removes it — but "install root absent" is then no longer true before the next run;
   the walkthrough records the directories it finds.
