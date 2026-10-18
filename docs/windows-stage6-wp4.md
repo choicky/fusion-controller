@@ -4,11 +4,14 @@ Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7
 
 **Result: WP4 is implemented and the owner walkthrough is complete on 2026-10-18 (run `wp4-run-20261018-185004`).**
 Install, second start, learning across sign-out, the upgrade with a Notepad open, both uninstall paths and the
-development-registration restore pass; **the exit gate is met except autostart reliability**, which is open as **R34**:
-at the second sign-in of the run the logon task did not start the Host, so U2's autostart verification is incomplete
-pending R34 and the cancelled-logoff behaviour is covered only by the `stage4a wp4sessionend` unit test. Three earlier
-attempts are kept below as history — `wp4-run-20261018-115501` (the walkthrough quoted a parameter *name*),
-`wp4-run-20261018-124402` (install.ps1 read `$LASTEXITCODE` after a `.ps1` call and aborted a *successful*
+development-registration restore pass; **the exit gate is met except B3c2, which FAILED** — a cancelled logoff ended the
+Host and nothing restarted it (**R34**, fixed in a separate PR; WP4 closes when that walkthrough passes). Logon autostart
+itself was exercised once and **passed** (the task started the Host at 18:58:43).
+*Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this paragraph said the task "did not start the
+Host at the second sign-in". There was no second sign-in — the only sign-out/sign-in of the run is 18:58:39→18:58:43 —
+and (c2) was not "not exercised": the logoff was cancelled (User32 1077 at 19:03:20) and the Host had already ended.*
+Three earlier attempts are kept below as history — `wp4-run-20261018-115501` (the walkthrough quoted a parameter
+*name*), `wp4-run-20261018-124402` (install.ps1 read `$LASTEXITCODE` after a `.ps1` call and aborted a *successful*
 registration) and `wp4-run-20261018-170730` (step (a) installed and asserted correctly for the first time, then aborted
 on a Notepad check that inspected the launcher process). All three were harness defects, all three were fixed and each
 fix proven without UAC; the same root cause — every Notepad window lives in one packaged process — also made step (d)
@@ -62,6 +65,11 @@ Recorded because they bound what these results mean, not as product decisions:
    repository script unmodified. This is a machine condition, not a repository change.
 4. **clang-format available on the 5700X is 23.1.3** (WP3 used 22.1.3). It reports formatting differences in files this
    WP did not touch (`src/tsf/service.hpp`, `src/tsf/diag.cpp`), so the check was scoped to the files this WP changed.
+   (The R34 PR used the VS-bundled 22.1.3, which is clean on its files.)
+5. **Task Scheduler history is disabled on the 5700X** (`Microsoft-Windows-TaskScheduler/Operational`), so no run can
+   show *which* trigger started the task. The walkthrough therefore decides from the System log (User32 1077 for a
+   cancelled logoff, read without elevation), the session's WTS logon time and the Host's own process and save state —
+   never from task history.
 
 ## A1 — windowless by default, console mode kept
 
@@ -95,13 +103,15 @@ after the exit signal is set.
 
 **A cancelled logoff must not stop the Host** (review finding, fixed before the walkthrough). A logoff or shutdown can
 still be cancelled *after* `WM_QUERYENDSESSION` — an application asks to save and the user cancels. Requesting the
-stop from the query would leave the session running with no Host until the next logon (and whether that logon starts
-one is R34). The decision now lives in
+stop from the query would leave the session running with no Host until the next logon. The decision now lives in
 `fusion::ipc::SessionEndHandler` (host_server), separate from the window procedure so it can be driven without a real
 session end: the query only answers TRUE, and only `WM_ENDSESSION(TRUE)` — the session is really ending — requests the
-stop and waits. The walkthrough's step (c2) was meant to check the product behaviour by cancelling a real logoff; the
-run could not hold the sign-out (the harness blocker died with its terminal), so the behaviour is covered only by the
-`stage4a wp4sessionend` unit test.
+stop and waits.
+*Corrected 2026-10-18 by the event-log evidence: this paragraph used to say step (c2) "checks the product behaviour by
+cancelling a real logoff", as if the handler made the Host survive one. It does not. The walkthrough cancelled a real
+logoff (User32 1077, 19:03:20) and the Host had already ended — Windows delivers `WM_ENDSESSION(TRUE)` application by
+application, so an application processed before the blocking one is gone before the Cancel takes effect (R34). The
+decision above is still right; surviving the cancel is the task's 1077 event trigger.*
 
 Fail-closed choices: a Host that cannot create the stop event, or (windowless) cannot create the session-end window,
 refuses to run — otherwise it could be neither stopped orderly nor save on logoff (R26).
@@ -210,8 +220,11 @@ needs a second token, which this scope does not have.
 session end. `WM_QUERYENDSESSION` returns TRUE and requests nothing; `WM_ENDSESSION(FALSE)` (a cancelled logoff)
 requests nothing; `WM_ENDSESSION(TRUE)` requests the stop exactly once and waits for the exit, bounded (measured
 against a 300 ms bound); with the exit already signalled the same call returns immediately. A real session end is
-exercised by the walkthrough's step (c) (sign-out and sign-in, PASS); step (c2) was meant to exercise a **cancelled** one
-but the harness could not hold the sign-out, so that half has no product-path evidence.
+exercised by the walkthrough's step (c) (sign-out and sign-in, PASS) and by step (c2): the logoff there was cancelled
+(User32 1077) and the Host had already ended — the decision under test is right, but it does not make the Host survive a
+cancelled end (R34).
+*Corrected 2026-10-18: this paragraph said (c2) "was meant to exercise a cancelled end but the harness could not hold the
+sign-out". It did hold it; the Host died anyway.*
 
 ## B1 — builds and tests (measured)
 
@@ -282,9 +295,9 @@ and user `PATH`. It records the development registration found before the run an
 |---|---|---|
 | a | allow UAC, close every Notepad (the script waits for that), check the taskbar input indicator (Win+Space only if Fusion is not already selected), type a few letters in the Notepad the script opened, press Enter | install exit code (fatal if non-zero), Host pid/session/user/integrity, HKLM/HKCU registration, "no Notepad window and no process holding a foreign Fusion DLL", which Notepad process was checked and why (window owner vs launcher), its loaded DLL + hash, `你好` yes/no, **"the current input method is Pinyin (not Shuangpin)" yes/no** |
 | b | nothing (the script starts the task again and `FusionHost.exe` directly) | Host count after each attempt, the direct start's exit code and stderr, typing still works |
-| c | type a pinyin string, select a candidate, report the rank change; then sign out | Host running before the learning prompt, the pinyin string, `before→after` ranks, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
+| c | type a pinyin string, select a candidate that is **not** rank 1 before learning, report `N→M` (a single number is rejected); then sign out | Host running before the learning prompt, the pinyin string, the `N→M` pair, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
 | c (resume) | sign in, close every Notepad (the script waits), type the same string in the Notepad the script opened, report the rank | the same assertions as step a, typing works, the current rank, whether the learning survived |
-| c2 | start a logoff and **cancel** it at Windows' "these apps are preventing you from signing out" screen — the blocker is the walkthrough's own window, titled `WP4 test: click Cancel` | the blocker (handle, block reason read back with `ShutdownBlockReasonQuery`, FALSE to a synthetic `WM_QUERYENDSESSION`), Host pid before and after, "still the same Host", "Host still from the wp4.1 `bin` directory", typing still works, blocker closed; if the sign-out was not held, the run resumes and records "blocker ineffective" |
+| c2 | start a logoff and **cancel** it at Windows' "these apps are preventing you from signing out" screen — the blocker is the walkthrough's own window, titled `WP4 test: click Cancel`; the terminal may close even though the cancel worked | the blocker (handle, block reason read back with `ShutdownBlockReasonQuery`, FALSE to a synthetic `WM_QUERYENDSESSION`); **session id, WTS logon time and the newest User32 1077 before and after**; the verdict from that evidence ("cancelled" = same session/logon + a newer 1077, "signed out" = new session/logon); a Host in this session within 60 s, with the old/new pids and the save time |
 | d | keep a Notepad open — **or, if none is open, open one and type a few letters with Fusion first** — allow UAC for the upgrade, type Chinese in that same window, then close every Notepad **including each tab** and type in the fresh one; Notepad A–E there | the pre-upgrade process + its loaded wp4.1 DLL; install exit code and how many files were copied vs skipped as identical; Host + registration for wp4.2 (**no Notepad assertion yet**); the old window's y/n, its DLL (still wp4.1), whether the process is alive, whether the wp4.1 directory exists and **every process holding it** (shell processes are expected); the "close all + poll" result; the fresh process's pid + loaded wp4.2 DLL + hash; A–E; whether the wp4.1 directory is free now (not removed here) |
 | e | allow UAC for the uninstall (the script asks for Notepads to be closed first) | exit code, no TIP/COM/task/Host, install root, **the holders of the wp4.2 directory before and after** (shell processes are expected and are not a failure), **HKCU `CTF\TIP` and the language-list tips before and after**, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
 | f | close every Notepad (the script waits), allow UAC twice | **whether the wp4.2 directory was still held before the reinstall** (identical files are skipped, so the reinstall succeeds over a held directory), reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left, **HKCU `CTF\TIP` and the language-list tips before and after** |
@@ -304,8 +317,8 @@ exercises **version-directory switching, not a binary change** — that is exact
 |---|---|---|
 | a | **PASS** | install exit 0; Host, registration and the Notepad module asserted; Pinyin confirmed |
 | b | **PASS** | a second Host was refused; typing still worked |
-| c | **PASS** | learning survived sign-out/sign-in — see the note below; `user.dict`/`user.history` mtime advanced at sign-out (19:03:13) |
-| c2 | **NOT EXERCISED** (harness) | the blocker ran in a PowerShell process inside Windows Terminal; that process was terminated at sign-out, so Cancel had no effect and the session signed out. Neither a pass nor a product failure |
+| c | **PASS** | learning survived sign-out/sign-in — the owner reports `shi` still rank 1 after re-logon (note below). The mtime that advanced at 19:03:13 belongs to (c2)'s cancelled logoff, not to this sign-out (which happened at 18:58:39) |
+| c2 | **FAIL** (product) | the logoff **was cancelled** — User32 1077 "user 5700X\choicky attempted to log off computer 5700X and failed" at 19:03:20 — and no Host was running afterwards: it had saved at 19:03:13 and ended. R34 |
 | d | **PASS** | upgrade with a Notepad open — details below |
 | e | **PASS** | Host 8124 stopped in order and Fcitx saved on stop (`user.dict` 406 → 768 B, `user.history` 170 → 309 B, mtime 19:16:45); HKLM COM/TIP and the task removed, no Host, `%APPDATA%\Fcitx5` kept, current-user HKCU `CTF\TIP` enable flag 1 → none |
 | f | **PASS** | the reinstall succeeded **while the wp4.2 directory was held by `explorer`** (hash-skip copy), task Running, Host 14940; the uninstall stopped it, `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` were deleted, registration and task removed |
@@ -316,9 +329,13 @@ Provenance of the ranks: the owner reports `shi` was 4th before learning and 1st
 sign-out/sign-in; the script's rank prompt (example `5→1`) recorded only `1` in `verify-wp4.log`, so the `4→1` pair is
 the owner's report, not the log's.
 
-**(c2) what is and is not covered.** The product behaviour under test — a cancelled logoff must leave the same Host
-running — is covered **only by the `stage4a wp4sessionend` unit test**. The walkthrough has no product-path evidence for
-it; the blocker was hosted in a terminal-owned process, which the sign-out killed.
+**(c2) what happened.** The logoff was cancelled — the terminal closing does **not** mean the session ended — and the
+Host did not survive it: Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another during a logoff, so an
+application processed before the blocking one has already ended when the Cancel takes effect. That is **R34**, fixed by
+an event trigger on User32 1077 that starts the Host again (separate PR).
+*Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this section recorded (c2) as "not exercised —
+the blocker died with its terminal". The blocker did hold the logoff (1077 at 19:03:20) and the session never ended
+(`query user`: session 2, logon time 18:58, still active at 20:06).*
 
 **(d) upgrade with a Notepad open.**
 
@@ -340,23 +357,55 @@ browser processes still hold the DLLs; it is to be removed after a restart (manu
 the task and the registration). That is the documented behaviour of R28 — report the holders, remove after sign-out —
 not a defect.
 
+### R34 — a cancelled logoff ends the Host (fixed in fusion-windows PR #18)
+
+The run's (c2) is a product failure, and the event log says why. `r34-evidence.txt` (owner's read-only collection,
+2026-10-18 20:06, elevated):
+
+| time | event |
+|---|---|
+| 18:58:39 → 18:58:43 | the run's **only** sign-out/sign-in (LocalSessionManager 23/21, Winlogon 7002/7001, Security 4647 then 4624 type 2); the task started the Host at 18:58:43 |
+| 19:03:13 | the Host saved (`user.dict`/`user.history`/`profile`/`pinyin.conf` mtimes) and ended |
+| 19:03:20 | System, User32 **1077**: "user 5700X\choicky attempted to log off computer 5700X and failed" — the Cancel worked |
+| 20:06 | `query user`: session 2, console, logon time 18:58, still active — the session never ended |
+
+**Mechanism (inference, not a proven cause):** Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another
+during a logoff, so an application processed before the blocking one has already ended when the Cancel takes effect. The
+Host's only save trigger without a stop-event signal is `WM_ENDSESSION(TRUE)`, which it received; `LastTaskResult`
+`0x40010004` is consistent with the process then being terminated. The handler's decision stays correct — the wrong
+assumption was that a cancelled end only ever delivers `ENDSESSION(FALSE)`.
+
+**Fix (direction A, owner-accepted 2026-10-18 as an implementation detail of U2 (b)):** the task gains a System-log
+`User32` 1077 event trigger scoped to the installing user's SID (the SID is in `System/Security/@UserID`), delayed
+`PT10S` so the old Host has released `HostClaim`; the logon trigger and every other setting stay. A latent defect found
+in the same review is fixed too: an external `WM_CLOSE` (`taskkill` without `/f`) used to destroy the hidden session-end
+window and leave the Host running with no logoff path; it now requests the orderly stop and keeps the window.
+
+**Verification without UAC:** Mock 71/71, Debug 79/79, Release 79/79; `wp4sessionend` covers the close decision; a real
+staged Release Host exits 0 in 0.3 s on `taskkill /pid` (no `/f`) with "Save before exiting" and "shutting down"; the
+pre-fix package leaves the Host running under the same test. The packages are
+`fusion-0.0.0-wp4.1+ab3530e.zip` (`83C1A1F2…467C`) and `fusion-0.0.0-wp4.2+ab3530e.zip` (`D62A4E6A…DCAD`), 101 files
+each, all twelve packaged-script hashes `MATCH`.
+
 ### Harness follow-ups (known, not fixed)
 
 1. **(c)** the prompted word may already be rank 1 — it was here (`shuangpin`), and the owner had to substitute `shi`.
    The rank prompt also accepts a single number, so a before→after pair is not enforced.
-2. **(c2)** a blocker hosted in a terminal-owned PowerShell process is killed at sign-out, so Cancel has no effect.
+2. **(c2)** the verdict was taken from the tester's impression ("the terminal closed, so the session ended"). It must be
+   taken from evidence — session id, logon time and the User32 1077 record — and a cancelled logoff ends the Host, so a
+   PASS needs a Host running afterwards, not the same pid.
 3. **(d)** question C's wording is wrong: `;` is the QuickPhrase trigger, not punctuation.
 4. **(d)** R18 makes "new Notepad" questions fail unless the IME is opened with Ctrl+Space, and the harness does not tell
    the tester — it recorded two false "n" answers because of that.
 
-These are picked up when `verify-wp4.ps1` is next touched (for example in the R34 fix PR).
+All four are fixed in the R34 PR (the (c2) verdict is now evidence-based, `Ask-RankChange` enforces `N→M`, C is reworded,
+and the tester is told about Ctrl+Space).
 
 ### What the run did not exercise
 
-The upgrade path "stop the **running** old Host before switching versions" was not exercised, because no Host was
-running before step (d) — a consequence of R34 (the task did not start one at the second sign-in). The same ordered-stop
-mechanism was exercised in (e) and (f). Re-verification belongs to the R34 fix PR's walkthrough and is recorded as
-R34's verification item, not as a separate register entry.
+The upgrade path "stop the **running** old Host before switching versions" was not exercised, because the cancelled
+logoff of (c2) had already ended the Host and nothing restarted it (R34). The same ordered-stop mechanism was exercised
+in (e) and (f). The R34 PR adds the assertion to (d) and re-verifies it in its own walkthrough.
 
 ### The 11:55 run — aborted, invalid (harness defect, not a result)
 
@@ -686,11 +735,11 @@ The blocker is now a harness object: a visible top-level window on its own threa
 back as `WP4 test: click Cancel`, `WM_QUERYENDSESSION` returns FALSE (the window procedure saw the query), and `Stop`
 closes it. No sign-out was performed.
 
-**What happened in the run.** The blocker verified and Windows did show the blocking screen, but the walkthrough was
-running inside Windows Terminal, so the blocker lived in a PowerShell process that the sign-out terminated: Cancel then
-had nothing left to cancel and the session ended. Step (c2) is therefore recorded as **not exercised** (see the results
-above), and the blocker has to be hosted outside the terminal-owned process tree before (c2) can produce evidence — a
-harness follow-up, not a product finding.
+**What happened in the run.** The blocker verified and Windows did show the blocking screen; the owner clicked Cancel
+and Windows recorded it (User32 1077 at 19:03:20), so the logoff **was** cancelled. The walkthrough's terminal still
+closed with the logoff attempt, and the Host had already saved and ended — which is R34, not a harness failure.
+*Corrected 2026-10-18 by the event-log evidence: this section used to say the blocker died with its terminal so "Cancel
+had nothing left to cancel". The cancel worked; the Host did not survive it.*
 
 ### Uninstall and the per-user input state (A2)
 
@@ -737,12 +786,12 @@ WP8), and §8.1 of the plan points here.
 
 ## Known limits at this scope
 
-- **The logon task did not start the Host at the second sign-in of the walkthrough run (R34, OPEN).** `Get-ScheduledTaskInfo`
-  showed `LastRunTime` 2026-10-18 18:58:43 (the first re-logon, where it did start), `LastTaskResult` `0x40010004`
-  (1073807364 — previous instance terminated at logoff), `NumberOfMissedRuns` 0, `State Ready`, and no `FusionHost`
-  process after the second sign-in (~19:04). The logoff save itself worked (user data saved 19:03:13). Autostart is
-  therefore **not verified**: U2's verification is incomplete pending R34, and WP4's exit gate is met except this.
-  Diagnosis and fix belong to a separate fusion-windows PR, not to #17; the root cause is unknown.
+- **A cancelled logoff ends the Host and nothing restarts it (R34, OPEN; fixed in the R34 PR, verification pending).**
+  At 19:03:20 Windows logged User32 1077 "user 5700X\choicky attempted to log off computer 5700X and failed" — the Cancel
+  worked — and the Host had already saved (19:03:13) and ended; no Host ran afterwards. Windows delivers
+  `WM_ENDSESSION(TRUE)` to applications one after another, so an application processed before the blocking one ends
+  before the Cancel takes effect (inference, consistent with all evidence; not a proven cause). The fix is an event
+  trigger on 1077 that starts the Host again — the handler itself is right, the survival assumption was wrong.
 - **During an upgrade there is a gap** between the old Host's orderly stop and the new Host's start: the TIP is still
   registered and keys pass to the application unmediated (no candidate, no composition). It is bounded by the install
   (seconds) and it is the same "Host absent" state WP5 §8.2 exercises deliberately; the walkthrough records it only
@@ -804,6 +853,8 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A1/A2 proof (blocker, per-user input state) | `proof-a1-a2.txt`, `proof-a1-a2.ps1` |
 | A2 investigation (HKCU CTF\TIP, language list) | `a2-hkcu-tip.txt`, `probe-a2.ps1` |
 | hash-skip copy proof | `proof-copy.txt`, `proof-copy.ps1` |
+| R34 event-log evidence (owner-collected, elevated) | `r34-evidence.txt` — kept locally by the owner; the times quoted above come from it |
+| R34 WM_CLOSE proof and negative control | `proof-wmclose.txt` / `proof-wmclose.ps1`, `proof-wmclose-old.txt` / `proof-wmclose-old.ps1` (under `worktmp\fusion-windows\stage6-r34\`) |
 | harness proof without UAC (round 2) | `harness-proof.txt` |
 | script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
 | script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |
