@@ -17,7 +17,7 @@ packaged process — also made step (d) unsatisfiable, so its order was correcte
 | item | value |
 |---|---|
 | fusion-windows base | `572fdb9` (PR #16 merge, `main`) |
-| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace), `53597d7` (harness fix after the 11:55 abort), `f63aa4f` (skip the Notepad check when an earlier assertion failed), `ae54e70` (elevated-path fix + full script audit), `2a8b0bb` (forward `-TranscriptPath` to the launched script), `97f90f7` (check the Notepad window's process, not the launcher's PID), `7fd83bf` (step (d) order for the single-process Notepad) |
+| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace), `53597d7` (harness fix after the 11:55 abort), `f63aa4f` (skip the Notepad check when an earlier assertion failed), `ae54e70` (elevated-path fix + full script audit), `2a8b0bb` (forward `-TranscriptPath` to the launched script), `97f90f7` (check the Notepad window's process, not the launcher's PID), `7fd83bf` (step (d) order for the single-process Notepad), `9c7ceec` (harness-owned sign-out blocker; per-user input state removed by uninstall) |
 | machine | **5700X** (this WP4 work, its packages and the walkthrough). WP1–WP3 work and evidence, including the WP3 walkthrough and the original `runtime-wp3-20261018` binaries, were produced on the owner's **7700** |
 | Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2`, `FusionTsf.dll` `FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9`, `FusionFcitxHost.dll` `B1F3A8A34664F988CD2CE35D39CE9648BE07A7D31B38B579F0DC38BDF63F085F` |
 | runtime | `runtime-wp3-20261018`, **5700X rebuild** (Debug + Release) — same pins as the 7700 build: fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB`. **Not byte-identical to the 7700 build** (see the machine section below) |
@@ -161,9 +161,11 @@ place and reported, never force-deleted and never partially deleted. A reinstall
 merges the package contents into it instead of nesting them (`bin\bin`).
 
 **Uninstall.** Elevated. Order: ask the Host for an orderly stop (abort if it does not exit within the bound) →
-unregister and remove the `CTF\TIP` / COM keys that the COM unregister leaves → delete the task → remove version
-directories no process holds → remove the install root if empty. `%APPDATA%\Fcitx5` is kept unless `-RemoveUserData` is
-given, which removes only the current user's `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5`.
+unregister and remove the `CTF\TIP` / COM keys that the COM unregister leaves → **remove this user's per-user input
+state** (`HKCU\SOFTWARE\Microsoft\CTF\TIP\{CLSID}`, i.e. the `EnableLanguageProfile` flag, and the language-list tip if
+this user has one) → delete the task → remove version directories no process holds → remove the install root if empty.
+`%APPDATA%\Fcitx5` is kept unless `-RemoveUserData` is given, which removes only the current user's `%APPDATA%\Fcitx5`
+and `%LOCALAPPDATA%\Fcitx5`.
 
 **Not implemented, as decided.** The logon **Run** entry (U2 (a)) is not implemented. Its recorded gaps: an elevated
 installer cannot start a Run entry non-elevated for the current user without a sign-out, and nothing restarts a Run
@@ -218,18 +220,18 @@ clean. (See environment fact 4 for why the formatter check is scoped to the chan
 
 ## B2 — packages (measured)
 
-Both packages were rebuilt from the branch head `2a8b0bb` with `tools/package/build-package.ps1`; every hash below is
+Both packages were rebuilt from the branch head `9c7ceec` with `tools/package/build-package.ps1`; every hash below is
 taken from `b2-manifests.txt` (written from the zips' own `package.json`), never transcribed from a console. The
 manifest records `builtOn: 5700X`, `runtime.machine: 5700X` and the note that the runtime is a rebuild from the WP3
 pins.
 
 | item | wp4.1 | wp4.2 |
 |---|---|---|
-| file | `fusion-0.0.0-wp4.1+2a8b0bb.zip` | `fusion-0.0.0-wp4.2+2a8b0bb.zip` |
-| zip SHA-256 | `0CBF47ADD4D7EC722F94E2A4C3A0429A243F5DCDDD5F5846FC6502E5A9004624` | `01EECAF1BDD9323F903F8EC39148AD2EE8EB976D91F8529D823B8E994D32B0D8` |
-| size | 39 461 225 B | 39 461 225 B |
-| files / uncompressed | 101 / 53 119 874 B | 101 / 53 119 874 B |
-| source commit | `2a8b0bbbc3f1e7e733e9440408a79c3ea735f8a7` (clean) | same |
+| file | `fusion-0.0.0-wp4.1+9c7ceec.zip` | `fusion-0.0.0-wp4.2+9c7ceec.zip` |
+| zip SHA-256 | `1BE9E74088E898558852472C35B4EFCC6B131DA6B1E7B54DD50D201D5802568C` | `887608ED3F343964A573883B15C5B95FA81C304A1A939C23DEF68810E1BC9422` |
+| size | 39 462 599 B | 39 462 599 B |
+| files / uncompressed | 101 / 53 124 622 B | 101 / 53 124 622 B |
+| source commit | `9c7ceec63bad18f19fbc65ee2a0d8f9dd8f097bd` (clean) | same |
 | runtime | `runtime-wp3-20261018` (5700X rebuild) | same |
 
 The only difference between the two packages is the version string, so the two zips differ in hash and bytes while
@@ -248,11 +250,14 @@ repository files at the same head; all twelve comparisons are `MATCH`:
 | file in the package | SHA-256 (both packages) |
 |---|---|
 | `install.ps1` | `D9146ED22914A721C518FCC692D18894595A989F4763DEB5A115F6F8888B9033` |
-| `uninstall.ps1` | `AAE7749439F3DAE00F93006CA97FD89F4AD903406C2BB2E14F612E76D023A14F` |
-| `host-state.ps1` | `93DB1C3D9CBBA98688C5ED218252F82C40668311C35091EFD59DF50680728362` |
+| `uninstall.ps1` | `C24FF5B26CB93D083E13DC4C61AAB1AD682627E739D2A4C8577F55C6D6A61AFC` |
+| `host-state.ps1` | `4E82DE49A1F83110C8AA49011100160582C7F011FDB6A1BCFC24B30BA11D6CE6` |
 | `tools/register.ps1` | `7534A2CC10F4DA0818D5F030D2E91D001BA6E6B345EFB11D4EEB8547978891C5` |
 | `tools/unregister.ps1` | `6F4FB97581E0C2E3D30F3E0A92953F568C98FCDB146087D0119F6F1A8DF47922` |
 | `tools/check-state.ps1` | `F019F0AA447FA2E080C77F529663FC666A00030341279E7712F58E3FC4CF728B` |
+
+`uninstall.ps1` and `host-state.ps1` changed in this round (the per-user input-state removal), which is why the packages
+were rebuilt; the other four are unchanged.
 
 ## B3/B4 — owner walkthrough (NOT RUN)
 
@@ -269,10 +274,10 @@ and user `PATH`. It records the development registration found before the run an
 | b | nothing (the script starts the task again and `FusionHost.exe` directly) | Host count after each attempt, the direct start's exit code and stderr, typing still works |
 | c | type a pinyin string, select a candidate, report the rank change; then sign out | Host running before the learning prompt, the pinyin string, `before→after` ranks, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
 | c (resume) | sign in, close every Notepad (the script waits), type the same string in the Notepad the script opened, report the rank | the same assertions as step a, typing works, the current rank, whether the learning survived |
-| c2 | leave an unsaved Notepad, start a logoff, **cancel** it | the window-owning Notepad process (pid + title), Host pid before and after, "still the same Host", typing still works |
+| c2 | start a logoff and **cancel** it at Windows' "these apps are preventing you from signing out" screen — the blocker is the walkthrough's own window, titled `WP4 test: click Cancel` | the blocker (handle, block reason read back with `ShutdownBlockReasonQuery`, FALSE to a synthetic `WM_QUERYENDSESSION`), Host pid before and after, "still the same Host", "Host still from the wp4.1 `bin` directory", typing still works, blocker closed; if the sign-out was not held, the run resumes and records "blocker ineffective" |
 | d | keep a Notepad open, allow UAC for the upgrade, type Chinese in that same window, then close every Notepad **including each tab** and type in the fresh one; Notepad A–E there | the pre-upgrade process + its loaded wp4.1 DLL; install exit code; Host + registration for wp4.2 (**no Notepad assertion yet**); the old window's y/n, its DLL (still wp4.1), whether the process is alive, whether the wp4.1 directory exists and is held; the "close all + poll" result; the fresh process's pid + loaded wp4.2 DLL + hash; A–E; whether the wp4.1 directory is free now (not removed here) |
-| e | allow UAC for the uninstall (the script asks for Notepads to be closed first) | exit code, no TIP/COM/task/Host, install root, whether the wp4.2 directory was still held before uninstalling, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
-| f | close every Notepad (the script waits), allow UAC twice | reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left |
+| e | allow UAC for the uninstall (the script asks for Notepads to be closed first) | exit code, no TIP/COM/task/Host, install root, whether the wp4.2 directory was still held, **HKCU `CTF\TIP` and the language-list tips before and after**, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
+| f | close every Notepad (the script waits), allow UAC twice | reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left, **HKCU `CTF\TIP` and the language-list tips before and after** |
 | end | — | the development registration restored and re-snapshotted |
 
 The learning used by steps (c)/(d) is produced inside the walkthrough with the Host already running (step (c) refuses
@@ -587,8 +592,85 @@ since `2a8b0bb`), so the packages were not rebuilt and their script hashes still
 **Pending.** B3a–B3f, B4 (Notepad A–E on the installed wp4.2) and the per-step results are not recorded here. Until the
 owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 
+### Step (c2): a sign-out blocker the harness owns
+
+Step (c2) needs a sign-out that can be cancelled. The first version relied on Notepad asking to save an unsaved
+document — but the packaged Windows 11 Notepad **restores unsaved content and does not prompt on sign-out**, so nothing
+would have held the session and the owner would have been signed out for real, after (a)–(c) and before (d).
+
+The blocker is now a harness object: a visible top-level window on its own thread (`FusionShutdownBlocker`) that calls
+`ShutdownBlockReasonCreate("WP4 test: click Cancel")` and answers **FALSE** to `WM_QUERYENDSESSION`, so Windows shows its
+"these apps are preventing you from signing out" screen. The step:
+
+1. starts the blocker and requires `alive`, a non-empty block reason read back with `ShutdownBlockReasonQuery`, and
+   FALSE from a synthetic `WM_QUERYENDSESSION` — otherwise it stops before asking the owner to do anything;
+2. saves the state as `c2-signout` **before** the request, so a sign-out that is not held leaves a resumable run;
+3. tells the owner exactly what to expect and to click **Cancel** (not "sign out anyway");
+4. after the cancel: same Host PID, still from the wp4.1 `bin` directory, typing works (y/n), blocker closed;
+5. if the owner *was* signed out, `-Resume` records `sign-out was not blocked (blocker ineffective)` — neither a pass
+   nor a product failure — and continues to (d).
+
+**Proof without UAC** (`proof-a1-a2.txt`): the window is visible with the expected title and class, the reason reads
+back as `WP4 test: click Cancel`, `WM_QUERYENDSESSION` returns FALSE (the window procedure saw the query), and `Stop`
+closes it. No sign-out was performed.
+
+### Uninstall and the per-user input state (A2)
+
+Snapshots showed `HKCU\Software\Microsoft\CTF\TIP\{CLSID}` present after installs while `uninstall.ps1` removed only
+the HKLM keys. Established read-only first (`a2-hkcu-tip.txt`):
+
+| question | answer |
+|---|---|
+| what does the HKCU key hold? | only `LanguageProfile\0x00000804\{profile}` with `Enable = 1`; no values on the parent keys, no `Description`, **no COM `InprocServer32`** (so it is not an override) |
+| who writes it? | `EnableLanguageProfile` (called by `src/tsf/register.cpp`), i.e. per-user profile enablement — not registration and not the language list |
+| is the TIP in the user's language list? | **no**: `Get-WinUserLanguageList` → zh-Hans-CN lists `{86598FB9…}{607FDF85…}` and `{81D4E9C9…}{FA550B04…}` only |
+
+So an uninstall that removed only HKLM would leave an **enable flag for a profile whose DLL no longer exists** — an entry
+the user can still see and select in the input indicator. The uninstaller therefore now removes, for the current user
+only:
+
+- `HKCU\SOFTWARE\Microsoft\CTF\TIP\{CLSID}` (recorded with the `Enable` value it held), and
+- the language-list tip `0804:{CLSID}{profile}`, **only if this user actually has it** — `InputMethodTips` is a get-only
+  `StringCollection`, so it is edited rather than assigned, and a failure there warns instead of failing the uninstall.
+
+`Get-FusionUserInputState` records the state and `Remove-FusionUserInputState` performs the removal (both in
+`host-state.ps1`, so the packaged uninstaller and the proof exercise the same code). Steps (e) and (f) record HKCU
+`CTF\TIP` and the language-list tips before and after, and the end-of-run restore records them again.
+
+**Proof without UAC** (`proof-a1-a2.txt`): against a synthetic `HKCU\…\CTF\TIP\{FFFFFFFF-…}` key of the same shape,
+the helper reports `EnableWas=1`, removes the key, leaves the real key and the language list untouched, and emits no
+warning; the language-list filter is exercised on a `StringCollection` of the same type (one matching entry removed, the
+unrelated one kept). Machine state before and after is identical.
+
+## Walkthrough harness rules (carry forward)
+
+Seven rules, each paid for by a failed attempt on 2026-10-18. They apply to every later owner walkthrough (WP5, WP6,
+WP8), and §8.1 of the plan points here.
+
+| rule | why it exists (what failed without it) | where it lives |
+|---|---|---|
+| **Prove the elevated span, or make every failure name its step and line.** The walkthrough cannot test an elevated script's internals; the script must therefore write its own transcript, set `$currentStep` before each phase and print `INSTALL FAILED at step '<x>': <message>` with its position | the 12:44 run aborted on a strict-mode read inside the elevated span and reported only an exit code | `install.ps1` / `uninstall.ps1` `-TranscriptPath` + `$currentStep`; the wrapper never starts a second transcript |
+| **Assert Host, registration and the loaded module before any typing question** — the module by path **and** hash, in the process that owns the target's window | the 11:55 run asked typing questions while the *development* DLL was registered; a profile name identified nothing | `Assert-InstalledTipInUse` / `Assert-HostAndRegistration` |
+| **Fail fast**: any non-zero step stops the run, records the step/command/exit code, runs the safe cleanup and asks nothing further | the 11:55 run continued to typing questions after `install.ps1` exited 1 | `Assert-StepExit` / `Stop-Walkthrough` / `Invoke-SafeRestore` |
+| **The owner never types commands or edits files**; prompts accept Enter / y / n or the one short answer they ask for, and every reported observation is captured | earlier harnesses relied on the owner transcribing results, and one "y" was recorded for a step that never ran | `Ask-Enter` / `Ask-YesNo` / `Ask-Text`, `Add-Result` |
+| **Account for packaged-application process topology**: a launched executable may be a launcher, several windows may share one process, and an open window keeps its DLL — resolve the window owner, and close every window of the app before asserting a fresh load | the 17:07 run checked the launcher PID; step (d) would have asserted the new DLL inside the process still holding the old one | `Get-NotepadWindows` / `Resolve-NotepadWindow` / `Wait-NotepadStateClear` / `Confirm-NoNotepad` (R31) |
+| **Save state before any sign-out request**, with a resume stage that can record "the session ended anyway" as neither pass nor failure | (c2) asks for a real sign-out; if it is not held, the run must survive it | `$state.stage = 'c2-signout'` before the prompt; the `c2-signout` branch records "blocker ineffective" |
+| **Prefer a blocker the harness owns over application behaviour**: a visible top-level window with a registered shutdown block reason that answers FALSE to `WM_QUERYENDSESSION` | the packaged Notepad restores unsaved text and never prompts, so it could not hold the sign-out — the owner would have been signed out for real | `FusionShutdownBlocker` / `Start-ShutdownBlocker` / `Test-ShutdownBlockerBlocksSessionEnd` |
+
 ## Known limits at this scope
 
+- **During an upgrade there is a gap** between the old Host's orderly stop and the new Host's start: the TIP is still
+  registered and keys pass to the application unmediated (no candidate, no composition). It is bounded by the install
+  (seconds) and it is the same "Host absent" state WP5 §8.2 exercises deliberately; the walkthrough records it only
+  implicitly (step (d) types in the old window *after* the upgrade, not during the gap).
+- **Multiple accounts on one machine**: the TIP is machine-wide but the task name `FusionHost` is global, so a second
+  account's install overwrites the first account's task, and an account without its own task types with no Host (fail
+  open). Hypothesis from source, not exercised (one interactive account here); CONDITIONAL, candidate fix is a per-user
+  task name (R32).
+- **The package is visibly a development build**: the TIP description is "Fusion Stage 3B (Real Fcitx5 Backend PoC)"
+  and the CLSID/profile are the development GUIDs, so they appear in the input indicator and the language settings.
+  Correct for an owner-only test package; the product name and permanent identifiers are decided before any package
+  leaves the owner (R29, WP8/U4), and changing them later needs the development registration removed first.
 - An old version directory stays locked until every application that loaded its DLL exits; a later install or uninstall
   removes it. It is reported, never force-deleted.
 - An install that fails after the copy leaves its version directory behind (the 12:44 run did). It is harmless — a later
@@ -601,7 +683,9 @@ owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 - The task, pipe, claim and stop event are single user × session; a machine with several interactive users needs the
   install per user, and an installer elevated as a *different* administrator cannot open the owner's stop event (it
   reports that instead of killing the Host).
-- The windowless Host writes no log file, so its stderr evidence only exists when a caller redirects it.
+- The windowless Host writes no log file, so its stderr evidence only exists when a caller redirects it. Recorded as
+  **R30**, required before WP5: §8.2 needs the Host log in every failure scenario, and its absence is what made the
+  2026-10-18 diagnosis depend on the walkthrough's own transcript.
 - `--console` is required by anything that still expects the console subsystem (the WP3 harness pattern); a caller that
   passes no switch gets the windowless Host.
 - No MSI, no signing, no distribution channel (U4, WP8); versions are provisional test identifiers.
@@ -617,13 +701,15 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
 | B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+2a8b0bb.zip`, `b2-manifests.txt` (UTF-8 copy `b2-manifests-utf8.txt`), `package-wp4.{1,2}.log` |
-| B3 dry run (post-fix) | `wp4-run-20261018-175316\verify-wp4.log`, `wp4-run-20261018-175316\snapshots\01-before.txt` |
+| B3 dry run (post-fix) | `wp4-run-20261018-180844\verify-wp4.log`, `wp4-run-20261018-180844\snapshots\01-before.txt` |
 | B3 aborted run 11:55 (invalid) | `wp4-run-20261018-115501\verify-wp4.log`, `install-wp4.1.log`, `elevated-install-wp4.1.ps1`, `snapshots\02-after-install-wp4.1.txt` |
 | B3 aborted run 12:44 (invalid) | `wp4-run-20261018-124402\verify-wp4.log`, `install-wp4.1.log` (the `$LASTEXITCODE` failure), `snapshots\*` |
 | B3 aborted run 17:07 (install OK, Notepad check invalid) | `wp4-run-20261018-170730\verify-wp4.log`, `install-0.0.0-wp4.1+2a8b0bb.log`, `snapshots\*` |
 | Notepad topology probe | `notepad-topology.txt`, `probe-notepad-topology.ps1` |
 | Notepad resolution proof (pass/fail, on the owner's window) | `proof-notepad-owner.txt`, `check-owner-notepad.ps1` |
 | single-process / close-and-relaunch proof | `proof-step-d.txt`, `proof-step-d.ps1` |
+| A1/A2 proof (blocker, per-user input state) | `proof-a1-a2.txt`, `proof-a1-a2.ps1` |
+| A2 investigation (HKCU CTF\TIP, language list) | `a2-hkcu-tip.txt`, `probe-a2.ps1` |
 | harness proof without UAC (round 2) | `harness-proof.txt` |
 | script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
 | script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |
