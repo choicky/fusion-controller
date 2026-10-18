@@ -4,20 +4,22 @@ Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7
 
 **Result: WP4 is implemented and locally verified; the owner walkthrough (B3/B4) is pending.** B1, B2 and the
 walkthrough dry run are complete on the branch head below. The lifecycle evidence that requires an interactive owner
-(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. A first attempt
-(`wp4-run-20261018-115501`) aborted in step (a) on a harness defect — it is recorded below as **invalid, not a
-result** — and the harness is now fixed and proven without UAC; the rerun is pending.
+(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. Two owner attempts
+aborted in step (a) and are recorded below as **invalid, not results**: `wp4-run-20261018-115501` (the walkthrough
+quoted a parameter *name*) and `wp4-run-20261018-124402` (install.ps1 read `$LASTEXITCODE` after a `.ps1` call and
+aborted a *successful* registration). Both defects are fixed, the package scripts were audited line by line, and the
+whole non-elevated span is proven; the rerun is pending.
 
 ## Candidate, runtime and tooling identities
 
 | item | value |
 |---|---|
 | fusion-windows base | `572fdb9` (PR #16 merge, `main`) |
-| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace) |
+| branch / head | `feature/stage6-wp4-packaging` — `7cba293` (implementation), `faeb266` (package file selection), `b050292` (walkthrough launcher), `8b0d9ec` (installer verification mode), `e6f131e` (cancelled-logoff fix, session-end test, machine identity in the manifest, walkthrough steps c/c2), `0d1a1c4` (ignore the local agent workspace), `53597d7` (harness fix after the 11:55 abort), `f63aa4f` (skip the Notepad check when an earlier assertion failed), `ae54e70` (elevated-path fix + full script audit), `2a8b0bb` (forward `-TranscriptPath` to the launched script) |
 | machine | **5700X** (this WP4 work, its packages and the walkthrough). WP1–WP3 work and evidence, including the WP3 walkthrough and the original `runtime-wp3-20261018` binaries, were produced on the owner's **7700** |
 | Release candidate | `stage6-wp4\build-release\bin` — `FusionHost.exe` `BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2`, `FusionTsf.dll` `FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9`, `FusionFcitxHost.dll` `B1F3A8A34664F988CD2CE35D39CE9648BE07A7D31B38B579F0DC38BDF63F085F` |
 | runtime | `runtime-wp3-20261018`, **5700X rebuild** (Debug + Release) — same pins as the 7700 build: fcitx5 `a7f2528` + `fcitx5-msvc.patch`, chinese-addons `61474bd` + `chinese-addons-msvc.patch`, libime `171edcf` unmodified, vcpkg `20ceb8ad`; Release `Fcitx5Core.dll` `98675392F46067DB13E442A5ED26EF64C719692069B1174BBE8478E2B4C662AB`. **Not byte-identical to the 7700 build** (see the machine section below) |
-| changed files | 13 (`CMakeLists.txt`, `README.md`, `src/host/main.cpp`, `src/host/host_server.{hpp,cpp}`, `tests/stage4a_ipc.cpp`, `tools/fcitx/build-native.ps1`, `tools/package/{build-package,install,uninstall,host-state,verify-wp4}.ps1`) |
+| changed files | 16 (`.gitignore`, `CMakeLists.txt`, `README.md`, `src/host/main.cpp`, `src/host/host_server.{hpp,cpp}`, `tests/stage4a_ipc.cpp`, `tools/fcitx/build-native.ps1`, `tools/package/{build-package,install,uninstall,host-state,walkthrough-assertions,verify-wp4}.ps1`, `tools/tsf/{register,unregister}.ps1`) — **no C++/CMake change after `0d1a1c4`**, the commit whose binaries are in both packages |
 
 ### Machines and the two `runtime-wp3-20261018` builds
 
@@ -143,16 +145,23 @@ registered one.
 **"Start now" from the elevated installer** uses `Start-ScheduledTask`; an interactive-token, limited-run-level task
 starts in the user's own session with the user's limited token. `install.ps1` then waits (bounded) for a `FusionHost`
 process whose path is under the version directory and reports its pid, session, user and integrity level; a Host that
-does not appear is reported as an installation that is complete but not running (exit 3), not as success.
+does not appear fails the step and names it, rather than reporting success.
+
+**Failure reporting.** Both scripts take `-TranscriptPath` and write their own transcript (a runas launch cannot redirect
+output), set `$currentStep` before every phase, and print `INSTALL FAILED at step '<x>': <message>` (or `UNINSTALL
+FAILED …`) with the script position before exiting 1. Every failure — including the integrity check, a Host that will not
+stop, and a Host that does not start — leaves through that one path, so a failed step always names itself.
 
 **Upgrade.** A new version directory; the previous Host is stopped through the stop event before any file is copied;
-registration and the task are re-pointed at the new directory; the previous directory is removed only if no running
-application still holds its DLL. A locked directory is left in place and reported, never force-deleted.
+registration and the task are re-pointed at the new directory; the previous directory is removed only if no process has
+a module loaded from it (`Test-DirectoryInUse`) and it is not the registered one. A directory a process holds is left in
+place and reported, never force-deleted and never partially deleted. A reinstall over an existing version directory
+merges the package contents into it instead of nesting them (`bin\bin`).
 
 **Uninstall.** Elevated. Order: ask the Host for an orderly stop (abort if it does not exit within the bound) →
 unregister and remove the `CTF\TIP` / COM keys that the COM unregister leaves → delete the task → remove version
-directories that are not locked → remove the install root if empty. `%APPDATA%\Fcitx5` is kept unless
-`-RemoveUserData` is given, which removes only the current user's `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5`.
+directories no process holds → remove the install root if empty. `%APPDATA%\Fcitx5` is kept unless `-RemoveUserData` is
+given, which removes only the current user's `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5`.
 
 **Not implemented, as decided.** The logon **Run** entry (U2 (a)) is not implemented. Its recorded gaps: an elevated
 installer cannot start a Run entry non-elevated for the current user without a sign-out, and nothing restarts a Run
@@ -207,21 +216,41 @@ clean. (See environment fact 4 for why the formatter check is scoped to the chan
 
 ## B2 — packages (measured)
 
-Both packages were built from the same commit `0d1a1c4` (the branch head) with `tools/package/build-package.ps1`; full
-manifests are in `b2-manifests.txt`. The manifest records `builtOn: 5700X`, `runtime.machine: 5700X` and the note that
-the runtime is a rebuild from the WP3 pins.
+Both packages were rebuilt from the branch head `2a8b0bb` with `tools/package/build-package.ps1`; every hash below is
+taken from `b2-manifests.txt` (written from the zips' own `package.json`), never transcribed from a console. The
+manifest records `builtOn: 5700X`, `runtime.machine: 5700X` and the note that the runtime is a rebuild from the WP3
+pins.
 
 | item | wp4.1 | wp4.2 |
 |---|---|---|
-| file | `fusion-0.0.0-wp4.1+0d1a1c4.zip` | `fusion-0.0.0-wp4.2+0d1a1c4.zip` |
-| zip SHA-256 | `5C377C565833ECC70C12EDC73D0430339E4B9D3E154DF71F389B00BCB23F3FB6` | `98442DEB25A3B8D27E70F34787FC86DDA4B86DFB9481DAC9E59925910DC1AE85` |
-| size | 39 458 262 B | 39 458 261 B |
-| files / uncompressed | 101 / 53 111 474 B | 101 / 53 111 474 B |
-| source commit | `0d1a1c484da5ca3ecd7b675bc28c7d912027e7b7` (clean) | same |
+| file | `fusion-0.0.0-wp4.1+2a8b0bb.zip` | `fusion-0.0.0-wp4.2+2a8b0bb.zip` |
+| zip SHA-256 | `0CBF47ADD4D7EC722F94E2A4C3A0429A243F5DCDDD5F5846FC6502E5A9004624` | `01EECAF1BDD9323F903F8EC39148AD2EE8EB976D91F8529D823B8E994D32B0D8` |
+| size | 39 461 225 B | 39 461 225 B |
+| files / uncompressed | 101 / 53 119 874 B | 101 / 53 119 874 B |
+| source commit | `2a8b0bbbc3f1e7e733e9440408a79c3ea735f8a7` (clean) | same |
 | runtime | `runtime-wp3-20261018` (5700X rebuild) | same |
 
 The only difference between the two packages is the version string, so the two zips differ in hash and bytes while
 their binaries are identical — which is what an upgrade of the same commit is supposed to exercise.
+
+**Product binaries are unchanged by the rebuild.** `bin\FusionHost.exe`
+`BE7FBC4E95706DB4F447A90E27EB56FC8C4B6378680B6E13C2F6DA81A3218CF2`, `bin\FusionTsf.dll`
+`FEACFCEDBE083976DB9A7DEF72C80337FFB64669BD09FFBAF763CA6C990052E9` and `bin\FusionFcitxHost.dll`
+`B1F3A8A34664F988CD2CE35D39CE9648BE07A7D31B38B579F0DC38BDF63F085F` are byte-identical to the `0d1a1c4` packages,
+because nothing after that commit touched C++ or CMake. Only the scripts inside the package and the manifest's
+`sourceCommit` differ, which is why the zip hashes changed while the binaries did not.
+
+**The packaged scripts are the audited ones.** `b2-manifests.txt` compares the six scripts inside each zip with the
+repository files at the same head; all twelve comparisons are `MATCH`:
+
+| file in the package | SHA-256 (both packages) |
+|---|---|
+| `install.ps1` | `D9146ED22914A721C518FCC692D18894595A989F4763DEB5A115F6F8888B9033` |
+| `uninstall.ps1` | `AAE7749439F3DAE00F93006CA97FD89F4AD903406C2BB2E14F612E76D023A14F` |
+| `host-state.ps1` | `93DB1C3D9CBBA98688C5ED218252F82C40668311C35091EFD59DF50680728362` |
+| `tools/register.ps1` | `7534A2CC10F4DA0818D5F030D2E91D001BA6E6B345EFB11D4EEB8547978891C5` |
+| `tools/unregister.ps1` | `6F4FB97581E0C2E3D30F3E0A92953F568C98FCDB146087D0119F6F1A8DF47922` |
+| `tools/check-state.ps1` | `F019F0AA447FA2E080C77F529663FC666A00030341279E7712F58E3FC4CF728B` |
 
 ## B3/B4 — owner walkthrough (NOT RUN)
 
@@ -296,17 +325,21 @@ machine where nothing is installed — and the Host was stopped through its own 
 machine was left exactly as before: HKLM still points at the development DLL, `%APPDATA%\Fcitx5` keeps the same five
 files with the same hashes and mtimes, no install root, no task, no Host.
 
-**Dry run (done).** With `-DryRun` the script read both packages, extracted them, recorded the pre-run snapshot
-(`wp4-run-20261018-122434/snapshots/01-before.txt`), printed step (a)'s prompt — now
-`install.ps1 -PackageDir '<path>'` — and stopped before any elevated action. The snapshot shows: install root absent,
-no task, no Host, the development registration at
-`evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, and the first-run
-`%APPDATA%\Fcitx5` from environment fact 2.
+**Dry run (done, post-fix).** With `-DryRun` the script read both packages, extracted them, recorded the pre-run snapshot
+(`wp4-run-20261018-165349/snapshots/01-before.txt`), printed step (a)'s prompt — `install.ps1 -PackageDir '<path>'` —
+and stopped before any elevated action. The snapshot shows: no task, no Host, the development registration at
+`evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, the first-run `%APPDATA%\Fcitx5`
+from environment fact 2, and — as expected after the 12:44 abort — the leftover version directory
+`0.0.0-wp4.1+0d1a1c4\` with 102 files whose `bin\FusionHost.exe` (`BE7FBC4E…`) and `bin\FusionTsf.dll` (`FEACFCED…`)
+are the package binaries. Step (a) records the version directories before and after the install, so the run will show
+whether `install.ps1` removed that directory as an older, unused version; nothing holds its DLL, so it should be
+removed.
 
-**Installer integrity gate exercised before the owner run** (`8b0d9ec`): `install.ps1 -VerifyOnly` is read-only and
-needs no elevation. On an untouched extracted package it verifies all 101 files and exits 0; after appending one byte
-to `bin\FusionHost.exe` it exits 4 and names the path. Both install and uninstall also refuse to run unelevated
-(exit 2).
+**Installer integrity gate exercised before the owner run** (introduced at `8b0d9ec`, re-proven at `2a8b0bb`):
+`install.ps1 -VerifyOnly` is read-only and needs no elevation. On an untouched extracted package it verifies all 101
+files and exits 0; after appending one byte to `bin\FusionHost.exe` it exits 1 and reports
+`INSTALL FAILED at step 'verify': Package integrity check failed: … bin/FusionHost.exe (sha256 mismatch)`. Both install
+and uninstall refuse to run unelevated (exit 2).
 
 **Harness defect found and fixed before the owner run** (`b050292`): the script launched its elevated steps through
 `Start-Process`, which builds an environment dictionary and fails when both `http_proxy` and `HTTP_PROXY` are defined —
@@ -315,6 +348,116 @@ it would have stopped the walkthrough at its first elevated action. The launcher
 "the packages come from the PR head" stays true (the packaged files are unchanged; only `package.json`'s source commit
 differs, which is why the zip hashes changed).
 
+### The 12:44 run — aborted, invalid (defect in the elevated span)
+
+`wp4-run-20261018-124402` is **not** a walkthrough result either. The command was correctly formed this time
+(`install.ps1 -PackageDir '<path>'`), the owner approved UAC, and the install got most of the way through — then died on
+its own strict-mode reading of a variable:
+
+| observation | evidence |
+|---|---|
+| verification, orderly-stop check, copy and registration all succeeded | `install-wp4.1.log`: `101 files verified`, `no running Host`, `102 files installed`, `Registered (elevated): …\0.0.0-wp4.1+0d1a1c4\bin\FusionTsf.dll` |
+| then `TerminatingError(): 检索不到变量"$LASTEXITCODE"，因为未设置该变量。` at `install.ps1:110`, exit 1 | same transcript |
+| the failed install left its version directory behind | `C:\Program Files\Fcitx5 Fusion\0.0.0-wp4.1+0d1a1c4\`, 102 files; `bin\FusionTsf.dll` `FEACFCED…052E9`, `bin\FusionHost.exe` `BE7FBC4E…18CF2`, both matching the package |
+| no task, no Host, registration back at the development DLL | abort cleanup ran (`register.ps1` exit 0); HKLM `InprocServer32` = `evidence\…-v2\deployment\bin\FusionTsf.dll`; task absent |
+| `%APPDATA%\Fcitx5` untouched | five files, same sizes, mtimes 09:59:09 and hashes as before the run |
+
+**Root cause.** `install.ps1:110` read `$LASTEXITCODE` after calling `register.ps1`; `uninstall.ps1:65` had the identical
+pattern after `unregister.ps1`. A `.ps1` call sets `$LASTEXITCODE` only when the callee calls `exit`, and
+`Set-StrictMode -Version 2.0` turns a read of the unset variable into a terminating error — so a **successful**
+registration aborted the install, before the task and the Host start.
+
+Measured, because the details matter more than the summary:
+
+| call | `$?` | `$LASTEXITCODE` |
+|---|---|---|
+| script succeeds, no `exit` | `True` | **unset → the read throws** |
+| script `exit 1` | `False` | `1` |
+| script `throw` (caught) | `False` | unchanged |
+| script `Write-Error` with `$ErrorActionPreference='Stop'` | `False` | unchanged |
+
+The variable also cannot be cleared before the call: it lives in the global scope, so a `Remove-Variable` in the script
+scope leaves it visible — a stale `1` from an earlier child was read as a *successful* call's status. `$?` is therefore
+the only sound contract, with `try`/`catch` for the message.
+
+**Why it was not caught.** The only thing that had ever run was `install.ps1 -VerifyOnly`, non-elevated. Everything after
+verification — copy, register, task, start, cleanup — had never executed once, and the defect sat exactly there.
+
+### Audit of the package scripts
+
+One complete pass over the scripts as they run when copied into the package, because the elevated span can only be
+executed by the owner. Findings:
+
+| # | finding | files | verdict |
+|---|---|---|---|
+| 1 | `$LASTEXITCODE` read after a `.ps1` call | `install.ps1:110`, `uninstall.ps1:65` | **fixed** — `Invoke-PackageScript` (in `host-state.ps1`) uses `$?` + `try`/`catch` only |
+| 2 | the elevated wrapper derived its exit code from `$LASTEXITCODE` after `& script` | `walkthrough-assertions.ps1` (`Invoke-ElevatedScript`) | **fixed** — `$?` decides success; `$LASTEXITCODE` only refines a non-zero code |
+| 3 | `(… Where-Object …).Prop` on an empty pipeline throws under strict mode | `install.ps1` (cleanup), `uninstall.ps1` (unregister), `verify-wp4.ps1` ×4 (abort cleanup, pre-run, step e, step f) | **fixed** — `Get-FusionRegisteredDll`, or `@(…)[0]` after a count check |
+| 4 | `.Count` / indexing on a value that can be a scalar or `$null` | `install.ps1` (file count, `$started`), `uninstall.ps1` (`$kept`, root emptiness), `verify-wp4.ps1` (`$zips`, `$hosts`, `$before`, `$remaining`), `host-state.ps1` (`$result`, `$pids`) | **fixed / OK** — each is wrapped in `@()` or guarded by a count check; the ones left are arrays by construction |
+| 5 | `$process.StartTime` throws for a process that just exited | `host-state.ps1` (`Get-FusionHostState`) | **fixed** — guarded, recorded as `null` |
+| 6 | `Start-ScheduledTask` on a missing task throws a raw error instead of a named step | `verify-wp4.ps1` step (b), `install.ps1` | **fixed** — step (b) stops through `Stop-Walkthrough`; `install.ps1` throws inside its own step |
+| 7 | `$task.Execute` / `LastResult` on a `$null` task | `install.ps1` | **fixed** — the task is read back and checked before use |
+| 8 | a synchronous `ReadToEnd` on the second Host start can block forever | `verify-wp4.ps1` step (b) | **fixed** — asynchronous read, bounded `WaitForExit(15000)`; a still-running process is asked to stop through its own event, never killed |
+| 9 | `Remove-Item -Recurse -Force` on a directory holding a loaded DLL deletes part of the tree before failing | `install.ps1` cleanup, `uninstall.ps1` removal | **fixed** — `Test-DirectoryInUse` first; a directory a process holds is kept and reported, never partially deleted |
+| 10 | `Copy-Item <dir> -Destination <existing dir> -Recurse` nests the source (`bin\bin`) on a reinstall | `install.ps1` copy | **fixed** — the contents are copied into the target |
+| 11 | `$ErrorActionPreference` not restored if the native `check-state` call throws | `verify-wp4.ps1` step (e) | **fixed** — `try`/`finally` |
+| 12 | `Resolve-Path` throws on a missing DLL, bypassing the `exit 2` below it | `tools/tsf/register.ps1`, `tools/tsf/unregister.ps1` | **fixed** — `Test-Path` first; both scripts now always `exit` (0/1/2), so the caller's contract is unambiguous |
+| 13 | native stderr becoming a terminating error (the R23 class) | `build-package.ps1` (git), `verify-wp4.ps1` (check-state) | **OK** — `git`'s exit code is checked directly after the native call (the correct use of `$LASTEXITCODE`); `check-state` is called with the preference lowered |
+| 14 | `Start-Process` / `runas` failing in this environment | `verify-wp4.ps1` | **OK** — `ProcessStartInfo` + `UseShellExecute` + `runas`, as fixed at `b050292` |
+| 15 | paths with spaces passed unquoted to native tools | `install.ps1`, `uninstall.ps1`, `register.ps1`, `unregister.ps1` | **OK** — `regsvr32` gets `"<path>"`; no `schtasks`/`reg` is used (the `*-ScheduledTask` cmdlets take the path as an argument) |
+| 16 | anything else that would throw only in the elevated span | `install.ps1`, `uninstall.ps1` | **fixed by construction** — every phase sets `$currentStep`, and one `catch` reports it |
+
+**Self-describing failures.** `install.ps1` and `uninstall.ps1` now take `-TranscriptPath` and start their own transcript
+in a `try`/`finally`, so a failure inside the elevated span leaves a log written by the failing process itself (a runas
+launch cannot redirect output). Every phase sets `$currentStep` — `manifest`, `verify`, `stop`, `copy`, `register`,
+`task`, `start`, `cleanup` for install; `stop`, `unregister`, `task`, `remove`, `userdata` for uninstall — and the single
+`catch` prints `INSTALL FAILED at step '<x>': <message>` (or `UNINSTALL FAILED …`) with the script position before
+exiting 1. Integrity, stop and start failures now `throw` instead of exiting with their own code, so **every** failure
+leaves through that one path. The walkthrough passes `<runDir>\install-<version>.log` and
+`<runDir>\uninstall-<version>.log` and starts no second (nested) transcript for those two calls.
+
+### Proof without UAC (third round)
+
+`proof-scripts.txt` (UTF-8 copy: `proof-scripts-utf8.txt`). Nothing here installs anything.
+
+**The contract, with stub scripts under the same strict mode** (`Invoke-PackageScript`, the function `install.ps1` now
+uses):
+
+| stub | `Ok` | `Threw` | `Error` |
+|---|---|---|---|
+| succeeds, no `exit` | `True` | `False` | — |
+| `exit 0` | `True` | `False` | — |
+| `exit 1` | `False` | `False` | — |
+| `throw "stub boom"` | `False` | `True` | `stub boom` |
+| `Write-Error "stub boom"` (preference `Stop`) | `False` | `True` | `stub boom` |
+
+And the old form, in a fresh process exactly as `install.ps1:110` had it: exit 1 with
+`检索不到变量"$LASTEXITCODE"` pointing at the `if ($LASTEXITCODE -ne 0)` line — the 12:44 failure reproduced in four
+lines.
+
+**`install.ps1 -VerifyOnly -TranscriptPath`, through the walkthrough's own `Invoke-ElevatedScript`** (run as the current
+user, since `-VerifyOnly` needs no elevation):
+
+| package | exit | transcript | content |
+|---|---|---|---|
+| `0.0.0-wp4.1+2a8b0bb` | 0 | `verifyonly-0.0.0-wp4.1+2a8b0bb.log`, 1167 B | `101 files verified`, `Package verified: 101 files match the manifest.` |
+| `0.0.0-wp4.2+2a8b0bb` | 0 | `verifyonly-0.0.0-wp4.2+2a8b0bb.log`, 1167 B | same |
+
+This proof found a real defect in the fix itself: the helper accepted `-TranscriptPath` for its own bookkeeping but never
+added it to the argument list it builds, so the script wrote no transcript at all (`exit 0`, no log). Fixed at `2a8b0bb`
+by forwarding it; the table above is the post-fix run.
+
+**A deliberately broken package** (one byte appended to `bin\FusionHost.exe`): exit 1, transcript 1425 B,
+`INSTALL FAILED at step 'verify': Package integrity check failed:` followed by `bin/FusionHost.exe (sha256 mismatch)`
+and the script position.
+
+**PSScriptAnalyzer** is not installed on the 5700X and was not installed for this run (optional, and installing a module
+is a machine change); the audit above is the substitute.
+
+**The machine is unchanged**: not elevated, HKLM `InprocServer32` still the development DLL, HKCU COM key absent, no
+task, no `FusionHost`, `%APPDATA%\Fcitx5` the same five files with the same sizes, mtimes (09:59:09) and hashes. The only
+residue of the 12:44 run is the version directory it left, recorded in the pre-run snapshot below.
+
 **Pending.** B3a–B3f, B4 (Notepad A–E on the installed wp4.2) and the per-step results are not recorded here. Until the
 owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 
@@ -322,6 +465,9 @@ owner runs the script, WP4 is not closed: the exit gate needs that evidence.
 
 - An old version directory stays locked until every application that loaded its DLL exits; a later install or uninstall
   removes it. It is reported, never force-deleted.
+- An install that fails after the copy leaves its version directory behind (the 12:44 run did). It is harmless — a later
+  install merges over it and uninstall removes it — but "install root absent" is then no longer true before the next run;
+  the walkthrough records the directories it finds.
 - Nothing restarts the Host after a crash, and an alive-but-unhealthy Host is not restarted (WP5/U7).
 - The task, pipe, claim and stop event are single user × session; a machine with several interactive users needs the
   install per user, and an installer elevated as a *different* administrator cannot open the owner's stop event (it
@@ -341,8 +487,11 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A3 runtime location and DLL dependencies | `a3-smoke.txt`, `a3-smoke-host-stderr.log` |
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
-| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+0d1a1c4.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
-| B3 dry run (post-fix) | `wp4-run-20261018-122434\verify-wp4.log`, `wp4-run-20261018-122434\snapshots\01-before.txt` |
+| B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+2a8b0bb.zip`, `b2-manifests.txt` (UTF-8 copy `b2-manifests-utf8.txt`), `package-wp4.{1,2}.log` |
+| B3 dry run (post-fix) | `wp4-run-20261018-165349\verify-wp4.log`, `wp4-run-20261018-165349\snapshots\01-before.txt` |
 | B3 aborted run 11:55 (invalid) | `wp4-run-20261018-115501\verify-wp4.log`, `install-wp4.1.log`, `elevated-install-wp4.1.ps1`, `snapshots\02-after-install-wp4.1.txt` |
-| harness proof without UAC | `harness-proof.txt` |
+| B3 aborted run 12:44 (invalid) | `wp4-run-20261018-124402\verify-wp4.log`, `install-wp4.1.log` (the `$LASTEXITCODE` failure), `snapshots\*` |
+| harness proof without UAC (round 2) | `harness-proof.txt` |
+| script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
+| script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |
 | runtime product | `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018\` (Debug + Release) |
