@@ -4,7 +4,9 @@ Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7
 
 **Result: WP4 is implemented and locally verified; the owner walkthrough (B3/B4) is pending.** B1, B2 and the
 walkthrough dry run are complete on the branch head below. The lifecycle evidence that requires an interactive owner
-(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here.
+(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. A first attempt
+(`wp4-run-20261018-115501`) aborted in step (a) on a harness defect — it is recorded below as **invalid, not a
+result** — and the harness is now fixed and proven without UAC; the rerun is pending.
 
 ## Candidate, runtime and tooling identities
 
@@ -232,12 +234,12 @@ and user `PATH`. It records the development registration found before the run an
 
 | step | what the owner does | what the script records |
 |---|---|---|
-| a | allow UAC, then type `nihao` + Space in Notepad | install exit code, Host pid/session/user/integrity, `你好` yes/no, "Pinyin default, no WP3 learning" yes/no |
+| a | allow UAC, close every Notepad, type `nihao` + Space in the Notepad the script opened | install exit code (fatal if non-zero), Host pid/session/user/integrity, HKLM/HKCU registration, the Notepad's loaded DLL + hash, `你好` yes/no, "Pinyin default, no WP3 learning" yes/no |
 | b | nothing (the script starts the task again and `FusionHost.exe` directly) | Host count after each attempt, the direct start's exit code and stderr, typing still works |
 | c | type a pinyin string, select a candidate, report the rank change; then sign out | Host running before the learning prompt, the pinyin string, `before→after` ranks, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
-| c (resume) | sign in, type the same string again, report the rank | one Host, its identity, typing works, the current rank, whether the learning survived |
+| c (resume) | sign in, close every Notepad, type the same string in the Notepad the script opened, report the rank | the same assertions as step a, typing works, the current rank, whether the learning survived |
 | c2 | leave an unsaved Notepad, start a logoff, **cancel** it | Host pid before and after, "still the same Host", typing still works |
-| d | keep a Notepad open, allow UAC for the upgrade, then check both Notepads and Notepad A–E | old Host's orderly stop, new Host path, whether the wp4.1 directory was removed, behaviour of the old and the new Notepad, A–E answers |
+| d | keep a Notepad open, allow UAC for the upgrade, then check both Notepads and Notepad A–E | the old Notepad's loaded DLL before and after, the same assertions as step a against the wp4.2 directory, whether the wp4.1 directory was removed, behaviour of the old and the new Notepad, A–E answers |
 | e | allow UAC for the uninstall | exit code, no TIP/COM/task/Host, install root, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
 | f | close every Notepad, allow UAC twice | reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left |
 | end | — | the development registration restored and re-snapshotted |
@@ -245,9 +247,59 @@ and user `PATH`. It records the development registration found before the run an
 The learning used by steps (c)/(d) is produced inside the walkthrough with the Host already running (step (c) refuses
 to continue if no Host is running), so the owner is never asked to do something the machine cannot do at that moment.
 
+### The 11:55 run — aborted, invalid (harness defect, not a result)
+
+`wp4-run-20261018-115501` is **not** a walkthrough result. Step (a) failed before touching anything:
+
+| observation | evidence |
+|---|---|
+| the elevated transcript runs `& install.ps1 '-PackageDir' '<path>'` | `install-wp4.1.log` |
+| `TerminatingError(): "package.json not found in -PackageDir"`, exit 1 | same; `[a] install.ps1 退出码 => 1` |
+| nothing installed: no `C:\Program Files\Fcitx5 Fusion`, no task, no Host | `snapshots/02-after-install-wp4.1.txt`, registry/task queries |
+| Notepad kept the previously registered development DLL | HKLM `InprocServer32` and the module list of the running Notepad both `evidence\…-v2\deployment\bin\FusionTsf.dll`, sha256 `03DEDD4CB251D82D4E6B674449067D763E1D6E0D266913EB75856B6F09935B92` |
+| that DLL needs no Host | `dumpbin /dependents`: `FusionFcitxHost.dll` + debug CRT → Fcitx runs in-process; it has no candidate surface |
+
+**Root cause.** `Invoke-ElevatedScript` single-quoted every element of the argument list, including the parameter
+*name*. A quoted `-PackageDir` is a string, so PowerShell bound it positionally to `$PackageDir` and the real path was
+dropped. Reproduced in isolation: quoted → `PackageDir=[-PackageDir]`; unquoted → `PackageDir=[C:\some\path]`. The
+script then continued to its typing questions, which is why the owner's "y" for step (a) means nothing.
+
+Two things this run proves about the record, not the product: a **profile name never identifies a build** (the
+registered description is "Fusion Stage 3B (Real Fcitx5 PoC)", and the loaded module was the Stage 3C deployment), and
+an owner's yes/no cannot substitute for an assertion on the loaded module.
+
+**Harness fixes** (`53597d7`; harness and installer message only, no C++/CMake change, packages from `0d1a1c4` stay
+valid):
+
+1. `Format-ArgumentList` (new `walkthrough-assertions.ps1`) emits parameter names bare and quotes only values; every
+   elevated call site passes a hashtable, and the dry-run command text uses the same formatter.
+2. **Fail fast**: any step whose command exits non-zero stops the walkthrough at once — it records the step, the
+   command and the exit code, runs the safe cleanup (orderly stop of an installed Host; restore the development
+   registration only if the run changed it; never `%APPDATA%`), and asks no further question. `check-state.ps1` is
+   covered too.
+3. **Assertions before every typing question** (step a, after sign-in, after the upgrade): a `FusionHost` from
+   `<install>\<version>\bin` running as the owner at Medium integrity in this session; HKLM `InprocServer32` pointing
+   at `<install>\<version>\bin\FusionTsf.dll` with no HKCU override; and a Notepad that really loaded that DLL
+   (module list + the manifest's SHA-256). A fresh Notepad loads the TIP only once Fusion is active in it, so a
+   "not loaded" result asks the owner to switch with Win+Space and re-checks, bounded.
+4. `install.ps1` names the `-PackageDir` value it received when `package.json` is missing.
+
+**Proof without UAC** (`harness-proof.txt`): the new form binds `-PackageDir` to the real path and `-VerifyOnly`
+verifies 101 files for **both** packages (exit 0); the old quoted form reproduces `package.json not found in
+-PackageDir` (exit 1). Against a Host started from the extracted wp4.1 package and a Notepad the proof started:
+`Test-FusionHostFrom` passes for that directory (`medium`, session 1, `5700X\choicky`) and returns null for the wp4.2
+directory; `Test-RegistrationPointsTo` passes for the registered development DLL and fails for the package DLL with the
+exact path mismatch; `Test-NotepadLoadedDll` passes on the application that has the DLL loaded and fails when expecting
+the package DLL, while a freshly started Notepad reports "not loaded" (the case the walkthrough now retries on). The
+aggregate `Test-InstalledTipInUse` therefore returns `Ok=false` with both failures named — the correct answer on a
+machine where nothing is installed — and the Host was stopped through its own stop event (exit after 130 ms). The
+machine was left exactly as before: HKLM still points at the development DLL, `%APPDATA%\Fcitx5` keeps the same five
+files with the same hashes and mtimes, no install root, no task, no Host.
+
 **Dry run (done).** With `-DryRun` the script read both packages, extracted them, recorded the pre-run snapshot
-(`wp4-run-20261018-112047/snapshots/01-before.txt`), printed step (a)'s prompt and stopped before any elevated action.
-The snapshot shows: install root absent, no task, no Host, the development registration at
+(`wp4-run-20261018-122434/snapshots/01-before.txt`), printed step (a)'s prompt — now
+`install.ps1 -PackageDir '<path>'` — and stopped before any elevated action. The snapshot shows: install root absent,
+no task, no Host, the development registration at
 `evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, and the first-run
 `%APPDATA%\Fcitx5` from environment fact 2.
 
@@ -290,5 +342,7 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A5 / R23 probe | `a5-probe.txt` |
 | B1 build and test logs | `build-mock.log`, `build-debug.log`, `build-release.log`; native runtime logs `native-debug.log`, `native-release.log` |
 | B2 packages and manifests | `packages\fusion-0.0.0-wp4.{1,2}+0d1a1c4.zip`, `b2-manifests.txt`, `package-wp4.{1,2}.log` |
-| B3 dry run | `wp4-run-20261018-112047\verify-wp4.log`, `wp4-run-20261018-112047\snapshots\01-before.txt` |
+| B3 dry run (post-fix) | `wp4-run-20261018-122434\verify-wp4.log`, `wp4-run-20261018-122434\snapshots\01-before.txt` |
+| B3 aborted run 11:55 (invalid) | `wp4-run-20261018-115501\verify-wp4.log`, `install-wp4.1.log`, `elevated-install-wp4.1.ps1`, `snapshots\02-after-install-wp4.1.txt` |
+| harness proof without UAC | `harness-proof.txt` |
 | runtime product | `C:\Users\choicky\worktmp\fusion-windows\runtime-wp3-20261018\` (Debug + Release) |
