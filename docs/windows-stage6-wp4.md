@@ -2,15 +2,17 @@
 
 Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7.1 of the plan).
 
-**Result: WP4 is implemented and locally verified; the owner walkthrough (B3/B4) is pending.** B1, B2 and the
-walkthrough dry run are complete on the branch head below. The lifecycle evidence that requires an interactive owner
-(install, sign-out/sign-in, upgrade with a running application, uninstall) is not claimed here. Three owner attempts
-are recorded below: `wp4-run-20261018-115501` (the walkthrough quoted a parameter *name*), `wp4-run-20261018-124402`
-(install.ps1 read `$LASTEXITCODE` after a `.ps1` call and aborted a *successful* registration) and
-`wp4-run-20261018-170730` (**step (a) installed and asserted correctly for the first time**, then aborted on a Notepad
-check that inspected the launcher process instead of the window's). All three are harness defects, all three are fixed,
-and each fix is proven without UAC; the rerun is pending. The same root cause — every Notepad window lives in one
-packaged process — also made step (d) unsatisfiable, so its order was corrected before the rerun (§ step (d) below).
+**Result: WP4 is implemented and the owner walkthrough is complete on 2026-10-18 (run `wp4-run-20261018-185004`).**
+Install, second start, learning across sign-out, the upgrade with a Notepad open, both uninstall paths and the
+development-registration restore pass; **the exit gate is met except autostart reliability**, which is open as **R34**:
+at the second sign-in of the run the logon task did not start the Host, so U2's autostart verification is incomplete
+pending R34 and the cancelled-logoff behaviour is covered only by the `stage4a wp4sessionend` unit test. Three earlier
+attempts are kept below as history — `wp4-run-20261018-115501` (the walkthrough quoted a parameter *name*),
+`wp4-run-20261018-124402` (install.ps1 read `$LASTEXITCODE` after a `.ps1` call and aborted a *successful*
+registration) and `wp4-run-20261018-170730` (step (a) installed and asserted correctly for the first time, then aborted
+on a Notepad check that inspected the launcher process). All three were harness defects, all three were fixed and each
+fix proven without UAC; the same root cause — every Notepad window lives in one packaged process — also made step (d)
+unsatisfiable, so its order was corrected before the run.
 
 ## Candidate, runtime and tooling identities
 
@@ -52,7 +54,8 @@ Recorded because they bound what these results mean, not as product decisions:
    check (below) ran without `FUSION_FCITX_SKIP_USER_PATH` and created a first-run default configuration plus an empty
    user dictionary at 09:59. That is recorded as an unintended touch of real user data by a WP4 check (no pre-existing
    data was modified or removed), and it is the state the walkthrough's "before" snapshot contains. Step (a) therefore
-   expects the Pinyin default with no WP3 learning to reuse.
+   only confirms that the current input method is Pinyin; it no longer asks about learning history, because the 17:07
+   Host had already saved the owner's input.
 3. **`reg.exe` is blocked on the 5700X** by its Security Center program blacklist, so `VsDevCmd.bat` cannot detect the
    Windows SDK and produces `LIB`/`INCLUDE` without SDK paths (link fails with `LNK1104: kernel32.lib`). The build was
    driven by a local wrapper outside the repository that supplies the SDK `INCLUDE`/`LIB`/`PATH` and then calls the
@@ -92,10 +95,13 @@ after the exit signal is set.
 
 **A cancelled logoff must not stop the Host** (review finding, fixed before the walkthrough). A logoff or shutdown can
 still be cancelled *after* `WM_QUERYENDSESSION` — an application asks to save and the user cancels. Requesting the
-stop from the query would leave the session running with no Host until the next logon. The decision now lives in
+stop from the query would leave the session running with no Host until the next logon (and whether that logon starts
+one is R34). The decision now lives in
 `fusion::ipc::SessionEndHandler` (host_server), separate from the window procedure so it can be driven without a real
 session end: the query only answers TRUE, and only `WM_ENDSESSION(TRUE)` — the session is really ending — requests the
-stop and waits. The walkthrough's step (c2) checks the product behaviour by cancelling a real logoff.
+stop and waits. The walkthrough's step (c2) was meant to check the product behaviour by cancelling a real logoff; the
+run could not hold the sign-out (the harness blocker died with its terminal), so the behaviour is covered only by the
+`stage4a wp4sessionend` unit test.
 
 Fail-closed choices: a Host that cannot create the stop event, or (windowless) cannot create the session-end window,
 refuses to run — otherwise it could be neither stopped orderly nor save on logoff (R26).
@@ -203,8 +209,9 @@ needs a second token, which this scope does not have.
 `stage4a wp4sessionend` (registered as `stage4a_ipc_wp4sessionend`): drives the session-end decision without a real
 session end. `WM_QUERYENDSESSION` returns TRUE and requests nothing; `WM_ENDSESSION(FALSE)` (a cancelled logoff)
 requests nothing; `WM_ENDSESSION(TRUE)` requests the stop exactly once and waits for the exit, bounded (measured
-against a 300 ms bound); with the exit already signalled the same call returns immediately. A real session end is still
-only exercised by the walkthrough's step (c) and step (c2).
+against a 300 ms bound); with the exit already signalled the same call returns immediately. A real session end is
+exercised by the walkthrough's step (c) (sign-out and sign-in, PASS); step (c2) was meant to exercise a **cancelled** one
+but the harness could not hold the sign-out, so that half has no product-path evidence.
 
 ## B1 — builds and tests (measured)
 
@@ -262,7 +269,7 @@ repository files at the same head; all twelve comparisons are `MATCH`:
 `install.ps1`, `uninstall.ps1` and `host-state.ps1` changed in this round (the hash-skip copy, the holder reporting
 and the per-user input-state removal), which is why the packages were rebuilt; the other three are unchanged.
 
-## B3/B4 — owner walkthrough (NOT RUN)
+## B3/B4 — owner walkthrough (2026-10-18, run `wp4-run-20261018-185004`)
 
 `tools/package/verify-wp4.ps1` performs every action itself; the owner never edits a file or types a command. Prompts
 accept Enter / y / n, or the one short answer a prompt asks for (a pinyin string, a rank such as `5→1`), and every
@@ -285,6 +292,67 @@ and user `PATH`. It records the development registration found before the run an
 
 The learning used by steps (c)/(d) is produced inside the walkthrough with the Host already running (step (c) refuses
 to continue if no Host is running), so the owner is never asked to do something the machine cannot do at that moment.
+
+### Results
+
+Machine 5700X, Windows 11, 175 % scaling, one monitor. Packages `fusion-0.0.0-wp4.1+e85d497.zip` (SHA-256
+`84B97968…29A9`) and `fusion-0.0.0-wp4.2+e85d497.zip` (`ED4D9280…C470`). **Both packages contain identical binaries**
+(`FusionHost.exe` `BE7FBC4E…`, `FusionTsf.dll` `FEACFCED…052E9`, `FusionFcitxHost.dll` `B1F3A8A3…F085F`), so the upgrade
+exercises **version-directory switching, not a binary change** — that is exactly what this run can prove about upgrade.
+
+| step | verdict | evidence |
+|---|---|---|
+| a | **PASS** | install exit 0; Host, registration and the Notepad module asserted; Pinyin confirmed |
+| b | **PASS** | a second Host was refused; typing still worked |
+| c | **PASS** | learning survived sign-out/sign-in — see the note below; `user.dict`/`user.history` mtime advanced at sign-out (19:03:13) |
+| c2 | **NOT EXERCISED** (harness) | the blocker ran in a PowerShell process inside Windows Terminal; that process was terminated at sign-out, so Cancel had no effect and the session signed out. Neither a pass nor a product failure |
+| d | **PASS** | upgrade with a Notepad open — details below |
+| e | **PASS** | Host 8124 stopped in order and Fcitx saved on stop (`user.dict` 406 → 768 B, `user.history` 170 → 309 B, mtime 19:16:45); HKLM COM/TIP and the task removed, no Host, `%APPDATA%\Fcitx5` kept, current-user HKCU `CTF\TIP` enable flag 1 → none |
+| f | **PASS** | the reinstall succeeded **while the wp4.2 directory was held by `explorer`** (hash-skip copy), task Running, Host 14940; the uninstall stopped it, `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` were deleted, registration and task removed |
+| end | **PASS** | development registration restored (`register.ps1` exit 0); HKCU enable flag back to 1 |
+
+**(c) harness note.** The prompted word `shuangpin` was already rank 1 on this machine, so the owner substituted `shi`:
+4th candidate before learning, rank 1 after learning, still rank 1 after sign-out/sign-in.
+
+**(c2) what is and is not covered.** The product behaviour under test — a cancelled logoff must leave the same Host
+running — is covered **only by the `stage4a wp4sessionend` unit test**. The walkthrough has no product-path evidence for
+it; the blocker was hosted in a terminal-owned process, which the sign-out killed.
+
+**(d) upgrade with a Notepad open.**
+
+- The pre-upgrade Notepad (pid 11884) had the wp4.1 DLL. After the upgrade it was still alive, still on the **wp4.1**
+  DLL, and typed Chinese through the new **wp4.2** Host — old DLL + new Host: PASS.
+- Host after the upgrade: pid 8124, wp4.2 path, Medium integrity, session 2. HKLM at the wp4.2 DLL, HKCU none.
+- The wp4.1 directory was retained while in use (holders: `firefox`, Notepad) — expected.
+- A fresh Notepad (pid 13484, launcher 34592) loaded the wp4.2 DLL with the manifest SHA-256.
+- **Correction (R18).** The recorded answers "new Notepad can type → n" and "A → n" were caused by **R18** — a new
+  Notepad window starts with the IME closed. After Ctrl+Space the owner confirmed `nihao`+Space commits 你好, so both are
+  **PASS** with that note; the raw answers stay visible as "recorded n, corrected: R18".
+- Firefox: `nihao`+Space → 你好, PASS.
+- B, D, E: PASS. C: PASS — `,` and `.` give Chinese punctuation; `;` and `www.` show the QuickPhrase prompt, which is
+  Fcitx behaviour (`;` is the QuickPhrase trigger, matching the WP1 record). The question's wording ("`;` gives Fcitx
+  punctuation") was wrong — a harness follow-up, not a product result.
+
+**Leftover after the run.** `C:\Program Files\Fcitx5 Fusion\` remains with both version directories because shell and
+browser processes still hold the DLLs; the owner removes it manually after a restart. That is the documented behaviour
+of R28 — report the holders, remove after sign-out — not a defect.
+
+### Harness follow-ups (known, not fixed)
+
+1. **(c)** the prompted word may already be rank 1 — it was here (`shuangpin`), and the owner had to substitute `shi`.
+2. **(c2)** a blocker hosted in a terminal-owned PowerShell process is killed at sign-out, so Cancel has no effect.
+3. **(d)** question C's wording is wrong: `;` is the QuickPhrase trigger, not punctuation.
+4. **(d)** R18 makes "new Notepad" questions fail unless the IME is opened with Ctrl+Space, and the harness does not tell
+   the tester — it recorded two false "n" answers because of that.
+
+These are picked up when `verify-wp4.ps1` is next touched (for example in the R34 fix PR).
+
+### What the run did not exercise
+
+The upgrade path "stop the **running** old Host before switching versions" was not exercised, because no Host was
+running before step (d) — a consequence of R34 (the task did not start one at the second sign-in). The same ordered-stop
+mechanism was exercised in (e) and (f). Re-verification belongs to the R34 fix PR's walkthrough and is recorded as
+R34's verification item, not as a separate register entry.
 
 ### The 11:55 run — aborted, invalid (harness defect, not a result)
 
@@ -341,8 +409,8 @@ and stopped before any elevated action. The snapshot shows: no task, no Host, th
 `evidence\fusion-windows-stage3c-faithful-frontend-v2\deployment\bin\FusionTsf.dll`, the first-run `%APPDATA%\Fcitx5`
 from environment fact 2, and — as expected after the 12:44 abort — the leftover version directory
 `0.0.0-wp4.1+0d1a1c4\` with 102 files whose `bin\FusionHost.exe` (`BE7FBC4E…`) and `bin\FusionTsf.dll` (`FEACFCED…`)
-are the package binaries. Step (a) records the version directories before and after the install, so the run will show
-whether `install.ps1` removed that directory as an older, unused version; nothing holds its DLL, so it should be
+are the package binaries. Step (a) records the version directories before and after the install, so the run recorded
+whether `install.ps1` removed that directory as an older, unused version; nothing held its DLL, so it should have been
 removed.
 
 **Installer integrity gate exercised before the owner run** (introduced at `8b0d9ec`, re-proven at `2a8b0bb`):
@@ -525,7 +593,7 @@ owner typing in a Notepad window:
 
 The development DLL is what is registered right now **because the abort cleanup restored it**; that is also why the
 owner saw Chinese input but no candidate popup. The installed TIP plus the Host (the state that shows the popup) is
-step (a)'s own subject, and the next run asserts it on the right process.
+step (a)'s own subject, and the walkthrough run asserted it on the right process (step (a) PASS, see the results).
 
 **Owner observation for R15 (evidence only).** In the 17:07 run, with the *installed* TIP and the Host running, the
 owner reports that Chinese input worked **and the candidate popup was visible** in the Notepad window at 175 % display
@@ -534,9 +602,9 @@ misplaced above 100 %" hypothesis at 175 %/one monitor, but it does not close R1
 two-monitor check, and "visible" is not "correctly positioned".
 
 **Residue of this abort.** Unlike the earlier runs it leaves a working install: the version directory, the logon task
-and the development registration all remain (the cleanup stops the Host and restores registration only). The next run's
-step (a) installs over the same version directory and refreshes the task, and step (e) uninstalls. Recorded as a known
-limit below rather than cleaned up by hand.
+and the development registration all remain (the cleanup stops the Host and restores registration only). The walkthrough
+run then did exactly what this note predicted — step (a) installed over the same directory and refreshed the task, and
+step (e) uninstalled. Recorded as a known limit below rather than cleaned up by hand.
 
 ### Step (d) with the single-process Notepad (same root cause, different consequence)
 
@@ -592,9 +660,6 @@ between the two facts to reset; the walkthrough itself never kills anything.
 **Packages**: no packaged script changed (`install.ps1`, `uninstall.ps1`, `host-state.ps1`, `tools\*.ps1` are untouched
 since `2a8b0bb`), so the packages were not rebuilt and their script hashes still match the repository.
 
-**Pending.** B3a–B3f, B4 (Notepad A–E on the installed wp4.2) and the per-step results are not recorded here. Until the
-owner runs the script, WP4 is not closed: the exit gate needs that evidence.
-
 ### Step (c2): a sign-out blocker the harness owns
 
 Step (c2) needs a sign-out that can be cancelled. The first version relied on Notepad asking to save an unsaved
@@ -616,6 +681,12 @@ The blocker is now a harness object: a visible top-level window on its own threa
 **Proof without UAC** (`proof-a1-a2.txt`): the window is visible with the expected title and class, the reason reads
 back as `WP4 test: click Cancel`, `WM_QUERYENDSESSION` returns FALSE (the window procedure saw the query), and `Stop`
 closes it. No sign-out was performed.
+
+**What happened in the run.** The blocker verified and Windows did show the blocking screen, but the walkthrough was
+running inside Windows Terminal, so the blocker lived in a PowerShell process that the sign-out terminated: Cancel then
+had nothing left to cancel and the session ended. Step (c2) is therefore recorded as **not exercised** (see the results
+above), and the blocker has to be hosted outside the terminal-owned process tree before (c2) can produce evidence — a
+harness follow-up, not a product finding.
 
 ### Uninstall and the per-user input state (A2)
 
@@ -662,6 +733,12 @@ WP8), and §8.1 of the plan points here.
 
 ## Known limits at this scope
 
+- **The logon task did not start the Host at the second sign-in of the walkthrough run (R34, OPEN).** `Get-ScheduledTaskInfo`
+  showed `LastRunTime` 2026-10-18 18:58:43 (the first re-logon, where it did start), `LastTaskResult` `0x40010004`
+  (1073807364 — previous instance terminated at logoff), `NumberOfMissedRuns` 0, `State Ready`, and no `FusionHost`
+  process after the second sign-in (~19:04). The logoff save itself worked (user data saved 19:03:13). Autostart is
+  therefore **not verified**: U2's verification is incomplete pending R34, and WP4's exit gate is met except this.
+  Diagnosis and fix belong to a separate fusion-windows PR, not to #17; the root cause is unknown.
 - **During an upgrade there is a gap** between the old Host's orderly stop and the new Host's start: the TIP is still
   registered and keys pass to the application unmediated (no candidate, no composition). It is bounded by the install
   (seconds) and it is the same "Host absent" state WP5 §8.2 exercises deliberately; the walkthrough records it only
@@ -680,7 +757,8 @@ WP8), and §8.1 of the plan points here.
   directory is removed by running the uninstaller again after sign-out or a restart. Never force-deleted. **Future
   protocol changes**: an upgrade that changed `protocol_version` would leave those processes on the old DLL and unable
   to use the new Host until sign-out (fail open), so such a change needs a sign-out requirement or a compatibility
-  window (R28).
+  window (R28). The walkthrough left exactly that: both version directories remained (holders `firefox`, Notepad,
+  `explorer`) and the owner removed `C:\Program Files\Fcitx5 Fusion\` manually after a restart.
 - An install that fails after the copy leaves its version directory behind (the 12:44 run did). It is harmless — a later
   install merges over it and uninstall removes it — but "install root absent" is then no longer true before the next run;
   the walkthrough records the directories it finds.
@@ -705,6 +783,7 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 
 | what | where |
 |---|---|
+| **owner walkthrough, 2026-10-18** | run `wp4-run-20261018-185004` — its directory (`verify-wp4.log`, `snapshots\*`, `install-*.log`, `uninstall-*.log`) is **kept locally by the owner**; the values quoted above come from that log |
 | A1 console mode / CTRL_BREAK | `a1-console.txt`, `a1-console-host-stderr.log` |
 | A3 runtime location and DLL dependencies | `a3-smoke.txt`, `a3-smoke-host-stderr.log` |
 | A5 / R23 probe | `a5-probe.txt` |
