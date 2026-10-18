@@ -425,6 +425,22 @@ process-local `RegisterProfile(TF_RP_LOCALPROCESS)` / `TF_IPPMF_FORPROCESS` 只�
 进程加载。经用户授权的 UAC 提权后，公开 API 的持久注册（RegisterProfile、EnableLanguageProfile、category 注册）+
 HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**“所有 TIP 都必须提权”的结论；P0-D 仍 OPEN。
 
+**启动机制：已实现基线（WP4，U2 (b) Accepted 2026-10-18）。** 在 §3 目标场景（Windows 11 x64、单个交互会话、标准
+用户 Medium IL）内，`FusionHost.exe` 由**每用户登录计划任务**启动：principal 为安装用户、interactive token、
+`RunLevel Limited`（Medium IL，从不提权）、无执行时限、`MultipleInstances=IgnoreNew`、**不**设置崩溃重启。任务只是
+启动者；DLL 仍然从不启动 Host（P0-D 的该子问题不变）。打包 Host 无控制台（Windows 子系统），因此登录/注销/关机的
+保存由隐藏的**顶层**窗口的 `WM_QUERYENDSESSION`/`WM_ENDSESSION` 触发（message-only 窗口收不到会话结束广播），
+在 4 s 界限内等待既有的有序关闭（request stop → stop → shutdown_backend → Fcitx save）；安装/升级/卸载通过
+`Local\FusionHost-stop-<user SID>-<session id>` 命名停止事件（与 pipe、HostClaim 相同的 user-only DACL）请求同一
+有序停止，而不是终止进程。三条路径都只**请求**停止，`main()` 仍是唯一执行有序关闭的线程，`HostClaim` 持有到进程
+退出；`one Host per user × session` 的权威仍是 `HostClaim`，不是任务设置。开发/测试用的控制台模式（`--console`，
+含 control handler）保留。证据与边界见 `docs/windows-stage6-wp4.md`；U2 (a)（登录 Run 项）未实现，其缺口已记录。
+
+**P0-D 仍然 OPEN 的部分：** 上述只是 §3 目标场景内的已实现基线，不是 Host topology 的冻结。High IL、x86/x64 混合、
+AppContainer/LPAC、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
+都仍未取证；每个被解除的排除项都需要自己的证据。计划任务/停止事件/pipe 的“单用户 × 单会话”范围意味着多交互用户
+机器需要按用户安装。
+
 ## 15. Backend policy
 
 Fcitx5 是 faithful port 的语义基础（D082；Pinyin、candidate behavior、punctuation、QuickPhrase、configuration、MoQi、
@@ -548,10 +564,17 @@ Stage 5    Composition / candidate UI                         VERIFIED / COMPLET
            Notepad A–E smoke 的 `670dfc0`；controller PR #29 已合并；未主张项与 DEFER 项见 §25）
 Stage 6    Packaging / release / soak                       PLAN PROPOSED — 未接受；WP1 已合并并在其范围内收口；
            WP2、WP3 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)、U1；WP3 运行于新 runtime
-           `runtime-wp3-20261018`）；后续工作包未授权（`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`）
+           `runtime-wp3-20261018`）；WP4 已实现并在本地验证（U2 (b) Accepted 2026-10-18；B1 70/70 Mock-only、
+           78/78 Debug、78/78 Release；两个测试包；A1–A6 与走查试运行见 `docs/windows-stage6-wp4.md`），
+           但**所有者走查 B3/B4 未运行**，故 WP4 未收口；后续工作包未授权
+           （`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`、`docs/windows-stage6-wp4.md`）
 P0-A / P0-B / P0-D 仍 OPEN（§24）
 ```
 
+**下一阶段边界。** Stage 6 仍未接受为计划，WP4 之后没有授权的工作包。WP4 的收口只差其所有者走查（安装、第二次启动、
+注销/登录、在记事本保持打开时升级、两条卸载路径、已安装 wp4.2 上的 Notepad A–E）；这些是 §14 启动基线与 R26 的
+部署侧证据，不是新的架构决定。WP5（失败与恢复，R7/R22）只有在 WP4 走查收口后按自己的执行指令开始，并且它是 U7 的
+证据来源；WP6/WP7 依赖 WP4 退出；WP8 还依赖 U4（签名/渠道）与 U7。
 ## 23. Decision classification
 
 ### ACCEPTED（D072）
