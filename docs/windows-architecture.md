@@ -361,6 +361,12 @@ ledger fence 到显式 terminal、unbind Host context、递增 entry generation 
 input scope/private/password constraints、preserved/system keys、composition validity、Host/link health。
 backend 不得覆盖 Windows hard policy。
 
+**U6（2026-10-19 决定）：** 新打开的应用窗口默认以 Fusion 打开。实现只在**新 context 首次出现**时把该线程的
+`GUID_COMPARTMENT_KEYBOARD_OPENCLOSE` 声明为开（每次 context 一次），不在每次按键或焦点切换时重写，因此用户在同一
+context 内用 Ctrl+Space 关闭仍然有效。诊断证据：激活时的写入会在 Windows/应用为新 context 重新初始化该 compartment 后
+丢失（`KEYBOARD_OPEN declared` 之后、新 context 的第一个按键读到 `HARD_POLICY openclose=closed`，中间没有本服务写入或
+`Deactivate`）。compartments 仍是 Windows 的权威；本项只是声明新 context 的默认值。
+
 ## 11. Context identity — wire set UNFROZEN
 
 `ITfContext` incarnation，而非 HWND，是 context identity 的基本对象。A′ 要求以下**概念**存在并被校验：context identity、
@@ -439,6 +445,13 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 **自动启动：**登录时启动已验证（2026-10-18 18:58:43，以及 2026-10-19 走查（run `wp4-run-20261019-130037`）的 (c) 登录）。
 **取消注销/重启（R34）：已解决 —— 2026-10-19 走查验证（run `wp4-run-20261019-130037`）：取消注销 (c2) 与取消重启 (c3) 均在同一会话内恢复 Host；取消关机由 1073 测量覆盖。
 2026-10-18 的走查中，注销被取消（User32 1077，19:03:20）后 Host 已经结束、没有任何东西重启它；修复是任务上的 1077（取消注销）或 1073（取消重启/关机）事件触发器，已在上述走查中验证。本段描述的是启动机制的设计与配置。
+
+**手动重启与诊断（WP7，2026-10-19）：** 包内 `restart-host.ps1` 只重启**当前用户 × 当前会话**的 Host：先经命名停止事件请求
+有序停止并在界限内等待；仍未退出时**仅**强制结束已核验为本用户/本会话的实例并明确报告（该实例不会执行 Fcitx 自身的保存）；
+随后用既有登录任务启动（Medium IL），再核验可执行文件路径、完整性与"恰好一个实例"。它不是新的启动机制，不启用自动重启，
+也不改变任务的崩溃重启设置；其他用户/会话的进程永不触碰。安装创建开始菜单快捷方式（`Fusion\Restart FusionHost`），卸载删除。
+`host-diagnostics.ps1` 是 R30 的显式 opt-in/opt-out（用户级 `FUSION_HOST_DIAGNOSTICS`），并**验证实际启动路径是否收到该设置**
+（重启后检查新 pid 的日志文件），产品默认仍为关闭。日常使用说明见 `docs/windows-daily-use.md`。
 
 **P0-D 仍然 OPEN 的部分：** 上述只是 §3 目标场景内的已实现基线，不是 Host topology 的冻结。High IL、x86/x64 混合、
 AppContainer/LPAC、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
