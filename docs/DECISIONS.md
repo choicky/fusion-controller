@@ -508,6 +508,31 @@ mechanism failure. No product code, requirement or runtime behavior changes unde
 this Decision; current normative wording is in `docs/windows-architecture.md`
 (header, §9, §13, §18, §22–§25).
 
+## D084 — Windows Stage 6: WP7 daily-use acceptance, U6 open-on-new-window, U7 presentation
+
+### D084 — WP7 daily use carries WP5/WP6 acceptance
+The owner directs Stage 6 to proceed to **WP7 daily use** (2026-10-19). WP5 (failure and recovery) and WP6 (application
+compatibility) are accepted through daily use: the owner reports a problem when one occurs, it is assessed and repaired
+by impact, and **closing the daily-use period without reported problems is acceptance**. This supersedes the separate
+WP5/WP6 acceptance campaigns, deliberate crash/hang injection for stage acceptance, and the mandatory pre-WP8 fault-test
+session; none of them is a release blocker. Unexecuted scenarios are never recorded as PASS, and daily use is not
+complete until the owner closes it. The Stage 6 plan's §8.2 and §8.3 remain the **analysis reference** for a reported
+problem, not a mandatory campaign.
+
+**U6 decided:** a newly opened application window starts with Fusion open, while an explicit Ctrl+Space close remains
+effective (before or after the first key) and ordinary focus changes are not overridden. Implementation and validation
+status are tracked in the Stage 6 plan (U6 row) and in the fusion-windows PR, not in this decision; the evidence that
+motivated it is that the keyboard open/close compartment reads open at activation and closed at the first key of a new
+context, and that attributing the change to the application or to Windows is an unconfirmed hypothesis.
+
+**U7 presentation decided:** a persistent tray status, a fault balloon notification, and actions to restart the Host and
+open its log directory; no focus stealing, no input content and no repeated per-key notifications. Automatic restart is
+**not** authorized. Implementation is pending; the minimal design is in `docs/windows-daily-use.md` §4.
+
+**Not changed:** U2's scheduled-task start mechanism and its no-automatic-restart policy; U3 (diagnostics off by default,
+technical content only); U4 (signing/channel) stays open; P0-A/P0-B/P0-D remain OPEN. Current normative wording is in
+`docs/windows-architecture.md` (§10, §14) and `docs/windows-stage6-plan.md`.
+
 ## Current authority rule
 
 For current post-release product state, use the compact current-state/current-
