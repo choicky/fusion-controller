@@ -5,9 +5,9 @@ Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7
 **Result: WP4 is implemented and the owner walkthrough is complete on 2026-10-18 (run `wp4-run-20261018-185004`).**
 Install, second start, learning across sign-out, the upgrade with a Notepad open, both uninstall paths and the
 development-registration restore pass; **the exit gate is met except B3c2, which FAILED** — a cancelled logoff ended the
-Host and nothing restarted it (**R34**, FIX IMPLEMENTED (fusion-windows #18), verification pending; WP4 closes when
-that walkthrough passes). Logon autostart itself was exercised once and **passed** (the task started the Host at
-18:58:43).
+Host and nothing restarted it (**R34**, FIX IMPLEMENTED (fusion-windows #18), verification pending; WP4 closes when that
+walkthrough passes, which now also covers a cancelled **restart** in the new step (c3)). Logon autostart itself was
+exercised once and **passed** (the task started the Host at 18:58:43).
 *Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this paragraph said the task "did not start the
 Host at the second sign-in". There was no second sign-in — the only sign-out/sign-in of the run is 18:58:39→18:58:43 —
 and (c2) was not "not exercised": the logoff was cancelled (User32 1077 at 19:03:20) and the Host had already ended.*
@@ -69,8 +69,8 @@ Recorded because they bound what these results mean, not as product decisions:
    (The R34 change used the VS-bundled 22.1.3, which is clean on its files.)
 5. **Task Scheduler history is disabled on the 5700X** (`Microsoft-Windows-TaskScheduler/Operational`), so no run can
    show *which* trigger started the task. The walkthrough therefore decides from the System log (User32 1077 for a
-   cancelled logoff, read without elevation), the session's WTS logon time and the Host's own process and save state —
-   never from task history.
+   cancelled logoff, User32 1073 for a cancelled restart or shutdown — both read without elevation), the session's WTS
+   logon time and the Host's own process and save state — never from task history.
 
 ## A1 — windowless by default, console mode kept
 
@@ -299,6 +299,7 @@ and user `PATH`. It records the development registration found before the run an
 | c | type a pinyin string, select a candidate that is **not** rank 1 before learning, report `N→M` (a single number is rejected); then sign out | Host running before the learning prompt, the pinyin string, the `N→M` pair, `%APPDATA%\Fcitx5` snapshot; then the exact `-Resume` command |
 | c (resume) | sign in, close every Notepad (the script waits), type the same string in the Notepad the script opened, report the rank | the same assertions as step a, typing works, the current rank, whether the learning survived |
 | c2 | start a logoff and **cancel** it at Windows' "these apps are preventing you from signing out" screen — the blocker is the walkthrough's own window, titled `WP4 test: click Cancel`; the terminal may close even though the cancel worked | the blocker (handle, block reason read back with `ShutdownBlockReasonQuery`, FALSE to a synthetic `WM_QUERYENDSESSION`); **session id, WTS logon time and the newest User32 1077 before and after**; the verdict from that evidence ("cancelled" = same session/logon + a newer 1077, "signed out" = new session/logon); a Host in this session within 60 s, with the old/new pids and the save time |
+| c3 | start a **restart** and cancel it the same way — the blocker is a second one in the same process, titled `WP4 test: cancel the restart`; the terminal may close here too | the blocker's second start (handle, block reason), FALSE to `WM_QUERYENDSESSION`; **session id, WTS logon time and the newest User32 1073 before and after**; the verdict from that evidence; a Host in this session within 60 s, with the old/new pids and the save time |
 | d | keep a Notepad open — **or, if none is open, open one and type a few letters with Fusion first** — allow UAC for the upgrade, type Chinese in that same window, then close every Notepad **including each tab** and type in the fresh one; Notepad A–E there | the pre-upgrade process + its loaded wp4.1 DLL; install exit code and how many files were copied vs skipped as identical; Host + registration for wp4.2 (**no Notepad assertion yet**); the old window's y/n, its DLL (still wp4.1), whether the process is alive, whether the wp4.1 directory exists and **every process holding it** (shell processes are expected); the "close all + poll" result; the fresh process's pid + loaded wp4.2 DLL + hash; A–E; whether the wp4.1 directory is free now (not removed here) |
 | e | allow UAC for the uninstall (the script asks for Notepads to be closed first) | exit code, no TIP/COM/task/Host, install root, **the holders of the wp4.2 directory before and after** (shell processes are expected and are not a failure), **HKCU `CTF\TIP` and the language-list tips before and after**, `%APPDATA%\Fcitx5` kept, `check-state.ps1` output |
 | f | close every Notepad (the script waits), allow UAC twice | **whether the wp4.2 directory was still held before the reinstall** (identical files are skipped, so the reinstall succeeds over a held directory), reinstall and `-RemoveUserData` exit codes, user data removed, nothing else left, **HKCU `CTF\TIP` and the language-list tips before and after** |
@@ -332,7 +333,7 @@ the owner's report, not the log's.
 
 **(c2) what happened.** The logoff was cancelled — the terminal closing does **not** mean the session ended — and the
 Host did not survive it: Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another during a logoff, so an
-application processed before the blocking one has already ended when the Cancel takes effect. That is **R34** — FIX IMPLEMENTED (fusion-windows #18), verification pending: an event trigger on User32 1077 starts the Host again.
+application processed before the blocking one has already ended when the Cancel takes effect. That is **R34** — FIX IMPLEMENTED (fusion-windows #18), verification pending: an event trigger on User32 1077 (cancelled logoff) or 1073 (cancelled restart/shutdown) starts the Host again.
 *Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this section recorded (c2) as "not exercised —
 the blocker died with its terminal". The blocker did hold the logoff (1077 at 19:03:20) and the session never ended
 (`query user`: session 2, logon time 18:58, still active at 20:06).*
@@ -357,7 +358,7 @@ browser processes still hold the DLLs; it is to be removed after a restart (manu
 the task and the registration). That is the documented behaviour of R28 — report the holders, remove after sign-out —
 not a defect.
 
-### R34 — a cancelled logoff ends the Host (FIX IMPLEMENTED (fusion-windows #18), verification pending)
+### R34 — a cancelled logoff, restart or shutdown ends the Host (FIX IMPLEMENTED (fusion-windows #18), verification pending)
 
 The run's (c2) is a product failure, and the event log says why. `r34-evidence.txt` (owner's read-only collection,
 2026-10-18 20:06, elevated):
@@ -369,6 +370,21 @@ The run's (c2) is a product failure, and the event log says why. `r34-evidence.t
 | 19:03:20 | System, User32 **1077**: "user 5700X\choicky attempted to log off computer 5700X and failed" — the Cancel worked |
 | 20:06 | `query user`: session 2, console, logon time 18:58, still active — the session never ended |
 
+**Which event a cancelled attempt writes** (owner's measurement, 2026-10-19, `b1b-restart.txt` and `b1b-shutdown.txt`;
+the shutdown's terminal was closed by the attempt, so its events were collected afterwards from the baseline record):
+
+| attempt | User32 event | evidence |
+|---|---|---|
+| cancelled logoff | **1077** | 2026-10-18 19:03:20, RecordId 104140, `Security/@UserID` = this user |
+| cancelled restart | **1073** | 2026-10-19 11:16:08, RecordId 104461 (after User32 1074 "restart requested" at 11:16:03), same SID |
+| cancelled shutdown | **1073** | 2026-10-19 11:23:50, RecordId 104462, same SID |
+| completed restart | **none** | EventLog 6006 at 11:24:41, Kernel-General 13 at 11:24:47, boot 11:25:02 — no 1073 |
+
+Both cancel events carry the user's SID in `System/Security/@UserID`, and neither is written when the attempt completes.
+**The order in which Windows closes applications varies between attempts**: the terminal running the probe survived the
+cancelled restart and was closed by the cancelled shutdown. That is direct support for the inference below — whether the
+Host survives a cancel is luck, not design.
+
 **Mechanism (inference, not a proven cause):** Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another
 during a logoff, so an application processed before the blocking one has already ended when the Cancel takes effect. The
 Host's only save trigger without a stop-event signal is `WM_ENDSESSION(TRUE)`, which it received; `LastTaskResult`
@@ -376,29 +392,50 @@ Host's only save trigger without a stop-event signal is `WM_ENDSESSION(TRUE)`, w
 assumption was that a cancelled end only ever delivers `ENDSESSION(FALSE)`.
 
 **Fix (direction A, owner-accepted 2026-10-18 as an implementation detail of U2 (b)):** the task gains a System-log
-`User32` 1077 event trigger scoped to the installing user's SID (the SID is in `System/Security/@UserID`), delayed
-`PT10S` so the old Host has released `HostClaim`; the logon trigger and every other setting stay. A latent defect found
-in the same review is fixed too: an external `WM_CLOSE` (`taskkill` without `/f`) used to destroy the hidden session-end
-window and leave the Host running with no logoff path; it now requests the orderly stop and keeps the window.
+`User32` **1077 or 1073** event trigger scoped to the installing user's SID (`Security[@UserID='<SID>']`), delayed
+`PT10S` so the old Host has released `HostClaim`; the logon trigger and every other setting stay, and the install fails
+if the read-back does not carry both ids. A latent defect found in the same review is fixed too: an external `WM_CLOSE`
+(`taskkill` without `/f`) used to destroy the hidden session-end window and leave the Host running with no logoff path;
+it now requests the orderly stop and keeps the window.
 
-**Scope: a cancelled logoff only.** A cancelled restart or shutdown is **unmeasured** — the B1b probe that records which
-System events such a cancel writes is committed as `tools/package/probe-b1b.ps1` and has not been run — so a Host lost
-that way is an **open sub-item** (owner: Stage 6 implementation; trigger: the R34 walkthrough). If the probe finds a
-distinct event, the trigger gains it and the walkthrough gains a cancelled-restart step.
+**Scope: all three cancelled ends.** The walkthrough verifies the cancelled **logoff** (c2) and the cancelled **restart**
+(c3); the cancelled **shutdown** is covered by the event measurement above — the same id, the same SID scoping — rather
+than by its own step, because a cancelled shutdown closes the terminal the walkthrough runs in more often than a restart
+does and the id is identical to the restart's.
 
 **Review defect found in the first version of the trigger (fixed in #18).** The subscription used `@UserID` on
 `System`, but `UserID` is an attribute of `System/Security`, so the XPath selected nothing and the trigger could never
 fire; the `QueryList` was also missing `</Query>`, which `Get-WinEvent` tolerates and the task registration does not.
-The query is now `Security[@UserID='<SID>']` and is proven against the record: the new form returns 2026-10-18
-19:03:20 / RecordId 104140, the same query with another SID returns nothing, and the old form returns nothing
-(`proof-xpath.txt`). `install.ps1` validates the query before registering — a valid query with no match is accepted,
-a malformed one fails the install at step 'task' (`proof-xpath-validation.txt`).
+The query is now `Security[@UserID='<SID>']` over `(EventID=1077 or EventID=1073)` and is proven against the records
+(`proof-a1.txt`, five queries): the exact subscription string that `install.ps1` builds returns 104140 (1077,
+2026-10-18 19:03:20), 104461 and 104462 (1073, 2026-10-19 11:16:08 and 11:23:50); the same query bounded to
+11:24:00–11:26:00 (the completed restart) returns nothing; another SID returns nothing; and the old `@UserID` form
+returns nothing. `install.ps1` validates the query before registering — a valid query with no match is accepted, a
+malformed one fails the install at step 'task' (`proof-xpath-validation.txt`).
+
+**Harness defects found while adding (c3)** (all fixed in #18, all proven without a restart):
+
+1. **The shutdown blocker could not start twice in one process.** `RegisterClassW` failed with
+   `ERROR_CLASS_ALREADY_EXISTS` on the second start and the static state was not reset, so `Start` returned false. (c3)
+   needs a second blocker in the same process when the terminal survives (c2). The class is now registered once and its
+   re-registration is tolerated, every field is reset on `Start`, and `Stop` leaves the class reusable
+   (`proof-a2-a4.txt`: start → stop → start both report `started=True` with a registered block reason).
+2. **`probe-b1b.ps1` could not run and could lose its events.** It did not dot-source `host-state.ps1`
+   (`Get-FusionHostState` was undefined), and it had no way to read the log after the attempt killed its terminal. It now
+   dot-sources the helper, writes the baseline record before the blocking prompt, and takes
+   `-CollectOnly -OutFile <file>` to append every event newer than that baseline from a fresh terminal — proven against
+   the 11:16 restart file (`probe-collectonly.txt`), and its append keeps the file's own encoding.
+3. **`Get-SessionIdentity` read the wrong field.** WTS class 24 is `WTSSessionInfo`, i.e. a `WTSINFOW`; reading its first
+   8 bytes as a FILETIME returned State + SessionId, so every session reported `1601-01-01 00:07:09`. The structure is
+   parsed properly and the value is sanity-checked (after 2000, not before the last boot), reporting `(unavailable)`
+   otherwise; it now prints the real logon time, 2026-10-19 11:25:12, matching `query user` (`proof-a2-a4.txt`).
 
 **Verification without UAC:** Mock 71/71, Debug 79/79, Release 79/79; `wp4sessionend` covers the close decision; a real
 staged Release Host exits 0 in 0.3 s on `taskkill /pid` (no `/f`) with "Save before exiting" and "shutting down"; the
 pre-fix package leaves the Host running under the same test. The packages are
-`fusion-0.0.0-wp4.1+2a58466.zip` (`0DE823C9…325A`) and `fusion-0.0.0-wp4.2+2a58466.zip` (`D7761D62…926A`), 101 files
-each, all twelve packaged-script hashes `MATCH`.
+`fusion-0.0.0-wp4.1+5f357b2.zip` (`6FE297B4…59E4`) and `fusion-0.0.0-wp4.2+5f357b2.zip` (`FB5FA711…2247`), 101 files
+each, all twelve packaged-script hashes `MATCH`, `-VerifyOnly` exits 0 ("101 files match"), and the dry run is
+`wp4-run-20261019-121935`.
 
 ### Harness follow-ups from the WP4 run (fixed in the R34 change)
 
@@ -867,8 +904,11 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A2 investigation (HKCU CTF\TIP, language list) | `a2-hkcu-tip.txt`, `probe-a2.ps1` |
 | hash-skip copy proof | `proof-copy.txt`, `proof-copy.ps1` |
 | R34 event-log evidence (owner-collected, elevated) | `r34-evidence.txt` — kept locally by the owner; the times quoted above come from it |
+| R34 cancel-event measurement (2026-10-19) | `b1b-restart.txt`, `b1b-shutdown.txt`, `b1b-shutdown.txt.after.txt` — kept locally by the owner; the RecordIds and times in the table above come from them |
 | R34 WM_CLOSE proof and negative control | `proof-wmclose.txt` / `proof-wmclose.ps1`, `proof-wmclose-old.txt` / `proof-wmclose-old.ps1` (under `worktmp\fusion-windows\stage6-r34\`) |
-| R34 event-query proof (the three XPath queries) | `proof-xpath.txt` / `proof-xpath.ps1`, `proof-xpath-validation.txt` / `proof-xpath-validation.ps1` (same directory) |
+| R34 event-query proof (the five XPath queries) | `proof-a1.txt` / `proof-a1.ps1` (same directory) |
+| R34 event-query validation | `proof-xpath-validation.txt` / `proof-xpath-validation.ps1` (same directory) |
+| R34 blocker-restart and session-identity proofs | `proof-a2-a4.txt` / `proof-a2-a4.ps1`, plus `probe-mode1.txt` and `probe-collectonly.txt` for the probe's two modes (same directory) |
 | harness proof without UAC (round 2) | `harness-proof.txt` |
 | script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
 | script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |

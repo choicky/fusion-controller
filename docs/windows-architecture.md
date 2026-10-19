@@ -438,7 +438,7 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 含 control handler）保留。证据与边界见 `docs/windows-stage6-wp4.md`；U2 (a)（登录 Run 项）未实现，其缺口已记录。
 **自动启动：**登录时启动已验证一次（2026-10-18 18:58:43，走查 run `wp4-run-20261018-185004`）。
 **取消注销尚未保证：**同一次走查中，注销被取消（User32 1077，19:03:20）后 Host 已经结束、没有任何东西重启它
-（R34；修复已实现（fusion-windows #18），验证待走查：任务是 1077 事件触发器）。本段描述的是启动机制的设计与配置。
+（R34；修复已实现（fusion-windows #18），验证待走查：任务是 1077（取消注销）或 1073（取消重启/关机）事件触发器）。本段描述的是启动机制的设计与配置。
 
 **P0-D 仍然 OPEN 的部分：** 上述只是 §3 目标场景内的已实现基线，不是 Host topology 的冻结。High IL、x86/x64 混合、
 AppContainer/LPAC、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
