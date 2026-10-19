@@ -425,17 +425,26 @@ malformed one fails the install at step 'task' (`proof-xpath-validation.txt`).
    dot-sources the helper, writes the baseline record before the blocking prompt, and takes
    `-CollectOnly -OutFile <file>` to append every event newer than that baseline from a fresh terminal — proven against
    the 11:16 restart file (`probe-collectonly.txt`), and its append keeps the file's own encoding.
-3. **`Get-SessionIdentity` read the wrong field.** WTS class 24 is `WTSSessionInfo`, i.e. a `WTSINFOW`; reading its first
-   8 bytes as a FILETIME returned State + SessionId, so every session reported `1601-01-01 00:07:09`. The structure is
-   parsed properly and the value is sanity-checked (after 2000, not before the last boot), reporting `(unavailable)`
-   otherwise; it now prints the real logon time, 2026-10-19 11:25:12, matching `query user` (`proof-a2-a4.txt`).
+3. **`Get-SessionIdentity` read the wrong field — twice.** WTS class 24 is `WTSSessionInfo`, i.e. a `WTSINFOW`; reading
+   its first 8 bytes as a FILETIME returned State + SessionId, so every session reported `1601-01-01 00:07:09`. The
+   first fix parsed the structure but omitted the six DWORD counters that follow `SessionId` (incoming/outgoing bytes
+   and frames, incoming/outgoing compressed bytes), which shifted every later field by 24 bytes — the field named
+   `LogonTime` read `ConnectTime`. The two are equal on a console session, which is why that first proof matched
+   `query user`, and differ after a disconnect/reconnect (fast user switching, RDP). The counters are now declared in
+   order, the Unicode field sizes and the sanity checks are unchanged, and `FusionWts.Query` exposes both timestamps
+   and the two sizes so the layout is checkable. Proof (`proof-wts.txt`): `Marshal.SizeOf` **216** equals the **216**
+   bytes WTS returned; `ConnectTime` 2026-10-19 11:25:12 and `LogonTime` 11:25:13 are distinct, and `LogonTime` matches
+   `query user` (11:25).
 
 **Verification without UAC:** Mock 71/71, Debug 79/79, Release 79/79; `wp4sessionend` covers the close decision; a real
 staged Release Host exits 0 in 0.3 s on `taskkill /pid` (no `/f`) with "Save before exiting" and "shutting down"; the
 pre-fix package leaves the Host running under the same test. The packages are
 `fusion-0.0.0-wp4.1+5f357b2.zip` (`6FE297B4…59E4`) and `fusion-0.0.0-wp4.2+5f357b2.zip` (`FB5FA711…2247`), 101 files
 each, all twelve packaged-script hashes `MATCH`, `-VerifyOnly` exits 0 ("101 files match"), and the dry run is
-`wp4-run-20261019-121935`.
+`wp4-run-20261019-121935`. They were built from `5f357b2`; the only later change is
+`tools/package/walkthrough-assertions.ps1`, which `build-package.ps1` does not package (it packages `install.ps1`,
+`uninstall.ps1` and `host-state.ps1`, plus `register.ps1`/`unregister.ps1`/`check-state.ps1`), so the packages and their
+twelve hashes still hold and the walkthrough runs from the branch head `3279293`.
 
 ### Harness follow-ups from the WP4 run (fixed in the R34 change)
 
@@ -908,7 +917,7 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | R34 WM_CLOSE proof and negative control | `proof-wmclose.txt` / `proof-wmclose.ps1`, `proof-wmclose-old.txt` / `proof-wmclose-old.ps1` (under `worktmp\fusion-windows\stage6-r34\`) |
 | R34 event-query proof (the five XPath queries) | `proof-a1.txt` / `proof-a1.ps1` (same directory) |
 | R34 event-query validation | `proof-xpath-validation.txt` / `proof-xpath-validation.ps1` (same directory) |
-| R34 blocker-restart and session-identity proofs | `proof-a2-a4.txt` / `proof-a2-a4.ps1`, plus `probe-mode1.txt` and `probe-collectonly.txt` for the probe's two modes (same directory) |
+| R34 blocker-restart and session-identity proofs | `proof-a2-a4.txt` / `proof-a2-a4.ps1`, `proof-wts.txt` / `proof-wts.ps1` (the WTSINFOW layout), plus `probe-mode1.txt` and `probe-collectonly.txt` for the probe's two modes (same directory) |
 | harness proof without UAC (round 2) | `harness-proof.txt` |
 | script-call semantics probe | `probe-semantics.ps1` (its output is quoted in the 12:44 section) |
 | script-call / VerifyOnly / broken-package proof (round 3) | `proof-scripts.txt` (UTF-8 copy `proof-scripts-utf8.txt`), `proof-scripts\verifyonly-0.0.0-wp4.{1,2}+2a8b0bb.log`, `proof-scripts\verifyonly-broken.log` |
