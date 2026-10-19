@@ -519,10 +519,11 @@ session; none of them is a release blocker. Unexecuted scenarios are never recor
 complete until the owner closes it. The Stage 6 plan's §8.2 and §8.3 remain the **analysis reference** for a reported
 problem, not a mandatory campaign.
 
-**U6 decided:** a newly opened application window starts with Fusion open. The implementation declares the thread's
-`GUID_COMPARTMENT_KEYBOARD_OPENCLOSE` open once per **new context** as well as at activation, never per key or per focus
-change, so an explicit Ctrl+Space close still holds inside a context. Diagnosis: the activation-time write is lost when
-Windows/the application re-initialises the compartment as a new context appears (fusion-tsf diagnostic log, 2026-10-19).
+**U6 decided:** a newly opened application window starts with Fusion open, while an explicit Ctrl+Space close remains
+effective (before or after the first key) and ordinary focus changes are not overridden. Implementation and validation
+status are tracked in the Stage 6 plan (U6 row) and in the fusion-windows PR, not in this decision; the evidence that
+motivated it is that the keyboard open/close compartment reads open at activation and closed at the first key of a new
+context, and that attributing the change to the application or to Windows is an unconfirmed hypothesis.
 
 **U7 presentation decided:** a persistent tray status, a fault balloon notification, and actions to restart the Host and
 open its log directory; no focus stealing, no input content and no repeated per-key notifications. Automatic restart is

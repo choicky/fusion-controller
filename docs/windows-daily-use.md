@@ -23,6 +23,11 @@ reports the holders.
 **Rollback:** run the previous version's `install.ps1` elevated (it installs side by side and re-registers that version),
 or uninstall and install the earlier package. User data is kept either way.
 
+**Installing registers and enables Fusion; it does not necessarily make it the selected input method.** After install (and
+after every upgrade), check the Windows input indicator in the taskbar. If Fusion is not the current input method, press
+**Win+Space** until it is, then type. Judge U6 only with Fusion already selected — otherwise "letters appear raw" means the
+IME was not selected, not that a new window failed to open.
+
 ## 2. Restarting the Host
 
 Start menu → **Fusion → Restart FusionHost** (`restart-host.ps1` in the installed version directory). It:
@@ -39,7 +44,9 @@ enables automatic restart or changes the task's restart-on-failure setting.
 ## 3. Selecting the backup input method
 
 Press **Win+Space** to cycle input methods; the indicator shows the current one. Use it if Fusion is not selected, or to
-compare against another IME. Fusion is the default after install; the tray/indicator reflects the Windows state.
+compare against another IME. Installing does not force Fusion to be the selected method; the Windows indicator is the
+authority. There is **no Fusion tray icon yet** (U7 is decided but not implemented) — the indicator is the only status
+surface in this build.
 
 ## 4. Diagnostics (off by default)
 
@@ -58,7 +65,7 @@ received it** (the new pid's log file must exist; a launcher with a cached envir
 - The TSF log (`%LOCALAPPDATA%\fusion-tsf\`) stays a separate developer opt-in (`FUSION_TSF_DIAGNOSTICS=1`).
 - Fcitx's own log is **not** part of this; at debug level it can contain key events.
 
-### U7 minimal design (presentation decided, implementation pending)
+### U7 minimal design (presentation decided, implementation pending — nothing here exists yet)
 
 Owner process: a small per-user tray process started at logon (its own scheduled task, Medium integrity), not inside the
 Host (a crashed Host cannot report itself) and not one instance per application's TSF DLL. Single instance per user ×
@@ -99,8 +106,9 @@ No daily report is required, and no feedback is needed for a day without problem
 
 - **Firefox:** composition and commit work, but the candidate popup is not shown (R25, observed 2026-10-18: hidden in 3 of
   4 runs). A known limitation, not a regression.
-- A new application window starts with Fusion open (U6, implemented 2026-10-19); if it does not, press Ctrl+Space once and
-  report it with the time and the application.
+- A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
+  PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
+  window still starts closed, press Ctrl+Space once and report it with the time and the application.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
   packaging and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically; use the restart shortcut.

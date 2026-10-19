@@ -591,10 +591,12 @@ Stage 6    Packaging / release / soak                       PLAN PROPOSED — �
 P0-A / P0-B / P0-D 仍 OPEN（§24）
 ```
 
-**下一阶段边界。** Stage 6 仍未接受为计划，WP4 之后没有授权的工作包。WP4 的收口只差其所有者走查（安装、第二次启动、
-注销/登录、在记事本保持打开时升级、两条卸载路径、已安装 wp4.2 上的 Notepad A–E）；这些是 §14 启动基线与 R26 的
-部署侧证据，不是新的架构决定。WP5（失败与恢复，R7/R22）只有在 WP4 走查收口后按自己的执行指令开始，并且它是 U7 的
-证据来源；WP6/WP7 依赖 WP4 退出；WP8 还依赖 U4（签名/渠道）与 U7。
+**下一阶段边界（2026-10-19，D084）。** Stage 6 计划仍未正式接受，但所有者已决定直接进入 **WP7 日常使用**。WP4 已于
+2026-10-19 收口（走查 run `wp4-run-20261019-130037` 全部通过）；WP5（失败与恢复，R7/R22）与 WP6（应用兼容性）通过
+**日常使用**验收：发现问题即按影响修复，未报告问题即为通过，不再要求单独的故障注入、应用矩阵普查或 WP8 前的
+崩溃/挂起会话；计划 §8.2/§8.3 是问题分析参考。**U6 已决定并实现**（新窗口默认打开；真机确认待所有者安装后的首次
+检查）。**U7 呈现已决定**（托盘状态、故障气泡、重启/打开日志目录），托盘实现与挂起检测是后续独立工作，尚未实现；
+WP8 还依赖 U4（签名/渠道）与 U7 实现。
 ## 23. Decision classification
 
 ### ACCEPTED（D072）
@@ -710,6 +712,8 @@ preedit 残留或崩溃；代表性真实 Forward 恰好送达应用一次）。
   其已实现并已验证的产品拓扑、重连/fencing 与生命周期边界；多应用 out-of-process 再验证记为 **VALIDATION DEBT**
   （可推迟的验证债，不是机制失效），归 Stage 6 的应用广度门。若日后真实应用暴露与已接受结论矛盾的观察，属 §9.7
   意义上的实质性新事实，按其规则重开对应事项；本条不预先否认当前结论。
+  **2026-10-19 更新（D084）：** 上述"应用广度门"不再作为独立验收关卡——应用兼容性通过 WP7 日常使用验收
+  （见 §22 下一阶段边界）；该 VALIDATION DEBT 的处置由此改变，Stage 4 的收口结论不变。
 - **仍 OPEN、不因 Stage 4 关闭：** P0-A 最终 recovery key policy、P0-B recovery representation、P0-D 除 §14 baseline
   之外的场景（High IL、AppContainer、多 session、RDP 等）、§9 未取证的 lifecycle 子边界、final wire protocol、
   permanent identifiers、timing/threshold 数值、effect-capable key 分类。Host 崩溃后旧 incarnation 状态与未决 EFFECT
