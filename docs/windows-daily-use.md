@@ -114,9 +114,9 @@ No daily report is required, and no feedback is needed for a day without problem
   in this application, not universal Notepad-- compatibility. Other applications that ship their own older
   `MSVCP140.dll` would have shown the same crash.
 - **Notepad--: Enter did not start a new line** while Fusion was the Chinese input method, after committing with Space
-  (R36). The key was claimed by the TIP and handed back, and that application drops it; fusion-windows PR #23 leaves an
-  idle Enter to the application. Confirmation is one `nihao` + Space + Enter on the repair package. Enter during a
-  composition, and candidate selection, are unchanged.
+  (R36). The TIP claimed the key and then handed it back, and that application had already stopped handling it;
+  fusion-windows PR #23 leaves an idle Enter to the application. Confirmation is one `nihao` + Space + Enter on the
+  repair package. Enter during a composition, and candidate selection, are unchanged.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
