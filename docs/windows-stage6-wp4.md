@@ -908,9 +908,10 @@ WP8), and §8.1 of the plan points here.
   **not** supported today: the task name `FusionHost` is global, so a second account's install overwrites the first
   account's task (R32, hypothesis from source, CONDITIONAL). An installer elevated as a *different* administrator cannot
   open the owner's stop event — it reports that instead of killing the Host.
-- The windowless Host writes no log file, so its stderr evidence only exists when a caller redirects it. Recorded as
-  **R30**, required before WP5: §8.2 needs the Host log in every failure scenario, and its absence is what made the
-  2026-10-18 diagnosis depend on the walkthrough's own transcript.
+- The windowless Host writes no log file **unless the opt-in is set**: with `FUSION_HOST_DIAGNOSTICS=1` it writes
+  `%LOCALAPPDATA%\fusion-host\fusion-host-<pid>.log` (technical only, 2 MiB cap, five files retained); without it, stderr
+  evidence still exists only when a caller redirects it. Recorded as **R30**, **IMPLEMENTED** in fusion-windows PR #19
+  (WP5's entry condition); Fcitx's own log is excluded by owner decision 2026-10-19.
 - `--console` is required by anything that still expects the console subsystem (the WP3 harness pattern); a caller that
   passes no switch gets the windowless Host.
 - No MSI, no signing, no distribution channel (U4, WP8); versions are provisional test identifiers.
