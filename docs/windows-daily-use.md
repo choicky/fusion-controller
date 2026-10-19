@@ -109,9 +109,14 @@ No daily report is required, and no feedback is needed for a day without problem
   2026-10-19). A known limitation, not a regression. The anchor-probe logging added in fusion-windows PR #22 names the
   failing stage on the next run with `FUSION_TSF_DIAGNOSTICS=1`.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
-  own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removes the CRT mutex that triggered it.
-  Confirmation is one Win+Space in Notepad-- on the repair package. Other applications that ship their own older
+  own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
+  the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
+  in this application, not universal Notepad-- compatibility. Other applications that ship their own older
   `MSVCP140.dll` would have shown the same crash.
+- **Notepad--: Enter did not start a new line** while Fusion was the Chinese input method, after committing with Space
+  (R36). The key was claimed by the TIP and handed back, and that application drops it; fusion-windows PR #23 leaves an
+  idle Enter to the application. Confirmation is one `nihao` + Space + Enter on the repair package. Enter during a
+  composition, and candidate selection, are unchanged.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
