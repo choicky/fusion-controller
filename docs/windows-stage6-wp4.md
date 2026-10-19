@@ -2,12 +2,7 @@
 
 Date: 2026-10-18. Owner decision recorded: **U2 = (b) Accepted 2026-10-18** (§7.1 of the plan).
 
-**Result: WP4 is implemented and the owner walkthrough is complete on 2026-10-18 (run `wp4-run-20261018-185004`).**
-Install, second start, learning across sign-out, the upgrade with a Notepad open, both uninstall paths and the
-development-registration restore pass; **the exit gate is met except B3c2, which FAILED** — a cancelled logoff ended the
-Host and nothing restarted it (**R34**, FIX IMPLEMENTED (fusion-windows #18), verification pending; WP4 closes when that
-walkthrough passes, which now also covers a cancelled **restart** in the new step (c3)). Logon autostart itself was
-exercised once and **passed** (the task started the Host at 18:58:43).
+**Result: WP4 is CLOSED within its scope on 2026-10-19.** The 2026-10-18 run (`wp4-run-20261018-185004`) met the exit gate except B3c2, which FAILED — a cancelled logoff ended the Host and nothing restarted it; the 2026-10-19 run (`wp4-run-20261019-130037`) then passed every step on the fixed packages: install, second start, sign-out/sign-in, the cancelled logoff (c2), the new cancelled restart (c3), the upgrade with a **running** Host, both uninstall paths and the development-registration restore. **R34** is RESOLVED — verified 2026-10-19 (run `wp4-run-20261019-130037`): cancelled logoff (c2) and cancelled restart (c3) restore a Host in the same session; cancelled shutdown covered by the 1073 measurement. Logon autostart is verified (the task started the Host at 18:58:43 and again at the 2026-10-19 sign-in).
 *Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this paragraph said the task "did not start the
 Host at the second sign-in". There was no second sign-in — the only sign-out/sign-in of the run is 18:58:39→18:58:43 —
 and (c2) was not "not exercised": the logoff was cancelled (User32 1077 at 19:03:20) and the Host had already ended.*
@@ -326,6 +321,9 @@ exercises **version-directory switching, not a binary change** — that is exact
 | f | **PASS** | the reinstall succeeded **while the wp4.2 directory was held by `explorer`** (hash-skip copy), task Running, Host 14940; the uninstall stopped it, `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` were deleted, registration and task removed |
 | end | **PASS** | development registration restored (`register.ps1` exit 0); HKCU enable flag back to 1 |
 
+**This table is the 2026-10-18 run and stays as history.** The 2026-10-19 run (`wp4-run-20261019-130037`) re-ran
+every step on the fixed packages and passed; its results are the verification block in the R34 section below.
+
 **(c) harness note.** The prompted word `shuangpin` was already rank 1 on this machine, so the owner substituted `shi`.
 Provenance of the ranks: the owner reports `shi` was 4th before learning and 1st after learning, and still 1st after
 sign-out/sign-in; the script's rank prompt (example `5→1`) recorded only `1` in `verify-wp4.log`, so the `4→1` pair is
@@ -333,7 +331,7 @@ the owner's report, not the log's.
 
 **(c2) what happened.** The logoff was cancelled — the terminal closing does **not** mean the session ended — and the
 Host did not survive it: Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another during a logoff, so an
-application processed before the blocking one has already ended when the Cancel takes effect. That is **R34** — FIX IMPLEMENTED (fusion-windows #18), verification pending: an event trigger on User32 1077 (cancelled logoff) or 1073 (cancelled restart/shutdown) starts the Host again.
+application processed before the blocking one has already ended when the Cancel takes effect. That is **R34** — RESOLVED — verified 2026-10-19 (run `wp4-run-20261019-130037`): cancelled logoff (c2) and cancelled restart (c3) restore a Host in the same session; cancelled shutdown covered by the 1073 measurement. The fix is an event trigger on User32 1077 (cancelled logoff) or 1073 (cancelled restart/shutdown) that starts the Host again.
 *Corrected 2026-10-18 by the event-log evidence (`r34-evidence.txt`): this section recorded (c2) as "not exercised —
 the blocker died with its terminal". The blocker did hold the logoff (1077 at 19:03:20) and the session never ended
 (`query user`: session 2, logon time 18:58, still active at 20:06).*
@@ -358,9 +356,11 @@ browser processes still hold the DLLs; it is to be removed after a restart (manu
 the task and the registration). That is the documented behaviour of R28 — report the holders, remove after sign-out —
 not a defect.
 
-### R34 — a cancelled logoff, restart or shutdown ends the Host (FIX IMPLEMENTED (fusion-windows #18), verification pending)
+### R34 — a cancelled logoff, restart or shutdown ends the Host (RESOLVED — verified 2026-10-19)
 
-The run's (c2) is a product failure, and the event log says why. `r34-evidence.txt` (owner's read-only collection,
+**RESOLVED — verified 2026-10-19 (run `wp4-run-20261019-130037`): cancelled logoff (c2) and cancelled restart (c3) restore a Host in the same session; cancelled shutdown covered by the 1073 measurement.**
+
+The 2026-10-18 run's (c2) is a product failure, and the event log says why. `r34-evidence.txt` (owner's read-only collection,
 2026-10-18 20:06, elevated):
 
 | time | event |
@@ -436,6 +436,30 @@ malformed one fails the install at step 'task' (`proof-xpath-validation.txt`).
    bytes WTS returned; `ConnectTime` 2026-10-19 11:25:12 and `LogonTime` 11:25:13 are distinct, and `LogonTime` matches
    `query user` (11:25).
 
+**Verification — owner walkthrough, run `wp4-run-20261019-130037` (2026-10-19).** Machine 5700X, Windows 11, 175 %
+scaling, one monitor. Scripts from fusion-windows branch head `3279293`; packages `fusion-0.0.0-wp4.1+5f357b2.zip`
+(`6FE297B4…59E4`) and `fusion-0.0.0-wp4.2+5f357b2.zip` (`FB5FA711…2247`); installed `FusionTsf.dll` SHA-256
+`1BC7907B…0F83`.
+
+| step | verdict | evidence |
+|---|---|---|
+| a | **PASS** | install exit 0; task triggers `Logon;Event` (count 2), subscription `User32 (1077 or 1073)` scoped to `S-1-5-21-…-1001`; Host 18324, Medium, session 1; HKLM at wp4.1, HKCU none; the Notepad module is the installed DLL; 你好; Pinyin. **The two leftover directories from the 2026-10-18 run (`0.0.0-wp4.1+e85d497`, `0.0.0-wp4.2+e85d497`) were removed by this install** (`still-present=none`) — the first observed instance of R28's "a later install removes it" |
+| b | **PASS** | re-running the task kept 1 Host; the direct start exited 1 ("another Host already owns this pipe name; exiting without touching user data"); typing OK |
+| c | **PASS** | a real sign-out/sign-in (session 1 → 2, logon 13:34:44); the logon task started Host 30376 (Medium, session 2); `shi` 6→4 before sign-out (the enforced `N→M` pair), rank 1 after sign-in, and the owner confirmed the learning survived |
+| c2 | **PASS** | logoff cancelled — User32 1077 record 104831 at 13:37:09, same session and logon time; the old Host 30376 saved (13:37:04) and ended; a new Host 14524 (Medium) ran in the same session within the bound; typing OK; blocker closed |
+| c3 | **PASS** | restart cancelled — User32 1073 record 104834 at 13:38:02, same session; the old Host 14524 saved (13:37:57) and ended; a new Host 32528 ran in the same session; the blocker's second start in the same process worked (A2 on the product path) |
+| d | **PASS** | upgrade with a **running** Host — the old Host 32528 stopped in order (save advanced 13:37:57 → 13:39:06), none still alive, new Host 35252 from wp4.2; the old Notepad 36220 stayed on the wp4.1 DLL and typed through the new Host; wp4.1 held by `explorer` + Notepad (expected); a fresh Notepad 28360 loaded the wp4.2 DLL with the manifest hash; new-Notepad typing and A–E all PASS |
+| e | **PASS** | uninstall exit 0; HKLM COM/TIP, the task and the Host gone; `%APPDATA%\Fcitx5` kept; the HKCU TIP enable flag removed; directories retained because held (wp4.1 by `explorer`, wp4.2 by `firefox`) — R28 expected |
+| f | **PASS** | reinstall exit 0 over a held wp4.2 directory, the event trigger present after the reinstall; the `-RemoveUserData` uninstall exited 0; `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` deleted; nothing else left |
+| end | **PASS** | the development registration restored; the HKCU enable flag back to 1 |
+
+**(c) rank note.** The owner reports `shi` 6→4 before sign-out and rank 1 after sign-in, and confirms the learning
+survived. The further improvement after sign-in most likely comes from the owner selecting the candidate again during the
+post-sign-in check; recorded as reported, conclusion "learning retained (not back to 6)".
+
+**The cancelled shutdown has no step of its own.** It is covered by the 2026-10-19 measurement above — the same event
+id 1073, record 104462, matched by the subscription proof in `proof-a1.txt` — not by a walkthrough step.
+
 **Verification without UAC:** Mock 71/71, Debug 79/79, Release 79/79; `wp4sessionend` covers the close decision; a real
 staged Release Host exits 0 in 0.3 s on `taskkill /pid` (no `/f`) with "Save before exiting" and "shutting down"; the
 pre-fix package leaves the Host running under the same test. The packages are
@@ -457,14 +481,20 @@ twelve hashes still hold and the walkthrough runs from the branch head `3279293`
 4. **(d)** R18 makes "new Notepad" questions fail unless the IME is opened with Ctrl+Space, and the harness does not tell
    the tester — it recorded two false "n" answers because of that.
 
-All four are fixed in the R34 change (fusion-windows #18): the (c2) verdict is now evidence-based, `Ask-RankChange` enforces `N→M`, C is reworded,
-and the tester is told about Ctrl+Space.
+All four are fixed in the R34 change (fusion-windows #18): the (c2) verdict is now evidence-based, `Ask-RankChange` enforces `N→M`, C is reworded, and the tester is told about Ctrl+Space.
 
-### What the run did not exercise
+### Harness follow-ups from the 2026-10-19 run (recorded, not fixed)
 
-The upgrade path "stop the **running** old Host before switching versions" was not exercised, because the cancelled
-logoff of (c2) had already ended the Host and nothing restarted it (R34). The same ordered-stop mechanism was exercised
-in (e) and (f). The R34 change (fusion-windows #18) adds the assertion to (d) and re-verifies it in its own walkthrough.
+1. **`Get-FusionSaveStamp` prints UTC while the session logon times print local time**, and neither value says which clock
+   it is (`LastWriteTimeUtc` vs `ToLocalTime`). Display only — every comparison uses one clock, so no result depends on
+   it. Owner: whoever next touches `verify-wp4.ps1`; trigger: WP6/WP7 harness work.
+2. **(c) accepts any `N→M` before sign-out, but the post-sign-in rank can improve further** if the tester selects the
+   candidate again while checking (this run's `6→4` became rank 1). Testers should only observe after sign-in, and the
+   prompt should say so. Owner and trigger as above.
+
+### What the 2026-10-18 run did not exercise
+
+The upgrade path "stop the **running** old Host before switching versions" was not exercised in the 2026-10-18 run, because the cancelled logoff of (c2) had already ended the Host and nothing restarted it (R34). The same ordered-stop mechanism was exercised in (e) and (f). The 2026-10-19 run exercised it directly in its (d): the old Host was stopped in order, the save advanced, and a new Host started from wp4.2.
 
 ### The 11:55 run — aborted, invalid (harness defect, not a result)
 
@@ -845,12 +875,7 @@ WP8), and §8.1 of the plan points here.
 
 ## Known limits at this scope
 
-- **A cancelled logoff ends the Host and nothing restarts it (R34; FIX IMPLEMENTED (fusion-windows #18), verification pending).**
-  At 19:03:20 Windows logged User32 1077 "user 5700X\choicky attempted to log off computer 5700X and failed" — the Cancel
-  worked — and the Host had already saved (19:03:13) and ended; no Host ran afterwards. Windows delivers
-  `WM_ENDSESSION(TRUE)` to applications one after another, so an application processed before the blocking one ends
-  before the Cancel takes effect (inference, consistent with all evidence; not a proven cause). The fix is an event
-  trigger on 1077 that starts the Host again — the handler itself is right, the survival assumption was wrong.
+- **A cancelled logoff, restart or shutdown ends the Host (R34; RESOLVED — verified 2026-10-19 (run `wp4-run-20261019-130037`): cancelled logoff (c2) and cancelled restart (c3) restore a Host in the same session; cancelled shutdown covered by the 1073 measurement).** At 19:03:20 on 2026-10-18 Windows logged User32 1077 "user 5700X\choicky attempted to log off computer 5700X and failed" — the Cancel worked — and the Host had already saved (19:03:13) and ended; no Host ran afterwards. Windows delivers `WM_ENDSESSION(TRUE)` to applications one after another, so an application processed before the blocking one ends before the Cancel takes effect (inference, consistent with all evidence; not a proven cause). The fix is a 1077/1073 event trigger that starts the Host again — the handler itself is right, the survival assumption was wrong — and the 2026-10-19 run verified it for a cancelled logoff (c2) and a cancelled restart (c3).
 - **During an upgrade there is a gap** between the old Host's orderly stop and the new Host's start: the TIP is still
   registered and keys pass to the application unmediated (no candidate, no composition). It is bounded by the install
   (seconds) and it is the same "Host absent" state WP5 §8.2 exercises deliberately; the walkthrough records it only
@@ -913,6 +938,7 @@ All under `C:\Users\choicky\worktmp\fusion-windows\stage6-wp4\` unless noted:
 | A2 investigation (HKCU CTF\TIP, language list) | `a2-hkcu-tip.txt`, `probe-a2.ps1` |
 | hash-skip copy proof | `proof-copy.txt`, `proof-copy.ps1` |
 | R34 event-log evidence (owner-collected, elevated) | `r34-evidence.txt` — kept locally by the owner; the times quoted above come from it |
+| 2026-10-19 walkthrough run | `wp4-run-20261019-130037` (under `worktmp\fusion-windows\stage6-wp4\`) — kept locally by the owner; the values quoted above come from its `verify-wp4.log` |
 | R34 cancel-event measurement (2026-10-19) | `b1b-restart.txt`, `b1b-shutdown.txt`, `b1b-shutdown.txt.after.txt` — kept locally by the owner; the RecordIds and times in the table above come from them |
 | R34 WM_CLOSE proof and negative control | `proof-wmclose.txt` / `proof-wmclose.ps1`, `proof-wmclose-old.txt` / `proof-wmclose-old.ps1` (under `worktmp\fusion-windows\stage6-r34\`) |
 | R34 event-query proof (the five XPath queries) | `proof-a1.txt` / `proof-a1.ps1` (same directory) |
