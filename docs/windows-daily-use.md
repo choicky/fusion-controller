@@ -104,12 +104,18 @@ No daily report is required, and no feedback is needed for a day without problem
 
 ## 6. Known limitations at this scope
 
-- **Firefox:** composition and commit work, but the candidate popup is not shown in every field (R25). The address bar
-  and the Google homepage search field show it; the ChatGPT conversation editor does not (owner observation
-  2026-10-19). A known limitation, not a regression, and the cause is still unknown. The anchor-probe logging that PR
-  #22 was meant to add never reached `main` (that PR was merged into a branch that had already been merged); it ships
-  in package `0.0.0-wp7+24914ff` (fusion-windows PR #24) and names the failing stage on the next run when
-  `FUSION_TSF_DIAGNOSTICS=1` is set for that process.
+- **Browsers: the candidate popup was missing in some fields** (R25). Firefox and Edge both showed the symptom on
+  2026-10-20 — no popup in the affected field — while `nihao` + Space still committed 你好. Measured that day: a fresh
+  Edge process shows the popup, while Firefox answers the anchor query with `TS_E_NOLAYOUT` for the whole composition,
+  which hid it. fusion-windows PR #25 falls back to the caret position and shows the popup; that needs the next package,
+  and owner confirmation is pending. The first letter of a composition still cannot be anchored in either browser, so
+  the popup appears from the second key. The address bar and the Google homepage search field showed the popup in the
+  2026-10-19 observation and were not retested since; the ChatGPT conversation editor was the field reported broken
+  that day.
+- **After installing a new package, close and reopen the applications you want to test.** A process keeps the
+  `FusionTsf.dll` it loaded at startup, so an already-running browser or editor can still show the previous build's
+  behaviour — and only that build's diagnostics — until it is restarted. This is the same loader fact recorded as R28,
+  and it is why a 2026-10-20 Edge report described the old build rather than the installed package.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
@@ -117,9 +123,9 @@ No daily report is required, and no feedback is needed for a day without problem
   `MSVCP140.dll` would have shown the same crash.
 - **Notepad--: Enter did not start a new line** while Fusion was the Chinese input method, after committing with Space
   (R36). The TIP claimed the key and then handed it back, and that application had already stopped handling it;
-  fusion-windows PR #23 (merged) leaves an idle Enter to the application. Confirmation is one `nihao` + Space + Enter
-  on a package built from `main`, i.e. `0.0.0-wp7+24914ff`; it has not been confirmed in the real application yet.
-  Enter during a composition, and candidate selection, are unchanged.
+  fusion-windows PR #23 (merged) leaves an idle Enter to the application. **Confirmed by the owner on 2026-10-20 with
+  `0.0.0-wp7+24914ff`:** the `nihao` → Space → Enter sequence inserts the newline again. Enter during a composition,
+  and candidate selection, are unchanged.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
