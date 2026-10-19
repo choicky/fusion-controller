@@ -104,18 +104,22 @@ No daily report is required, and no feedback is needed for a day without problem
 
 ## 6. Known limitations at this scope
 
-- **Browsers: the candidate popup was missing in some fields** (R25). Firefox and Edge both showed the symptom on
-  2026-10-20 — no popup in the affected field — while `nihao` + Space still committed 你好. Measured that day: a fresh
-  Edge process shows the popup, while Firefox answers the anchor query with `TS_E_NOLAYOUT` for the whole composition,
-  which hid it. fusion-windows PR #25 falls back to the caret position and shows the popup; that needs the next package,
-  and owner confirmation is pending. The first letter of a composition still cannot be anchored in either browser, so
-  the popup appears from the second key. The address bar and the Google homepage search field showed the popup in the
-  2026-10-19 observation and were not retested since; the ChatGPT conversation editor was the field reported broken
-  that day.
+- **Browsers: the candidate popup is still missing in some fields** (R25 — open, not closed by fusion-windows PR #25).
+  Firefox and Edge showed no popup in the affected fields on 2026-10-20 while `nihao` + Space still committed 你好. The
+  cause measured that day is that Firefox answers the anchor query with `TS_E_NOLAYOUT` for the whole composition; PR
+  #25 falls back to the caret position, and in fresh processes with the installed package the popup does appear from the
+  second keystroke in the Firefox address bar, the Edge address bar, a page textarea and the Gemini composer. **The
+  affected real pages have not yet been checked with the installed package**, because the browser windows used for the
+  2026-10-20 table had been started before it was installed and were still running older builds. Until that check is
+  done, treat this as open: if a field shows no popup, restart the browser first (see the next bullet) and then report
+  the field. The first letter of a composition cannot be anchored in either browser, so the popup appears from the
+  second key — a one-key gap, not an explanation for a popup that never appears.
 - **After installing a new package, close and reopen the applications you want to test.** A process keeps the
   `FusionTsf.dll` it loaded at startup, so an already-running browser or editor can still show the previous build's
-  behaviour — and only that build's diagnostics — until it is restarted. This is the same loader fact recorded as R28,
-  and it is why a 2026-10-20 Edge report described the old build rather than the installed package.
+  behaviour — and only that build's diagnostics — until it is restarted. This is the same loader fact recorded as R28.
+  Measured on 2026-10-20: a browser started three days earlier still held a development build, and the Edge process used
+  for that day's report held one that contains no candidate window at all, so its "no popup in the address bar either"
+  result described that old build rather than the installed package.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
