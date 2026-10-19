@@ -104,8 +104,14 @@ No daily report is required, and no feedback is needed for a day without problem
 
 ## 6. Known limitations at this scope
 
-- **Firefox:** composition and commit work, but the candidate popup is not shown (R25, observed 2026-10-18: hidden in 3 of
-  4 runs). A known limitation, not a regression.
+- **Firefox:** composition and commit work, but the candidate popup is not shown in every field (R25). The address bar
+  and the Google homepage search field show it; the ChatGPT conversation editor does not (owner observation
+  2026-10-19). A known limitation, not a regression. The anchor-probe logging added in fusion-windows PR #22 names the
+  failing stage on the next run with `FUSION_TSF_DIAGNOSTICS=1`.
+- **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
+  own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removes the CRT mutex that triggered it.
+  Confirmation is one Win+Space in Notepad-- on the repair package. Other applications that ship their own older
+  `MSVCP140.dll` would have shown the same crash.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
