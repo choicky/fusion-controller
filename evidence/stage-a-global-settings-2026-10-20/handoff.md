@@ -17,7 +17,7 @@ live input-method configuration was not touched.
 |---|---|---|---|---|---|
 | `choicky/fusion-windows` | product | `feature/stage-a-global-settings-im-methods` | `fe23f07611707c2d70aaf16a2ece282057ff8097` (origin/main, PR #28 merged) | `0a965e20957022f578526cc86a3314b9fb3be717` | https://github.com/choicky/fusion-windows/pull/29 |
 | `choicky/fcitx5-configtool` (owner fork) | reusable widget-layer contract | `windows/fusion-settings` | `0234c64e93f1d61badc1fd3eaad2ba786ca63850` (merged PR #1 base) | `abc2c6644b030d761d3d5e7c27c888af019e63f0` | https://github.com/choicky/fcitx5-configtool/pull/2 |
-| `choicky/fusion-controller` | docs/authority + this evidence | `feature/stage-a-global-settings` | `96fb28c2bca1cc400361fc2377409e668201054f` (origin/main, PR #51 merged) | see controller PR | opened with this pack |
+| `choicky/fusion-controller` | docs/authority + this evidence | `feature/stage-a-global-settings` | `96fb28c2bca1cc400361fc2377409e668201054f` (origin/main, PR #51 merged) | PR #52 branch tip (this evidence pack; `d25c39c` = first commit) | https://github.com/choicky/fusion-controller/pull/52 |
 
 Dependency order followed: fork commit (`abc2c66`) first, then product re-pin + commit (`0a965e2`),
 then controller docs/evidence. The product `cmake/settings-ui/versions.cmake`
