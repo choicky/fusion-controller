@@ -589,8 +589,8 @@ Stage 6    Packaging / release / soak                       PLAN PROPOSED — �
            WP2、WP3 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)、U1；WP3 运行于新 runtime
            `runtime-wp3-20261018`）；WP4 已在其范围内收口（2026-10-19；U2 (b) Accepted 2026-10-18；走查 run
            `wp4-run-20261019-130037` 全部通过；R34 RESOLVED；证据见 `docs/windows-stage6-wp4.md`）；
-           **WP7 日常使用准备已授权**（D084：WP5/WP6 经日常使用验收；U6 已实现但真机确认待做，U7 呈现已决定、
-           实现待后续批次）；WP8 仍依赖 U4 与 U7 实现
+           **WP7 日常使用准备已授权**（D084：WP5/WP6 经日常使用验收；U6 已实现但真机确认待做，U7 托盘已实现
+           （fusion-windows PR #26，head `2f9c178`），挂起检测待后续批次）；WP8 仍依赖 U4 与 U7 挂起检测
            （`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`、`docs/windows-stage6-wp4.md`、
            `docs/windows-daily-use.md`）
 P0-A / P0-B / P0-D 仍 OPEN（§24）
@@ -600,8 +600,11 @@ P0-A / P0-B / P0-D 仍 OPEN（§24）
 2026-10-19 收口（走查 run `wp4-run-20261019-130037` 全部通过）；WP5（失败与恢复，R7/R22）与 WP6（应用兼容性）通过
 **日常使用**验收：发现问题即按影响修复，未报告问题即为通过，不再要求单独的故障注入、应用矩阵普查或 WP8 前的
 崩溃/挂起会话；计划 §8.2/§8.3 是问题分析参考。**U6 已决定并实现**（新窗口默认打开；真机确认待所有者安装后的首次
-检查）。**U7 呈现已决定**（托盘状态、故障气泡、重启/打开日志目录），托盘实现与挂起检测是后续独立工作，尚未实现；
-WP8 还依赖 U4（签名/渠道）与 U7 实现。
+检查）。**U7 呈现已决定**（托盘状态、故障气泡、重启/打开日志目录），**托盘已实现**（fusion-windows PR #26，head
+`2f9c178`：每用户×会话一个图标、每次 `running → absent` 一次气泡、Restart FusionHost / Open log folder / Exit、
+独立登录任务，以及安装/升级/卸载/重启工具的集成；以隔离测试进程与桩重启工具验证，未安装、未停生产 Host，故气泡、
+会话结束抑制与安装器路径尚未端到端观察）；**挂起检测是后续独立工作，尚未实现**；WP8 还依赖 U4（签名/渠道）与 U7
+挂起检测。
 ## 23. Decision classification
 
 ### ACCEPTED（D072）
@@ -837,7 +840,7 @@ gate 记录的范围内；fusion-windows PR #11 与 PR #12 均已合并）。** 
 另有明确的执行指令才可开始。该计划不是 Accepted Decision，不改变本文的 OPEN/UNFROZEN 项，也不复制上表；其输入包括
 多应用 out-of-process 兼容性验证债（§25 Stage 4 收口、§18）、上表以 Stage 6 为 trigger 的 DEFER 项（如精确 caret
 锚定）、上面的 pinned-runtime 发现核验（已由 WP1 完成），以及安装/注册/签名/soak/阈值测量（§21、§25 Stage 4"不属于"条款）。
-WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）。WP3 亦已在其范围内收口：选择只经 Fcitx 既有配置文件，存储落在 Fcitx 标准每用户路径，学习与选项跨重启持久（B3a–B3g、Notepad A–E 通过，候选 `a720319`，运行于新 runtime `runtime-wp3-20261018`；WP2 结论仍取自已记录的 `runtime-wp1-20261017`，未在新 runtime 上复跑），已知限制为无热键切换（R19）、强制终止丢失未保存改动、登出/关机保存取决于启动方式（R26）（`docs/windows-stage6-wp3.md`）；后续工作包仍须各自的明确授权；**U2 与 U6 已决定**（U6 真机确认待所有者的首次安装窗口检查），**U7 呈现已决定、实现待后续批次**，**U4 仍待决定**。
+WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）。WP3 亦已在其范围内收口：选择只经 Fcitx 既有配置文件，存储落在 Fcitx 标准每用户路径，学习与选项跨重启持久（B3a–B3g、Notepad A–E 通过，候选 `a720319`，运行于新 runtime `runtime-wp3-20261018`；WP2 结论仍取自已记录的 `runtime-wp1-20261017`，未在新 runtime 上复跑），已知限制为无热键切换（R19）、强制终止丢失未保存改动、登出/关机保存取决于启动方式（R26）（`docs/windows-stage6-wp3.md`）；后续工作包仍须各自的明确授权；**U2 与 U6 已决定**（U6 真机确认待所有者的首次安装窗口检查），**U7 托盘已实现**（fusion-windows PR #26，head `2f9c178`；挂起检测仍待后续批次），**U4 仍待决定**。
 
 **暂不应做：** freeze final wire protocol；freeze permanent identifiers；freeze recovery/timing thresholds；freeze
 未决 Host topology；无证据即冻结 §16 candidate renderer 的进程/位置；借其他阶段的工作偷跑 P0-A / P0-B 的最终

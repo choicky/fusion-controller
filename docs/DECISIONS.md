@@ -527,7 +527,9 @@ context, and that attributing the change to the application or to Windows is an 
 
 **U7 presentation decided:** a persistent tray status, a fault balloon notification, and actions to restart the Host and
 open its log directory; no focus stealing, no input content and no repeated per-key notifications. Automatic restart is
-**not** authorized. Implementation is pending; the minimal design is in `docs/windows-daily-use.md` §4.
+**not** authorized. The minimal design is in `docs/windows-daily-use.md` §4. **Implementation (2026-10-20):** the tray
+exists in fusion-windows PR #26 (head `2f9c178`) within exactly this presentation — no automatic restart, no hang
+detection; hang detection stays a separate, still-pending piece.
 
 **Not changed:** U2's scheduled-task start mechanism and its no-automatic-restart policy; U3 (diagnostics off by default,
 technical content only); U4 (signing/channel) stays open; P0-A/P0-B/P0-D remain OPEN. Current normative wording is in
