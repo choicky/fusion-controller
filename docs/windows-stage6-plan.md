@@ -208,9 +208,11 @@ fork/patch series; `fcitx5-qt` needs only one plausibly upstreamable MSVC portab
 neither a Host IPC path nor real-application UI validation; the spike adds the UI layer over a task-local pipe to an
 isolated engine, still not the production Host path. The UI sources are GPL-2.0-or-later, so a fork carrying them
 puts the settings executable under that licence — an owner decision required before any retained upstream source is
-committed or distributed. The settings item stays **open and unimplemented in the product**; the next step is the
-settings-UI implementation batch (the spike's engine service is the reference implementation of the semantics), and
-the **EXE installer** keeps its place behind this item. Nothing was installed or packaged in these batches.
+committed or distributed, and therefore a **prerequisite** for the implementation batch. The settings item stays
+**open and unimplemented in the product**; the next step is that licence decision, then the settings-UI implementation
+batch (the spike's engine service is the reference implementation of the semantics; durable evidence in
+`evidence/settings-ui-spike-2026-10-20/`), and the **EXE installer** keeps its place behind this item. Nothing was
+installed or packaged in these batches.
 
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 

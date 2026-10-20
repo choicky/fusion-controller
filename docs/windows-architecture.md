@@ -625,7 +625,8 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 **平台专属的 SwiftUI 界面**。上游改动恰为两份补丁文件；`fcitx5-configtool` 需要维护的 fork/补丁系列，`fcitx5-qt`
 仅需一处可上游化的 MSVC 可移植性修复。上游界面源码为 GPL-2.0-or-later，Qt6 是不可避免的新依赖。界面**尚未集成进
 产品**（未改产品代码、未安装注册），Pinyin/双拼**选择**仍是独立未映射面，且在保留上游代码提交或分发前需要所有者的
-**许可证**决定；下一步是设置界面实现批次，其后是 EXE 安装包（`docs/windows-settings-ui-feasibility.md`）。
+**许可证**决定——该决定是实现批次的**前置条件**；因此下一步是先做许可证决定，再做设置界面实现批次，其后是 EXE 安装包
+（`docs/windows-settings-ui-feasibility.md`，持久证据 `evidence/settings-ui-spike-2026-10-20/`）。
 安装包交付物形态已定为单个 **EXE**
 （不是 MSI，也不是解压后跑脚本的 zip），安装框架未定；签名与分发渠道仍未决（U4 仍 OPEN）。这两项不改变 WP7 日常使用
 验收与 U6 决定，也不改变最小托盘的范围（无自动重启、无挂起检测、无新的生命周期框架）。U1 的"只经 Fcitx 配置文件

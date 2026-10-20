@@ -4,10 +4,10 @@ Status: **feasibility established over three rounds (2026-10-20). Round 3 — a 
 spike on this machine — built the retained upstream subset with Qt 6.8.3/MSVC, replaced the transport
 at the provider seam, and drove one real round trip through the official widget layer (Pinyin `PageSize`
 7 → 9, applied, used by the engine, persistent across an orderly restart). Route A′ is proven for the
-configuration surface and ready for the implementation batch; the UI is not integrated into the product;
-the EXE installer is the next separate item; an owner licence decision is required before retained
-upstream sources can be committed or distributed.** Scope: the settings-UI item of D085. Nothing here
-changes an accepted decision.
+configuration surface; product integration has not started. The owner's licence decision is a
+prerequisite for introducing retained upstream source into the product; the EXE installer is the next
+separate item.** Evidence: `evidence/settings-ui-spike-2026-10-20/` (index: `final-report.md`).
+Scope: the settings-UI item of D085. Nothing here changes an accepted decision.
 
 Evidence classes used below: **[measured]** = executed on this machine or read from the pinned
 source; **[documented]** = a public API or behaviour taken from its own documentation, not executed
@@ -133,44 +133,75 @@ a subclass; it must be a different class exposing the same method names returnin
 
 ## 4. The minimal upstream-UI adaptation (route A′)
 
-**Viable in principle, not yet built.** It retains the official UI sources and changes the
-boundary, rather than importing the whole Linux stack or writing a new UI:
+**Built and exercised in the Round-3 spike (§5); not integrated into the product.** It retains the
+official UI sources and changes the boundary, rather than importing the whole Linux stack or
+writing a new UI. The spike's experimental target was the official **`ConfigWidget`** — the
+schema-driven option renderer — hosted in a minimal test window. It was **not** the complete
+`configtool` application: no addon list, no input-method page, no application shell or main-window
+chrome.
 
-1. **Build a subset**: `src/configtool` + `src/lib/{configlib,configwidgetslib}`, with `layout/`,
-   `src/kcm`, `src/migrator` and `plasmathemegenerator` excluded. Excluding `layout/` removes X11,
-   XKeyboardConfig and xkbfile outright; excluding `kcm` removes Plasma/Kirigami/KCMUtils. This is a
-   build-file change, not a source change.
+1. **Build a subset**: `src/lib/{configlib,configwidgetslib}`, with `layout/`, `src/kcm`,
+   `src/migrator`, `plasmathemegenerator` and the `src/configtool` shell excluded. Excluding
+   `layout/` removes X11, XKeyboardConfig and xkbfile outright; excluding `kcm` removes
+   Plasma/Kirigami/KCMUtils. **[measured, Round 3]** The CMake exclusions alone were **not**
+   sufficient: source adjustments were required as well, enumerated in the items below and in
+   `evidence/settings-ui-spike-2026-10-20/patch-inventory.md`. Retained: `configlib`
+   (`dbusprovider`, `launchexternal`, `logging`, `font`) and `configwidgetslib` (`configwidget`,
+   the option widgets, `keylistwidget`, `varianthelper`, `erroroverlay`, `verticalscrollarea`,
+   `fontbutton`, `categoryhelper`); excluded with their features: addon list, input-method page,
+   keyboard-layout picker, IsoCodes language names, translations, application shell.
 2. **Replace the transport at its single seam**: keep `DBusProvider`'s interface (`available()`,
    `canRestart()`, `availabilityChanged`, `controller()`) and implement it over the product's
-   per-user named pipe. **[measured, Round 3]** The originally planned mechanism — methods returning
-   `QDBusPendingCall::fromCompletedCall(QDBusMessage)` so call sites compile unchanged — **does not
-   work**: the synthesized call and its watcher behave correctly, but `QDBusPendingReply` rejects the
-   reply (`Unexpected reply signature: got "", expected "v"`), because QtDBus computes the reply
-   signature only during wire marshalling and exposes no setter. The working seam is the fallback
-   this document already named: a small local asynchronous interface at the affected call sites —
-   a `ControllerProxy` with `GetConfig`/`SetConfig`/`CanRestart` returning a local `PendingCall`
-   (a QObject with `finished()` and the reply message), and the two `configwidget.cpp` call sites
-   adapted to it. The GUI thread never blocks on pipe I/O.
-3. **Serve 2 methods for settings and 4 for selection** from the Host: `GetConfig`/`SetConfig`
-   already map onto `Configuration::dumpDescription` + `AddonInstance::setConfig`, which the PoC
-   proved work on this Host (`POC.md` §B). The four selection methods map onto Fcitx's own
-   input-method-group API in the Host.
-4. **Remove the layout feature** from `impage.cpp` (2 call sites) and drop `layoutselector`.
-5. **KF6**: either ship `KF6WidgetsAddons` + `KF6ItemViews` (both build on Windows), or patch the
-   three spots — replace `KColorButton` with `QToolButton`+`QColorDialog` (~20 lines), drop
-   `fontbutton.cpp`'s `KFontChooser`, drop `addonselector.cpp` (the addon list is not needed when the
-   product exposes one engine's settings).
-6. **IsoCodes**: ship the three JSON files, or drop the language-name column.
+   per-user named pipe. Two approaches were tried; the order matters for anyone reading the record:
+   - *Historical — disproven.* The first attempt returned
+     `QDBusPendingCall::fromCompletedCall(QDBusMessage)` from the provider's methods, so that the
+     upstream call sites would compile unchanged. The synthesized call and its watcher behaved
+     correctly with no session bus at all, and custom `QDBusArgument` types read back through
+     `reply().arguments()` — but `QDBusPendingReply` rejects the reply
+     (`Unexpected reply signature: got "", expected "v"`), because QtDBus computes the signature
+     only during wire marshalling and exposes no setter. This route is kept here as experimental
+     evidence; it is not the plan. Details:
+     `evidence/settings-ui-spike-2026-10-20/transport-probe.md`.
+   - *Current.* The seam is the local asynchronous interface this document had already named as the
+     fallback: a `ControllerProxy` whose `GetConfig`/`SetConfig`/`CanRestart` return a local
+     `PendingCall` (a QObject emitting `finished()` and carrying the reply message), with the two
+     `configwidget.cpp` call sites adapted to it. The GUI thread never blocks on pipe I/O, and the
+     engine side schedules every touch onto Fcitx's event loop. This is what drove the round trip
+     in §5.
+3. **Serve the settings methods; selection stays out of scope.** `GetConfig` and `SetConfig` were
+   served from the isolated engine over the pipe in the spike, on the official semantics
+   (`Configuration::dumpDescription` for the schema, `save()` for the values,
+   `InputMethodEngine::setConfigForInputMethod` for the apply). The four selection methods
+   (`InputMethodGroups`, `InputMethodGroupInfo`, `SetInputMethodGroupInfo`,
+   `AvailableInputMethods`) were **not** implemented — selection is a separate surface (§6) and
+   remains product-integration work.
+4. **Drop the layout feature.** `layout/` and `layoutselector.cpp` are excluded with the subset, so
+   no `impage.cpp` edit is needed (that file is excluded too).
+5. **KF6 reduces to two widgets in the retained subset**: `KColorButton` → `QToolButton` +
+   `QColorDialog` (`optionwidget.cpp`, the `Color` option type) and `KFontChooser` → `QFontDialog`
+   (`fontbutton.cpp`, retained — not dropped). `addonselector.cpp` is excluded with the addon list,
+   and `configtool/main.cpp`'s KF6 use is already inside `#ifdef CONFIG_QT_UNIQUE_APP_SUPPORT`.
+6. **IsoCodes is not needed**: `iso639.cpp` is excluded with the keyboard-layout list.
 
-What stays untouched is the valuable part: the schema-driven option renderer (~2.1k lines), the
-key-sequence widget, and the official per-addon config-UI plugin interface.
+Two further source adjustments were required and are part of the recorded delta: one genuine MSVC
+portability fix in `fcitx5-qt` (`std::filesystem::path` → `QString` in `fcitxqtconfiguifactory.cpp`,
+where the implicit POSIX conversion does not exist on Windows), and `launchExternalConfig` extracted
+verbatim from the excluded `addonmodel.cpp` so the `External` option type keeps its upstream
+behaviour. Note that `External` rows render but launch nothing on Windows — no wrapper binaries
+exist there — which is upstream's own fallback, not a validated feature.
+
+What stays untouched is the valuable part: the schema-driven option renderer and its supporting
+widgets (~3.4k lines across the retained files, transport included), the key-sequence widget, and
+the official per-addon config-UI plugin interface.
 
 **Costs and obligations.** Qt6 (Core/Gui/Widgets/DBus) becomes a product dependency — LGPLv3,
 dynamically linked, and unavoidable for any upstream-widget route. The UI sources are
 **GPL-2.0-or-later** (`src/configtool`, `src/lib`, `src/kcm`), so a fork carrying them puts the
 settings executable under GPL-2.0-or-later; neither product repository has a `LICENSE` file, so the
-product's own outbound licence has to be settled first. The fork must be recorded with its upstream
-revision and licence text, and carried forward on upstream changes.
+product's own outbound licence has to be settled first. **That owner decision is a prerequisite,
+not a later step: no retained upstream source may be introduced into the product before it.** The
+fork must be recorded with its upstream revision and licence text, and carried forward on upstream
+changes.
 
 ## 5. Round 3 — the bounded build-and-transport spike [measured]
 
@@ -178,8 +209,16 @@ Executed 2026-10-20 on machine 7700, entirely inside a task directory
 (`…\official-settings-ui\spike\`): task-local Qt 6.8.3 `win64_msvc2022_64` (Qt6DBus included),
 ECM 6.10.0, MSVC 14.51.36231 + Windows SDK 10.0.26100.0; the pinned runtime reused, not rebuilt.
 No system dependency, PATH, installed input method, production Host or owner profile touched;
-every run redirected `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` to a disposable profile. Full
-commands, logs, screenshot and patches: task-dir `evidence/spike3-repro.md`, `REPORT-3.md`.
+every run redirected `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` to a disposable profile.
+
+**Durable evidence:** `evidence/settings-ui-spike-2026-10-20/` — commands and artifact hashes
+(`build-and-run.md`), the transport probe (`transport-probe.md`), the full round-trip transcript
+(`ui-roundtrip.log`), the no-change comparison (`values-comparison.md`), the upstream delta with
+hashes and provenance (`patch-inventory.md`), the window screenshot (`settings-window.png`) and the
+index (`final-report.md`). The working tree — sources, binaries, patched checkouts, profiles —
+stays in the recovery workspace and is not committed; because the retained upstream patches are
+local-only pending the owner's licence decision (§9), that evidence directory alone cannot
+reproduce the patched build.
 
 The three uncertainties the two-round record left open (not compiled; the synthesized-reply path;
 the custom types) were measured, and the second answered **against** the expectation:
@@ -209,7 +248,9 @@ the custom types) were measured, and the second answered **against** the expecta
    widget layer applied via the `setConfigForInputMethod` path; re-read returned 9; the engine's own
    candidate list used 9; 9 persisted across an orderly engine restart; a no-change load/apply left
    the engine value tree and every profile file (config + learning) byte-identical. The official
-   schema served over the seam: 43 value keys, 2 config types, 62 renderable options.
+   schema served over the seam was 43 value keys, 2 config types and 62 renderable options — the
+   page **rendered** from that schema; only `PageSize` was driven through a round trip, so no claim
+   is made for the other options, for `External` actions, for selection, or for the production Host.
 4. **Pinyin/Shuangpin selection remains unimplemented** (§6) — only the configuration surface is
    proven.
 
@@ -264,7 +305,7 @@ page size was read from the engine's candidate list inside the harness.
 
 | # | Route | Reuses | Status |
 | --- | --- | --- | --- |
-| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Built and validated by the Round-3 spike for the configuration surface (Pinyin page round trip, persistence, no-change safety); ready for the implementation batch.** The smallest route that satisfies "reuse upstream first" |
+| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Built and validated by the Round-3 spike for the configuration surface (Pinyin `PageSize` round trip, persistence, no-change safety); ready for the implementation batch once the licence prerequisite (§9) is decided.** The smallest route that satisfies "reuse upstream first" |
 | A | Full upstream stack: Qt6 + KF6 + X11 + xkbcommon + IsoCodes + rebuilt runtime with keyboard/dbus modules + a session D-Bus | The official UI unmodified | Works, but imports Linux-only features the product does not need and reopens runtime provenance |
 | B | Fusion-authored window over `dumpDescription`/`setConfig` via the existing named pipe | Official schema and apply only | **Not authorized by D085**; also the largest new-code surface for the same user-visible result |
 | C | No UI: settings edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f) | Nothing new | Correct today, but gives the user no settings surface |
@@ -275,7 +316,9 @@ configuration lives under `%APPDATA%\Fcitx5`.
 
 ## 9. Fork, patch scope, and licences [measured]
 
-The Round-3 upstream deltas are exactly two patch files (task dir `patches/`):
+The Round-3 upstream deltas are exactly two patch files. Their inventory, hashes and provenance are
+committed in `evidence/settings-ui-spike-2026-10-20/patch-inventory.md`; **the patch content itself
+is not committed** (see the licence boundary below).
 
 - `fcitx5-qt` `0285a5d`: **1 file** — `fcitxqtconfiguifactory.cpp` MSVC portability
   (`std::filesystem::path` → `QString`). This one is plausibly upstreamable as a portable fix; if
@@ -289,24 +332,32 @@ The Round-3 upstream deltas are exactly two patch files (task dir `patches/`):
 Licences of the retained sources/dependencies: configtool `src/lib` **GPL-2.0-or-later**;
 fcitx5-qt widgetsaddons LGPL-2.1-or-later, dbusaddons BSD-3-Clause; Qt 6.8.3 LGPL-3/GPL-2-or-later
 (dynamic link); ECM BSD-3-Clause (build-time only). Neither product repository's outbound licence
-was chosen or changed; **an owner licence decision is required before any retained upstream source
-is committed or distributed**, and until then the retained code stays as local experimental patches.
+was chosen or changed.
+
+**Licence boundary.** The owner's licence decision is an explicit **prerequisite**: retained
+upstream source may not be committed to, or introduced into, either product repository until it is
+made. Until then the patches stay local to the recovery workspace, and the committed evidence is an
+inventory with hashes — not a distributable patch. This document does not choose a licence.
 
 ## 10. What remains, and the next action
 
-Remaining work for the settings item, in order:
+Remaining work for the settings item, in prerequisite order:
 
-1. **The implementation batch** (smallest viable): port the proven pipe transport into the product
-   (engine-side Get/Set handlers in the product backend on the Fcitx event loop + the
-   `ControllerProxy`/`PendingCall` adapter + the retained widget subset), Pinyin page first. The
-   engine service in the spike is the reference implementation of the semantics.
-2. **Selection stays separate** (§6): selecting Pinyin/Shuangpin is input-method-group management,
-   not a config option; it needs its own mapping and is not claimed by anything here.
-3. **Packaging**: the EXE installer remains the next separate batch under D085 (framework,
+1. **The owner's licence decision** (§9) — required *before* step 2, because step 2 introduces
+   retained upstream source into the product. No product licence is chosen here.
+2. **The implementation batch** (smallest viable), once step 1 is settled: port the proven pipe
+   transport into the product (engine-side Get/Set handlers in the product backend on the Fcitx
+   event loop + the `ControllerProxy`/`PendingCall` adapter + the retained widget subset), Pinyin
+   page first. The spike's engine service is the reference implementation of the semantics, and
+   `evidence/settings-ui-spike-2026-10-20/` is the reviewable record of what it proved.
+3. **Selection stays separate** (§6): selecting Pinyin/Shuangpin is input-method-group management,
+   not a config option; it needs its own mapping and is not claimed by anything here. `External`
+   options likewise render but have no Windows launch path — product-integration work, not a
+   validated feature.
+4. **Packaging**: the EXE installer remains the next separate batch under D085 (framework,
    signing, channel still undecided under U4).
-4. **The licence decision** (§9) before any retained upstream code is committed or distributed.
 
-The settings item stays **open until actual product integration is complete**. U4, U6, WP7 and the
-other gates are untouched by this document. A Fusion-authored UI remains unauthorized, and the
-Round-3 spike did not need one: the official widget layer ran on Windows as-is (modulo the recorded
-patches).
+The settings item stays **open until actual product integration is complete** and appropriately
+validated. U4, U6, WP7 and the other gates are untouched by this document. A Fusion-authored UI
+remains unauthorized, and the Round-3 spike did not need one: the official widget layer ran on
+Windows as-is (modulo the recorded patches).
