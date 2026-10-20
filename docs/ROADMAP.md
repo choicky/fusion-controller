@@ -62,7 +62,7 @@ VERIFIED / COMPLETE. The accepted r4 behavior, bounded mixed search, separate Ch
 
 ## Current next
 
-There is no new product implementation task created by this cleanup. The only explicitly open/deferred items are:
+The authorized Windows settings-UI implementation is active on `feature/official-settings-ui-product` in fusion-windows; reusable configtool adaptations are on owner-fork PR `choicky/fcitx5-configtool#1` (`windows/fusion-settings`). The generated owner-test ZIP is not an installation or owner acceptance. The EXE installer remains the following separate D085 item. The only other explicitly open/deferred items are:
 
 - Self-hosted real endpoint/device checkpoint, deferred and non-blocking until suitable environment/conditions exist.
 - Optional realtime partial-transcript preedit UX, future and not a current requirement.

@@ -574,6 +574,20 @@ still the owner's check. U6's decision is unchanged. The minimal tray's scope is
 detection, no new lifecycle framework. No implementation of the settings UI or of the EXE installer is authorized by this
 record; the work-package ordering is updated in `docs/windows-stage6-plan.md` and `docs/ROADMAP.md`.
 
+## D086 — scoped Windows settings executable licence and upstream integration
+
+Accepted by the owner on 2026-10-20 through the bounded implementation instruction for the upstream-derived Windows settings UI.
+
+**Scope of the licence authorization.** The separate Windows settings executable (`FusionSettings.exe`) and source code derived from the retained `fcitx5-configtool` 5.1.16 widget/configtool sources may be distributed under **GPL-2.0-or-later**. Preserve all upstream copyright/SPDX notices and the full GPL text, and provide the complete corresponding source, exact upstream revision, maintained patch/source integration, and build instructions with the owner-test package. This authorization is limited to the settings executable and its derivative source; it does **not** select a repository-wide license and does **not** apply GPL to `FusionHost.exe`, `FusionTray.exe`, `FusionTsf.dll`, the existing Host/backend/runtime, or unrelated repository content.
+
+**Other components retain their own licenses.** `fcitx5-qt` modules retain their per-file licenses (LGPL-2.1-or-later for widgetsaddons and BSD-3-Clause for dbusaddons); the Qt shared libraries/plugin use their applicable upstream open-source license terms (the owner-test build selects the LGPL-3.0-only shared-library path and supplies the license texts/source-access instructions); pinned Fcitx/chinese-addons/LibIME runtime components retain their own upstream LGPL-2.1-or-later terms. The implementation must preserve these notices and check the actual linked/distributed dependency set; this decision does not blanket-license the product.
+
+**Relationship to D085.** D085 remains unchanged and continues to govern work order, Fcitx configuration semantics/data paths, and the separate EXE installer. This later scoped authorization removes D085's previously identified *licence prerequisite* for the bounded settings implementation; it does not itself authorize a public release, machine installation/registration, merge, selection of U4 signing/channel, or implementation of the EXE installer. D085's official-settings-UI-before-EXE-installer order remains current.
+
+**Upstream maintenance.** The owner-maintained `choicky/fcitx5-configtool` fork is the source home for reusable configtool UI adaptations, on a dedicated branch based on the pinned upstream 5.1.16 commit. The Windows product repository owns FusionHost transport, tray, packaging and source-pin/build integration. The single `fcitx5-qt` MSVC path-portability fix remains a separate, reviewable patch; no fork was authorized or created for fcitx5-qt by this decision.
+
+Implementation/package/validation state is tracked in the Stage 6 plan and product PRs, not in this Accepted Decision. U4, U6, WP7 and P0-A/P0-B/P0-D remain unchanged.
+
 ## Current authority rule
 
 For current post-release product state, use the compact current-state/current-
