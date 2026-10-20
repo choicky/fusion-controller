@@ -158,7 +158,7 @@ was set by mistake, remove it at User scope and confirm it is empty:
 [Environment]::GetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS','User')
 ```
 
-### The Fusion tray (U7 — implemented in `0.0.0-wp7+2f9c178`)
+### The Fusion tray (U7 — implemented in `0.0.0-wp7+0094269`)
 
 The decided presentation (D084) now exists as `FusionTray.exe` in the installed version directory. It is started at logon by
 its own scheduled task (`FusionTray`, Medium integrity, interactive token) — not from inside the Host (a crashed Host
@@ -179,7 +179,14 @@ fact, **not** a health claim: an alive-but-unresponsive Host still reads as runn
 **When it notifies.** One balloon per `running → absent` transition, never per key, and never for a transition it did not
 witness (a tray that starts while the Host is already absent says so in the tooltip and stays quiet). A **manual
 restart** from the tray, the Start Menu or the installer, and a **session end**, are recognised as intentional and never
-produce the balloon. Recovery (`absent → running`) is silent; the tooltip changes back.
+produce the balloon. Recovery (`absent → running`) is silent; the tooltip changes back. A replacement Host under the same
+running state is not a transition either: the tooltip's pid refreshes and nothing is reported.
+
+**A cancelled session end.** The tray exits when the session really ends, so a logoff or restart that another application
+then cancels could leave no tray behind. Its own task carries the same User32 1077/1073 cancellation trigger the Host
+task uses, so the tray is started again in the same session; a tray that was still running when the end was cancelled
+resumes normal reporting instead of staying silent, and does not replay the Host stop that happened during the attempt.
+A second start is harmless either way: one tray per user × session is enforced by the tray's own single-instance claim.
 
 **What it does not do.** No automatic restart (not authorized), no hang detection, no per-key or per-application
 notification, no focus stealing, no input content, no log of its own, and it never stops the Host — not even when the
@@ -188,17 +195,24 @@ tray exits. Diagnostics remain default-off; the tray neither reads nor enables t
 **Why a separate logon task.** A task instance stays alive while any of its actions runs, so a long-lived tray action on
 the `FusionHost` task would keep that task in the Running state and `restart-host.ps1`'s start (`MultipleInstances =
 IgnoreNew`) would be silently ignored — a manual restart would appear to do nothing. The tray therefore has its own task,
-which install creates/refreshes and uninstall deletes. install/upgrade/uninstall stop the tray before the Host (orderly
-close, reported if it has to be forced) and restart it afterwards; the manual restart tool writes a short-lived marker so
-its own Host stop is not reported as a failure. The marker is honoured for five minutes, so one left behind by a crash
-cannot silence a later real exit.
+which install creates/refreshes and uninstall deletes. **Install and upgrade** stop the tray before the Host (orderly
+close, reported if it has to be forced) and start the new tray afterwards; **uninstall** stops the tray and does not
+start it again — the task, the icon and the shortcut go away. The manual restart tool writes a short-lived marker so its
+own Host stop is not reported as a failure. The marker is honoured for five minutes, so one left behind by a crash cannot
+silence a later real exit.
+
+**Only the product's tray is touched.** The installer, the uninstaller and the restart tool act on a tray only when it is
+this user's, in this session, and running from `<install root>\<version>\bin\FusionTray.exe`; any version directory
+counts, so an upgrade can stop the previous version's tray. A process that merely shares the name `FusionTray` is
+reported as `left alone (identity not verified)` and is never signalled.
 
 **Not yet observed on this machine.** The tray was built and validated with isolated test processes and a stubbed restart
 tool, without installing it and without stopping the running Host. So: the `running → absent` balloon itself, the
-session-end suppression, and the install/upgrade/uninstall integration have **not** been exercised end to end here; the
-transition rules are covered by unit tests. The two assumptions that remain open are that a Host killed during logoff
-always ends before the tray sees the session end, and that no application blocks the session end long enough to race the
-marker. Hang detection (alive but unresponsive) is the remaining design work and is **not** in this version.
+session-end suppression and its cancellation recovery, and the install/upgrade/uninstall integration have **not** been
+exercised end to end here; the transition rules are covered by unit tests and the scoped inventory, the window ownership
+and both `WM_ENDSESSION` cases by an isolated harness. The two assumptions that remain open are that a Host killed during
+logoff always ends before the tray sees the session end, and that no application blocks the session end long enough to
+race the marker. Hang detection (alive but unresponsive) is the remaining design work and is **not** in this version.
 
 ## 5. Reporting a problem
 

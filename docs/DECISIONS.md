@@ -527,13 +527,52 @@ context, and that attributing the change to the application or to Windows is an 
 
 **U7 presentation decided:** a persistent tray status, a fault balloon notification, and actions to restart the Host and
 open its log directory; no focus stealing, no input content and no repeated per-key notifications. Automatic restart is
-**not** authorized. The minimal design is in `docs/windows-daily-use.md` §4. **Implementation (2026-10-20):** the tray
-exists in fusion-windows PR #26 (head `2f9c178`) within exactly this presentation — no automatic restart, no hang
-detection; hang detection stays a separate, still-pending piece.
+**not** authorized. The minimal design is in `docs/windows-daily-use.md` §4. What the presentation deliberately excludes
+is part of the decision: no automatic restart and no hang detection. Implementation, validation and package state are
+**not** part of this record — they are tracked in the Stage 6 plan's U7 row, `docs/windows-daily-use.md` §4 and the
+fusion-windows PR, so a moving implementation head never has to be edited into an accepted decision.
 
 **Not changed:** U2's scheduled-task start mechanism and its no-automatic-restart policy; U3 (diagnostics off by default,
 technical content only); U4 (signing/channel) stays open; P0-A/P0-B/P0-D remain OPEN. Current normative wording is in
 `docs/windows-architecture.md` (§10, §14) and `docs/windows-stage6-plan.md`.
+
+## D085 — Windows next work after the minimal tray: official settings UI, then the EXE installer (partial supersession of U1's selection method and of the broad-settings-UI exclusion)
+
+Decided by the owner on 2026-10-20.
+
+**Order of the next work.** After the minimal U7 tray batch is closed, the next work is the **official settings UI**, and
+after it the **installer that packages it**. Nothing else is promoted ahead of those two, and neither starts without its
+own bounded execution instruction.
+
+**The installer deliverable is an EXE.** The Windows installer that carries the product to a user is a single **EXE** —
+not an MSI, and not a zip the user unpacks and runs a script from. The framework is **not** chosen by this decision and
+must not be assumed by the implementation.
+
+**The settings UI reuses upstream first.** The UI prefers **reusing Fcitx5's own settings UI** and its configuration
+semantics over writing a Fusion-specific configuration surface. Whether that is feasible on Windows is **not
+established**: the upstream UI's Windows dependencies and the way it would communicate with this product's Host must be
+inspected before an implementation approach is chosen. A Fusion-written UI is a fallback, not the default, and it is not
+authorized here.
+
+**Partial supersession.** Exactly two accepted statements are narrowed:
+
+- **U1's "selection only through Fcitx's existing configuration files"** was a *no-UI* decision. It remains the
+  configuration model — the UI is a front end to those same files — but it no longer excludes a UI, and "no
+  Fusion-specific file, switch or registry key" now means no *additional* configuration store, not the absence of a UI.
+- **The Stage 6 plan's exclusion of "a broad settings UI"** is superseded for this settings-UI work and only for it:
+  the UI is the product's own settings surface, not an attempt at a general desktop-configuration product.
+
+Everything else U1 fixed is **unchanged**: official Fcitx configuration formats, storage in Fcitx's standard per-user
+paths (`%APPDATA%\Fcitx5\{config,data}`), no Fusion-specific data location, upgrade keeps user data, and uninstall
+leaves it unless the user chooses removal.
+
+**Not decided.** Signing and the distribution channel stay **undecided** (U4 remains open), the installer framework is
+undecided, and the UI's exact scope is undecided beyond "official settings for what the product actually exposes".
+
+**Not changed.** Overall WP7 acceptance is unchanged — daily use still closes it, and the tray's first installed run is
+still the owner's check. U6's decision is unchanged. The minimal tray's scope is unchanged: no automatic restart, no hang
+detection, no new lifecycle framework. No implementation of the settings UI or of the EXE installer is authorized by this
+record; the work-package ordering is updated in `docs/windows-stage6-plan.md` and `docs/ROADMAP.md`.
 
 ## Current authority rule
 
