@@ -1,0 +1,63 @@
+== baseline read (fresh profile, expect PageSize 7) ==
+[client] connected to fusion-settings-ui-1
+PASS  GetConfig returns Ok
+[client] fcitx://config/inputmethod/pinyin: 43 value key(s), 2 config type(s)
+[client] PageSize before = 7
+PASS  schema carries renderable options
+[client] schema option count = 62
+[client] engine page size before = 7
+
+[client] ALL CHECKS PASSED (0 failure(s))
+== UI round trip: 7 -> 9 through the upstream widgets ==
+[ui] PageSize as rendered before = 7
+PASS  the widget shows the engine's 7
+[ui] PageSize after setValue = 9
+PASS  setValue drives the rendered widgets
+[ui] save() sent SetConfig
+[ui] PageSize re-read from the engine = 9
+PASS  a reload through GetConfig returns 9
+PASS  window screenshot written
+[ui] ALL CHECKS PASSED (0 failure(s))
+
+== read again through the pipe (expect 9, engine uses 9) ==
+[client] connected to fusion-settings-ui-1
+PASS  GetConfig returns Ok
+[client] fcitx://config/inputmethod/pinyin: 43 value key(s), 2 config type(s)
+[client] PageSize before = 9
+PASS  schema carries renderable options
+[client] schema option count = 62
+[client] engine page size before = 9
+
+[client] ALL CHECKS PASSED (0 failure(s))
+== orderly restart on the same profile ==
+[client] connected to fusion-settings-ui-1
+PASS  GetConfig returns Ok
+[client] fcitx://config/inputmethod/pinyin: 43 value key(s), 2 config type(s)
+[client] PageSize before = 9
+PASS  schema carries renderable options
+[client] schema option count = 62
+[client] engine page size before = 9
+
+[client] ALL CHECKS PASSED (0 failure(s))
+== orderly shutdown for persistence ==
+[client] connected to fusion-settings-ui-1
+PASS  GetConfig returns Ok
+[client] fcitx://config/inputmethod/pinyin: 43 value key(s), 2 config type(s)
+[client] PageSize before = 9
+PASS  schema carries renderable options
+[client] schema option count = 62
+[client] engine page size before = 9
+PASS  Shutdown acknowledged
+[client] engine asked to stop
+
+[client] ALL CHECKS PASSED (0 failure(s))
+== no-change pass: baseline ==
+== UI --nochange (load, apply unmodified, reload) ==
+[ui] no-change save() (nothing modified)
+[ui] PageSize after no-change round trip = 9
+[ui] value key count = 36
+[ui] NOCHANGE DONE
+
+PASS  engine value tree unchanged after a no-change apply: True
+PASS  profile files (config + learning) untouched: True
+SPIKE_EXIT=0
