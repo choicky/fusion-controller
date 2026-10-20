@@ -1,23 +1,25 @@
-# Stage A handoff — global settings + input-method management (Windows validation pending)
+# Stage A handoff — global settings + input-method management (Windows validation executed)
 
 Scope: D082 / D085 / D086. Base governance: `fusion-windows/AGENTS.md`, `fusion-controller`
 `windows-architecture.md` (D072 §4/§5/§9/§13/§15/§22/§23/§25), `windows-stage6-plan.md`,
 `windows-stage6-wp3.md`, `provider-settings-acceptance.md`, `docs/windows-settings-ui-feasibility.md`.
 Bounded contract: `change-contract.md` (same directory). Capability mapping and the Shift/raw-input
-resolution: `capability-mapping.md`.
+account: `capability-mapping.md`.
 
-Status: **implementation complete on the Linux dev machine (minis); Windows/MSVC build and all
-real-Host validation NOT RUN — this is a handoff for Windows validation on machine 7700, not an
-acceptance.** No merge performed on any repository. Nothing installed or registered. The owner's
-live input-method configuration was not touched.
+Status: **implemented, built in Release on Windows 7700, validated against an isolated Host + GUI and
+packaged.** This file started as a minis-side handoff and is now the closing record; §6 states which
+Windows checks were executed and which were not. It is **not** an acceptance: no merge was performed
+on any repository, nothing was installed or registered, and the owner's production Host, tray,
+browser and profile were not modified. The live key-down/key-up check through a TSF-registered
+application was **not run**.
 
 ## 1. Repositories, branches, bases, heads, PRs
 
 | Repo | Role | Branch | Base commit | Head commit | Draft PR |
 |---|---|---|---|---|---|
-| `choicky/fusion-windows` | product | `feature/stage-a-global-settings-im-methods` | `fe23f07611707c2d70aaf16a2ece282057ff8097` (origin/main, PR #28 merged) | `0a965e20957022f578526cc86a3314b9fb3be717` | https://github.com/choicky/fusion-windows/pull/29 |
-| `choicky/fcitx5-configtool` (owner fork) | reusable widget-layer contract | `windows/fusion-settings` | `0234c64e93f1d61badc1fd3eaad2ba786ca63850` (merged PR #1 base) | `abc2c6644b030d761d3d5e7c27c888af019e63f0` | https://github.com/choicky/fcitx5-configtool/pull/2 |
-| `choicky/fusion-controller` | docs/authority + this evidence | `feature/stage-a-global-settings` | `96fb28c2bca1cc400361fc2377409e668201054f` (origin/main, PR #51 merged) | PR #52 branch tip (this evidence pack; `d25c39c` = first commit) | https://github.com/choicky/fusion-controller/pull/52 |
+| `choicky/fusion-windows` | product | `feature/stage-a-global-settings-im-methods` | `fe23f07611707c2d70aaf16a2ece282057ff8097` (origin/main, PR #28 merged) | `2e28a88d8beb0548070cc8073cbb80b8174d8c66` (feature `0a965e2` + correction `fb62348` + packaging-pin `2e28a88`) | https://github.com/choicky/fusion-windows/pull/29 |
+| `choicky/fcitx5-configtool` (owner fork) | reusable widget-layer contract | `windows/fusion-settings` | `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b` (upstream base) | `abc2c6644b030d761d3d5e7c27c888af019e63f0` (unchanged this batch — no new commit) | https://github.com/choicky/fcitx5-configtool/pull/2 |
+| `choicky/fusion-controller` | docs/authority + this evidence | `feature/stage-a-global-settings` | `96fb28c2bca1cc400361fc2377409e668201054f` (origin/main, PR #51 merged) | PR #52 branch tip (this evidence pack; `d25c39c` = first commit, `8ca1282` = Draft index, this batch on top) | https://github.com/choicky/fusion-controller/pull/52 |
 
 Dependency order followed: fork commit (`abc2c66`) first, then product re-pin + commit (`0a965e2`),
 then controller docs/evidence. The product `cmake/settings-ui/versions.cmake`
@@ -80,20 +82,31 @@ input engine, no general addon/dictionary management, no cosmetic redesign, no E
   fork header, so there is no duplicate-symbol conflict; the fork's merged `dbusprovider.cpp` is not
   a product-compiled unit.
 
-## 4. Shift / raw-input commit — resolved against source, not assumed
+## 4. Shift / raw-input commit — what the source does
 
 `CommitRawInput` is a **per-input-method** Pinyin `KeyListOption` on
 `fcitx://config/inputmethod/pinyin`, **not** a global option. This stage reuses that official option
 as delivered; the Pinyin page already routes its Shift+Return / plain-Return family to the engine
 while a composition is active.
 
-**Hard-stop boundary (reported, not implemented):** routing a **modifier-held** key
-(Ctrl/Alt/Win + key, including `Control+Return`), a **numpad Enter** variant, or a **bare-Shift**
-trigger to the engine is the D072 §5 UNFROZEN "production effect-capable key classification" / WP3-B6
-(R19) boundary and, under D082, would require evidence that mature Fcitx behavior is otherwise a
-defect. This stage does **not** change `routes_key`/`classify_key` ownership, does not add a Shift
-state machine, and leaves ordinary Shift+letter, key-up and modifier handling unchanged. Details in
-`capability-mapping.md` §1.
+Three separate things were conflated in the earlier drafts of this record, and are kept apart here:
+
+- **`Shift+Return` commits raw input** because the option lists it. It is **not** a lone `Shift`
+  trigger and must never be described as one.
+- **Lone `Shift` is NOT implemented.** A bare modifier never reaches the engine: modified keys are
+  routed as Pass by the D072 §5 UNFROZEN "production effect-capable key classification", and no
+  Shift state machine was added. Nothing in `src/tsf/` changed in this batch
+  (`git diff fe23f07..HEAD -- src/tsf/` is empty).
+- **Numpad Enter is not a separate case.** Windows delivers it as `VK_RETURN`, so it matches the
+  ordinary `Return` family and the `KP_Enter` entries in the key lists never match. No keysym
+  translation was added, and none is needed for the option to behave as documented.
+
+`Control`/`Alt`/`Win`-modified keys share the same Pass routing. Ordinary Shift+letter, key-up and
+modifier handling are unchanged. Routing a modifier-held key or a bare-Shift trigger to the engine
+would be the D072 §5 / WP3-B6 (R19) boundary and, under D082, needs evidence that mature Fcitx
+behaviour is otherwise a defect — not implementation here. Details in `capability-mapping.md` §1.
+The Windows key-down/key-up check through a real TSF-registered application was **not run**, so this
+section is a source reading, not a measurement.
 
 ## 5. Exact tests run on minis (Linux) and results
 
@@ -114,24 +127,46 @@ Pre-existing minis validation debt (NOT a Stage A change, NOT fixed here): the s
 `semantic.cpp` / `stage5_candidates` family fails to build on this machine's GCC 15.2 with
 `-Werror=missing-field-initializers` at base `fe23f07` (MSVC-tuned code). Recorded only.
 
-Qt / Fcitx / Host / fork files are **STATIC REVIEW PASS / COMPILE UNVERIFIED** on minis: they require
-Qt 6.8 + Fcitx headers + MSVC and are not built here.
+Qt / Fcitx / Host / fork files could not be built on minis (Qt 6.8 + Fcitx headers + MSVC). That
+limitation was recorded as source-reviewed/compile-unverified and is now **superseded**: those files
+were compiled in Release and exercised on Windows 7700 (§6).
 
-## 6. Required Windows validation checks — NOT RUN here (machine 7700)
+## 6. Windows validation checks — results on machine 7700
 
-All of the following are the Windows/MSVC handoff. They must be run before this lands; Linux/mock
-results above are **not** Windows validation.
+The list below was the handoff; each item now carries its result. Linux/mock results are not Windows
+validation and are not counted here.
 
-1. MSVC **Release** build of the settings executable + Host (fork re-pinned to `abc2c66`).
-2. Default **and** explicit isolated per-user pipe connection.
-3. Global page: load / apply / read-back, and persistence across an orderly Host restart.
-4. No-change Apply short-circuit; Cancel/reload; unknown + learning-data preservation.
+1. MSVC **Release** build of the settings executable + Host (fork pinned at `abc2c66`) — **EXECUTED**:
+   `FusionSettings.exe`, `FusionHost.exe`, `FusionTray.exe`, `FusionTsf.dll` and
+   `FusionFcitxHost.dll` built with MSVC 14.51.36231, SDK 10.0.26100.0, Qt 6.8.3 and
+   `runtime-wp3-20261018`; `ninja` then reports no work to do.
+2. Default **and** explicit isolated per-user pipe connection — **EXECUTED** on an explicit unique
+   pipe (`fusion-stage-a-20261021k`); the default-endpoint normalization was corrected and validated
+   in PR #28 and is unchanged here.
+3. Global page: load / apply / read-back, and persistence across an orderly Host restart —
+   **EXECUTED and passing** (a `Behavior/DefaultPageSize` probe value applied and read back; the
+   restart check re-read all three pages from the profile).
+4. No-change Apply short-circuit; Cancel/reload; unknown + learning-data preservation — **EXECUTED and
+   passing** (the profile was byte-identical after a no-change Apply; the pinyin learning files were
+   present in the profile after the restart; Cancel/Reload now re-read the list and all three pages).
 5. Input-method management: add / remove / reorder / select persistence; invalid-choice
-   (empty / unavailable) handling.
-6. Cross-page stale-value regression (global page vs IM page).
-7. Composition refusal / retry on any apply/switch during an active composition.
-8. Shift / raw-input commit and **ordinary Shift+letter** through the real Windows
-   key-down/key-up path.
+   (empty / unavailable) handling — **EXECUTED and passing** (reorder → remove → add-back ended on a
+   changed order that survived the restart; empty and `fusion-unavailable-probe` were both refused
+   with the documented message).
+6. Cross-page stale-value regression (global page vs IM page) — **EXECUTED and passing** (the
+   cross-page scenario that motivated the shared-configuration fix is part of the same harness).
+7. Composition refusal / retry on any apply/switch during an active composition — **NOT RUN**; it
+   needs a live composing context and was not driven through a TSF-registered application.
+8. Shift / raw-input commit and **ordinary Shift+letter** through the real Windows key-down/key-up
+   path — **NOT RUN**. No keyboard behaviour is claimed as measured. Lone `Shift` remains
+   unimplemented (§4).
+
+`ctest` over `stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0` and `stage2`
+is **36 of 37**: `stage4a_ipc_integration` is **not passing**. That test is fixed to the production
+pipe, so it types into whatever installed Host owns it; it fails deterministically at its
+`nihao`+Space commit assertion (a commit is produced, but not `你好`), and the code it exercises is
+byte-identical to base `fe23f07`. It is an environment-bound test, not a regression signal for this
+batch, and it is recorded as failing rather than excused.
 
 Windows entry points: Host handlers `handle_settings_get_im_list` / `handle_settings_set_im_list`
 (`src/host/host_server.cpp`, gated by `settings_capable`, `close_after_settings_request = true`,
@@ -139,10 +174,18 @@ Windows entry points: Host handlers `handle_settings_get_im_list` / `handle_sett
 global branch (`src/fcitx/backend.cpp`); GUI Global tab + IM-management panel (`src/settings/main.cpp`);
 payload codecs (`include/fusion/settings_protocol.hpp`, `src/settings/dbusprovider.cpp`).
 
-## 7. Packaging / remaining work (not in this stage)
+## 7. Packaging and remaining work
 
-- **Packaging pending.** No new package identity; the current available owner-test package remains
-  `fusion-0.0.0-settings+5271848.zip`. A Stage A package is produced only after Windows validation.
+- **Packaged.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
+  `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, built by the committed
+  packaging script from the clean committed source `2e28a88d8beb0548070cc8073cbb80b8174d8c66`
+  (`sourceDirty=false`). All 148 manifest entries were re-verified after extraction, along with the
+  Qt platform plugin, the executable/DLL identities, the zh_CN catalogs, the non-nested
+  `data\locale` layout and the notice/corresponding-source set. The manifest's settings block now
+  reads its repository, branch and commit from `cmake/settings-ui/versions.cmake` instead of a
+  literal, which is what had left a stale `0234c64` in it.
+  `fusion-0.0.0-settings+5271848.zip` (60,052,053 bytes) is retained for rollback. **Not installed,
+  not registered, not owner-accepted.**
 - **EXE installer** remains a separate later item (D085 / U4). U4 signing + distribution channel,
   U6 real-window confirmation, U7 tray hang-detection follow-up, WP5/WP7/P0-A/P0-B/P0-D are not
   closed by this stage.
@@ -152,13 +195,29 @@ payload codecs (`include/fusion/settings_protocol.hpp`, `src/settings/dbusprovid
 ## 8. Unrelated state preserved
 
 No commit to `main`; `feature/*` naming per D076. Nothing installed/registered; production services
-untouched; owner's live IM config untouched. Only the three intended task branches were pushed.
+untouched. Every settings write in this batch went through a unique pipe to an isolated Host with a
+disposable profile, so no Stage A apply targeted the owner's configuration, and no production
+Host/tray/browser was stopped or restarted.
+
+One side effect is recorded rather than left implicit: the repository's own
+`stage4a_ipc_integration` test is fixed to the production pipe by design, so running the suite types
+through whatever installed Host owns that pipe and appends to that user's pinyin history. That is a
+test-design property of the existing suite, not a settings change, and it is one reason the test's
+result is environment-bound (§6). Only the three intended task branches were pushed.
 
 ## 9. Artifacts in this directory
 
-- `change-contract.md` — bounded Stage A change contract.
-- `capability-mapping.md` — global/IM option-by-option mapping + the Shift/raw-input resolution.
-- `diffs/fusion-windows-stage-a.diff` — cumulative product diff `fe23f07..0a965e2` (this is the real diff, not a summary).
+- `change-contract.md` — bounded Stage A change contract, with the executed outcome appended.
+- `correction-inventory.md` — C1–C9, the consolidated correction batch and what was deliberately not
+  changed.
+- `capability-mapping.md` — global/IM option-by-option mapping and the Shift/raw-input account.
+- `diffs/fusion-windows-stage-a.diff` — cumulative product diff `fe23f07..2e28a88` (the real diff, not
+  a summary).
 - `diffs/fusion-windows-commits.txt` — product commit list.
-- `diffs/fcitx5-configtool-stage-a.diff` — cumulative fork diff `0234c64..abc2c66`.
+- `diffs/fcitx5-configtool-stage-a.diff` — the Stage A increment in the fork, `0234c64..abc2c66`
+  (header-only). The full upstream-to-fork adaptation is the 10-file range `9bd6022..abc2c66` on
+  fork PR #2; this batch added nothing to the fork.
+- The cumulative controller diff is saved outside the repository, under the persistent task workspace
+  (`C:\Users\choicky\worktmp\fusion-windows\official-settings-ui\`), because a diff of this pack
+  cannot contain itself.
 - `handoff.md` — this record.

@@ -1,1 +1,3 @@
+2e28a88 fix(package): read the settings fork identity from the pin file
+fb62348 fix(settings): compile the list surface, reload every page, and finish Stage A
 0a965e2 feat(settings): global configuration and input-method list management

@@ -10,7 +10,7 @@ Authority sources read for this map (all at their pinned revisions):
   (the `fcitx5-msvc` empty-range preflight tree; same generation as `runtime-wp3-20261018`).
 - pinned fcitx5-chinese-addons `61474bd3aa9fca26d1c31df93343035697e9f265` —
   `/home/choicky/coding-projects/fcitx5-chinese-addons` (`git show 61474bd:im/pinyin/pinyin.h`).
-- owner fork `choicky/fcitx5-configtool` `windows/fusion-settings` `0234c64` (base `9bd6022`).
+- owner fork `choicky/fcitx5-configtool` `windows/fusion-settings` `abc2c66` (base `9bd6022`, fork PR #2).
 - product `fusion-windows` `stage-a-settings` worktree at `fe23f07`.
 - controller D072 (`windows-architecture.md`), D082, D085, D086, WP3 (`windows-stage6-wp3.md`),
   `windows-settings-ui-feasibility.md`, `provider-settings-acceptance.md`, `evidence/settings-ui-spike-2026-10-20/`.
@@ -57,8 +57,13 @@ Consequence, per default-key entry:
 - `Shift+Return` → keysym 0xff0d, mod Shift: **delivered to the engine** while a composition/page is
   present (`return_has_engine_work`, `service.cpp:865-872`); an idle Return is left to the app (R36).
 - `Return` → 0xff0d, mod 0: same, but R36 leaves idle Return native.
-- `KP_Enter` → currently mis-sent as 0xff0d or not matched: **fixable by keysym translation only**
-  (`0xff8d`), no ownership change. In scope.
+- `KP_Enter` / `Shift+KP_Enter` / `Control+KP_Enter` → **these entries never match on this path.** A
+  numpad Enter reports `VK_RETURN` (0x0D), the same virtual key as the main Return, and
+  `translate_key` maps `kVkReturn` to `0xff0d` only (`key_map.cpp:51-53`); nothing produces the
+  `KP_Enter` keysym `0xff8d`. The key is therefore delivered as `Return`, which the `Return` /
+  `Shift+Return` entries already cover, so numpad Enter behaves like Return and the `KP_Enter`-named
+  entries are inert. **No keysym change is part of this stage** — the delivered diff touches no
+  `src/tsf/` file.
 - `Control+Return`, `Control+Shift+Return`, `Alt+…` → **not delivered** (no modifier bit + `modified`
   filtered by `routes_key`). Routing a modifier-held key to the engine is exactly the **D072 §5
   UNFROZEN** "production effect-capable key classification" and the WP3-B6 "modifier combinations
@@ -69,8 +74,15 @@ Key-up / bare-modifier: `OnTestKeyUp`/`OnKeyUp` set `pfEaten=FALSE` and forward 
 (`service.cpp:879-900`); a lone Shift press/release never reaches the engine. Fcitx
 `CommitRawInput` and hotkeys are **press-driven** (`instance.cpp:790-904` match on key event), so
 key-up is not required for them. The instruction to "preserve ordinary Shift+letter and key-up /
-modifier handling and not create an independent Shift state machine" is therefore satisfied simply
-by leaving the existing key-up/modifier behaviour untouched and adding only the KP_Enter keysym.
+modifier handling and not create an independent Shift state machine" is therefore satisfied by
+leaving the existing key-up/modifier behaviour untouched: this stage changes no key routing at all.
+
+**Lone Shift is NOT implemented.** A bare `Shift_L` is the **global** `AltTriggerKeys` activate
+hotkey, whose meaning is "activate/deactivate the input method" — not "commit raw input". No official
+option expresses "a lone Shift commits the raw input"; the closest official pair is the trigger hotkey
+plus the per-IM `SwitchInputMethodBehavior` (what a switch does with the preedit). Delivering a bare
+modifier to the engine is the same D072 §5 UNFROZEN classification as a modifier-held key, so the
+owner's request is **reported, not implemented**, and must not be described as resolved.
 
 ## 2. Global configuration → official schema / API / widget
 
@@ -114,7 +126,12 @@ Functional support of what *does* render on the Windows product path:
 | Hotkey | `TriggerKeys`, `AltTriggerKeys`, `ActivateKeys`, `DeactivateKeys`, `Enumerate*`, `PrevPage/NextPage/PrevCandidate/NextCandidate/TogglePreedit`, `ModifierOnlyKeyTimeout`, `ConsumeRedundantActivateKeys` | **inert on Windows** | these are matched by Fcitx **core as ordinary per-focus-context key events** (`instance.cpp:790-904`), not an X11 grab. The product never delivers bare Shift / modifier-held keys to the engine (§1; WP3-B6), and Ctrl+Space enable is the OS/TSF compartment. Page/candidate moves are synthesized as explicit `BackendStimulus` actions (Stage 5), not by forwarding these hotkeys. |
 
 So "schema presence ≠ functionality": the global page is served from the official schema, and the
-inert options are **explained** (GUI limitations label + this record), not hidden by a new filter.
+inert and partially-supported options are stated in the UI itself — the Global tab carries a note
+(`SettingsWindow::globalPageNote()` in `src/settings/main.cpp`) that names the three unsupported
+categories (global hotkeys, input-method information/panel options, password-field options) and the
+two partial ones (`ActiveByDefault`, `resetStateWhenFocusIn`) before the option list. The options stay
+visible because the schema is Fcitx's; nothing is disabled or hidden, and no Fusion-specific filter
+replaces the official one. The table above is the detailed record behind that note.
 
 ## 3. Available/enabled input methods → official management APIs
 

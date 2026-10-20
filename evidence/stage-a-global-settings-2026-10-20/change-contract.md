@@ -2,7 +2,8 @@
 
 Per `fusion-windows/AGENTS.md` §9.2. Bounded contract for the Stage A implementation instruction.
 Base: `fusion-windows` origin/main `fe23f07` (PR #28 merged); `fusion-controller` origin/main
-`96fb28c` (PR #51 merged); fork `choicky/fcitx5-configtool` `windows/fusion-settings` `0234c64`.
+`96fb28c` (PR #51 merged); fork `choicky/fcitx5-configtool` `windows/fusion-settings` `abc2c66`
+(fork PR #2; the pin the build and the package use).
 
 ## Goal
 Extend the existing official-widget settings surface (`FusionSettings.exe` → `FusionHost` over the
@@ -99,8 +100,10 @@ behaviour is delivered through the already-working Shift+Return path + option re
   invalid-choice handling; cross-page stale-value regression; composition refusal/retry; Shift/raw-
   input + ordinary Shift+letter through the real Windows key-down/key-up path.
 - Gate discipline: minis = Gate 1 (source/semantic) + Gate 2 (actual+negative diff, `git diff
-  --check`) + the pure-logic Gate 3 above. Qt/Windows/Gate-3 product build is NOT RUN on minis;
-  recorded as `STATIC REVIEW PASS; COMPILE UNVERIFIED` for the Qt/fork files.
+  --check`) + the pure-logic Gate 3 above. Qt/Windows/Gate-3 product build was NOT RUN on minis,
+  which is the whole reason those files were handed off; the minis-side classification was
+  "source-reviewed, compile unverified" and is **superseded** by the Windows execution recorded in
+  the Outcome section below.
 
 ## Required Artifacts
 Product Draft PR (task branch off `fe23f07`), fork Draft PR off `0234c64` then product re-pin,
@@ -113,3 +116,39 @@ D072 §5 boundary.
 Follow D076 branch namespaces (`feature/*`, `fix/*`, `docs/*`). No commit to `main`. Push task
 branches, open Draft PRs, **do not merge**, do not install/register, do not touch the owner's live
 input-method configuration or production services. Fork commit precedes the product pin update.
+
+## Outcome (2026-10-21) — what actually happened, by state
+
+The contract above is the plan of record for the batch; this section is its result. The states are
+kept apart on purpose: implemented ≠ compiled ≠ tested ≠ packaged ≠ installed ≠ accepted.
+
+- **Implemented.** Product `fusion-windows` `feature/stage-a-global-settings-im-methods` off `fe23f07`:
+  feature commit `0a965e2`, one consolidated correction `fb62348` (C1–C9), packaging-pin correction
+  `2e28a88`. Controller `fusion-controller` `feature/stage-a-global-settings` off `96fb28c`.
+  **Fork: no new commit** — the build and the package pin `abc2c66`, and inspection showed nothing in
+  the fork needed changing (`configlib` links only `launchexternal.cpp`/`logging.cpp`/`font.cpp`;
+  `configwidgetslib` calls only `GetConfig`, `SetConfig` and `PendingSignal::finished`; no fork
+  translation unit switches on `Operation`).
+- **Compiled.** Release build on Windows 7700 of `FusionSettings.exe`, `FusionHost.exe`,
+  `FusionTray.exe`, `FusionTsf.dll`, `FusionFcitxHost.dll` with MSVC 14.51.36231, SDK 10.0.26100.0,
+  Qt 6.8.3 and `runtime-wp3-20261018`; `ninja` reports no work to do afterwards. The Windows-side
+  compile that this contract could only mark unverified is therefore **verified**.
+- **Tested.** `ctest` over `stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0`
+  and `stage2`: **36 of 37 pass**. `stage4a_ipc_integration` does **not** pass: it is fixed to the
+  production pipe, so it types into whatever installed Host owns that pipe, and it fails
+  deterministically at its `nihao`+Space commit assertion (a commit is produced, but not `你好`). The
+  code it exercises is byte-identical to base `fe23f07`. Recorded as not passing — not excused.
+  Real Host + GUI round trip against an isolated Host on a unique pipe with a disposable profile
+  passes: three pages load, a changed value applies and reads back, an orderly restart restores the
+  value, the enabled order `shuangpin,pinyin` and the pinyin learning files from the profile, a
+  no-change Apply leaves the profile byte-identical, and empty/unavailable list entries are refused
+  with the documented message.
+- **Packaged.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
+  `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, from clean committed source
+  `2e28a88d8beb0548070cc8073cbb80b8174d8c66` with `sourceDirty=false`. All 148 manifest entries were
+  re-verified after extraction. `fusion-0.0.0-settings+5271848.zip` is retained for rollback.
+- **Not installed, not registered, not accepted.** No package was installed, no TIP was registered,
+  and the owner's production Host, tray, browser and profile were not modified. The live
+  key-down/key-up check through a TSF-registered application was **not run**, so the `Shift`/`Return`
+  account rests on source reading only; **lone Shift is not implemented** and numpad Enter matches the
+  `Return` family because it arrives as `VK_RETURN`.
