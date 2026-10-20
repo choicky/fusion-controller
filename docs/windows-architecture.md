@@ -623,10 +623,7 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 应用、引擎采用、跨有序重启持久、无变更应用逐字节安全）。对 `fcitx5-macos` 的受限源码核查佐证了设计：macOS 在**共享的
 官方配置语义**（相同三种配置 URI、`dumpDescription` schema、`save` 值、相同 apply 路径与事件循环调度）之上使用
 **平台专属的 SwiftUI 界面**。上游改动恰为两份补丁文件；`fcitx5-configtool` 需要维护的 fork/补丁系列，`fcitx5-qt`
-仅需一处可上游化的 MSVC 可移植性修复。上游界面源码为 GPL-2.0-or-later，Qt6 是不可避免的新依赖。界面**尚未集成进
-产品**（未改产品代码、未安装注册），Pinyin/双拼**选择**仍是独立未映射面，且在保留上游代码提交或分发前需要所有者的
-**许可证**决定——该决定是实现批次的**前置条件**；因此下一步是先做许可证决定，再做设置界面实现批次，其后是 EXE 安装包
-（`docs/windows-settings-ui-feasibility.md`，持久证据 `evidence/settings-ui-spike-2026-10-20/`）。
+仅需一处可上游化的 MSVC 可移植性修复。上游界面源码为 GPL-2.0-or-later，Qt6 是不可避免的新依赖。所有者已按 D086 **授权**：仅对上游派生的独立 `FusionSettings.exe` 及其派生代码使用 GPL-2.0-or-later，并保留上游 notices、对应源码与构建说明；FusionHost、FusionTray、FusionTsf 及其他组件不被整体重新许可。实现已进入独立的 `feature/official-settings-ui-product` 分支：FusionHost 增加保持 v4 的附加 settings 控制消息，设置进程使用用户/会话命名管道和 Host 事件循环，官方 ConfigWidget 子集提供 Pinyin/双拼页面、Apply/Cancel/Reload，托盘与 Start Menu 提供入口；对应可复现 owner-test ZIP 已生成，但**未安装、未注册、未获所有者验收**。`fcitx5-configtool` 的可复用适配已放入所有者 fork `choicky/fcitx5-configtool` 的 `windows/fusion-settings` 分支，`fcitx5-qt` 仍为单独可上游化补丁。Pinyin/双拼选择现已映射到 Fcitx `InputMethodManager` group API；External/词库动作仍明确禁用/未实现。实现、隔离产品验证与 owner 安装验收分开记录，不把包生成写成安装完成。详细状态见相关产品 PR、fork PR、`docs/windows-settings-ui-feasibility.md` 与 Stage 6 计划。
 安装包交付物形态已定为单个 **EXE**
 （不是 MSI，也不是解压后跑脚本的 zip），安装框架未定；签名与分发渠道仍未决（U4 仍 OPEN）。这两项不改变 WP7 日常使用
 验收与 U6 决定，也不改变最小托盘的范围（无自动重启、无挂起检测、无新的生命周期框架）。U1 的"只经 Fcitx 配置文件

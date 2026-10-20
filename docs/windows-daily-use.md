@@ -2,7 +2,7 @@
 
 This is the owner-facing guide for the Stage 6 WP7 daily-use period. The durable decisions are in
 `docs/DECISIONS.md` (D084) and `docs/windows-architecture.md` (§10, §14); the acceptance policy is in
-`docs/windows-stage6-plan.md` §8.1. **Daily use is not complete until the owner closes the period** (see §6).
+`docs/windows-stage6-plan.md` §8.1. **Daily use is not complete until the owner closes the period** (see §7).
 
 ## 1. Install, upgrade, uninstall
 
@@ -28,10 +28,24 @@ after every upgrade), check the Windows input indicator in the taskbar. If Fusio
 **Win+Space** until it is, then type. Judge U6 only with Fusion already selected — otherwise "letters appear raw" means the
 IME was not selected, not that a new window failed to open.
 
-## 2. Restarting the Host
+## 2. Opening Fusion Settings
+
+The owner-test package includes `FusionSettings.exe` and the installer creates **Fusion → Fusion Settings** in the Start Menu. The tray's **Settings** command launches the same installed executable. These entries are package integration, not the later single-EXE installer, and they do not install/register anything by themselves.
+
+Fusion Settings talks to the current user's/current session's `FusionHost` over the existing user/session-scoped pipe. It does not start a second engine or restart the Host. If the Host is absent, the UI reports that it is unavailable; if the Host disconnects, times out, or rejects the settings API version, the operation is shown as unsuccessful and the UI tells the user to reload/retry rather than claiming success.
+
+- **Pinyin settings / Shuangpin settings:** each page is rendered from Fcitx's official per-input-method schema and writes through the Host's official configuration path. Unknown/unexposed values are preserved.
+- **Apply:** applies the options you changed on the current page; the Host merges them onto its live configuration and confirms the resulting state before the UI reports success. Options you did not touch on that page are not submitted, so applying on one page cannot revert a shared option that the other page changed earlier — the other page shows the new value once it is applied or reloaded. A no-change Apply is a no-op for the engine setter and must not rewrite learning files.
+- **Cancel:** reloads authoritative Host state and discards un-applied UI edits; it does not write configuration.
+- **Input-method selection:** the selector uses Fcitx's official input-method group API; `Items/0` is the selected method and the existing `DefaultIM` fallback is preserved. If a composition or strict pending engine state is active, selection/apply returns a visible retry condition rather than resetting or silently committing the composition.
+- **External/subconfiguration actions:** disabled in this Windows package with an explanation. Dictionary management is not included in this batch.
+
+The current package is an owner-test artifact only. Product implementation, isolated validation, owner installation and owner acceptance are separate status claims; none of the latter two is implied by this guide.
+
+## 3. Restarting the Host
 
 Start menu → **Fusion → Restart FusionHost** (`restart-host.ps1` in the installed version directory), or the tray icon's
-**Restart FusionHost** command (§4, "The Fusion tray") — both run the same tool. It:
+**Restart FusionHost** command (§5, "The Fusion tray") — both run the same tool. It:
 
 1. asks the running Host for an **orderly** stop through the product's own stop event and waits up to 20 s;
 2. if it is still alive, force-stops **only** the instance verified as this user's and this session's, and says so — that
@@ -42,14 +56,14 @@ Start menu → **Fusion → Restart FusionHost** (`restart-host.ps1` in the inst
 An absent Host is a normal restart. Another user's or another session's Host is reported and never touched. Nothing here
 enables automatic restart or changes the task's restart-on-failure setting.
 
-## 3. Selecting the backup input method
+## 4. Selecting the backup input method
 
 Press **Win+Space** to cycle input methods; the indicator shows the current one. Use it if Fusion is not selected, or to
 compare against another IME. Installing does not force Fusion to be the selected method; the Windows indicator is the
-authority. The Fusion tray icon (§4, "The Fusion tray") reports whether this user's Host is running; it is not an
+authority. The Fusion tray icon (§5, "The Fusion tray") reports whether this user's Host is running; it is not an
 input-method selector — the Windows indicator remains the authority for which method is current.
 
-## 4. Diagnostics and the tray
+## 5. Diagnostics and the tray
 
 ### Diagnostics (off by default)
 
@@ -70,7 +84,7 @@ received it** (the new pid's log file must exist; a launcher with a cached envir
 
 ### R25 browser capture (optional troubleshooting, one-off per process)
 
-R25 was **reported recovered by the owner on 2026-10-20** (see §6), so this capture is no longer a required step. Keep it
+R25 was **reported recovered by the owner on 2026-10-20** (see §7), so this capture is no longer a required step. Keep it
 for a browser field that shows no candidate list: it checks that field against the **installed** package. It uses the
 existing `FUSION_TSF_DIAGNOSTICS` opt-in for one process, so nothing is added to the user or machine environment.
 
@@ -217,7 +231,7 @@ and both `WM_ENDSESSION` cases by an isolated harness. The two assumptions that 
 logoff always ends before the tray sees the session end, and that no application blocks the session end long enough to
 race the marker. Hang detection (alive but unresponsive) is the remaining design work and is **not** in this version.
 
-## 5. Reporting a problem
+## 6. Reporting a problem
 
 Only when something goes wrong. Include:
 
@@ -231,7 +245,7 @@ Only when something goes wrong. Include:
 No daily report is required, and no feedback is needed for a day without problems. Resource observations stay incidental
 (Task Manager's Host memory/handle count if something looks wrong); there is no mandatory benchmark or monitoring.
 
-## 6. Known limitations at this scope
+## 7. Known limitations at this scope
 
 - **Browsers: the candidate popup now appears in normal use** (R25 — **recovered, owner-confirmed 2026-10-20** on package
   `0.0.0-wp7+995e5a5`, source `995e5a5`). The owner reported "firefox 和 edge 目前正常" after installing that package and
@@ -252,7 +266,7 @@ No daily report is required, and no feedback is needed for a day without problem
     appears from the second keystroke there; the address bars anchor from the first. That is a one-key gap, not an
     explanation for a popup that never appears.
   - **If a field ever shows no popup again:** restart the browser first (see the next bullet) and then, if you want to
-    report it, run the optional capture in §4 "R25 browser capture" — it gives the exact steps, the log location and
+    report it, run the optional capture in §5 "R25 browser capture" — it gives the exact steps, the log location and
     what to report.
 - **After installing a new package, close and reopen the applications you want to test.** A process keeps the
   `FusionTsf.dll` it loaded at startup, so an already-running browser or editor can still show the previous build's
@@ -277,7 +291,7 @@ No daily report is required, and no feedback is needed for a day without problem
 - **The tray reports a process, not a health state** (U7). `Fusion: Host running (pid N)` means this user's Host process
   exists in this session; it does not mean the Host is responsive, and the tray does not detect an alive-but-unresponsive
   Host. It also does not restart anything by itself: **Restart FusionHost** is always your action. Its first installed
-  run, the fault balloon and the install/upgrade/uninstall handling are described in §4 "The Fusion tray", including what
+  run, the fault balloon and the install/upgrade/uninstall handling are described in §5 "The Fusion tray", including what
   has not been observed yet.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
   packaging and a distribution channel are not decided (U4).
@@ -288,7 +302,7 @@ No daily report is required, and no feedback is needed for a day without problem
 **No zero-loss, zero-corruption or automatic-recovery guarantee is made.** The mechanisms give explicit terminals for the
 scenarios in `docs/windows-stage6-plan.md` §8.2; a problem is assessed and repaired by impact under the daily-use policy.
 
-## 7. Acceptance
+## 8. Acceptance
 
 WP5 and WP6 are accepted through this daily-use period: the owner reports a problem when one occurs, it is repaired by
 impact, and **closing the period without reported problems is the acceptance** (owner decision 2026-10-19, D084). No

@@ -13,8 +13,9 @@ packages it. The settings-UI feasibility investigation D085 required is complete
 upstream build cannot be configured here, but the dependency trace shows a **minimal upstream-UI adaptation** is the
 right route, and a bounded build-and-transport spike has **proven it on Windows** (built, transport replaced at the
 provider seam, one real UI round trip through the official widget layer) — Qt6 is required, and the transport, X11 and
-KF6 requirements are separable features rather than the whole stack. **No UI is integrated into the product**, and the
-next step is the settings-UI implementation batch
+KF6 requirements are separable features rather than the whole stack. The UI is now **implemented on
+`feature/official-settings-ui-product`** (fusion-windows PR #27) under D086's scoped licence and packaged for owner
+testing; it is **not installed or owner-accepted**, and the real product GUI round trip has not been executed
 (`docs/windows-settings-ui-feasibility.md`). Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
 R25:** Notepad-- 3.4 crashed on Win+Space because the TIP bound to that application's own older `MSVCP140.dll` (fixed in
 fusion-windows PR #21 and **owner-confirmed** on the repair package), idle Return in the same application inserted no newline
@@ -173,46 +174,39 @@ execution instruction after the plan review (WP0).
 
 ## 7. Owner decisions, scope requirements and positioning
 
-**Next work after the minimal tray (owner decision 2026-10-20, D085).** Two items are scheduled ahead of anything else,
-in this order: (1) the **official settings UI** — the preferred approach is reuse of Fcitx5's own settings UI and
-configuration semantics, with the upstream UI's Windows dependencies and the way it would communicate with this Host
-inspected **before** an approach is chosen (feasibility is not established); (2) the **EXE installer** that packages it —
-a single EXE, with the framework **not** chosen, and signing/channel still U4. Neither item is a WP in the table above,
-and neither starts without its own bounded execution instruction. The release candidate (WP8) keeps its entry
-conditions: U4 decided and the WP7 daily-use closure. The installer item is the vehicle for WP8's packaging, not a
-replacement for those conditions, and WP5/WP6/WP7 acceptance is unchanged.
+**Next work after the minimal tray (owner decision 2026-10-20, D085; licence scope D086).** Two items remain scheduled ahead of anything else,
+in this order: (1) the **official settings UI** implementation/integration and its owner-test package; (2) the **EXE installer** that packages it.
+The feasibility prerequisite is closed by the three-round evidence and the bounded product implementation. The owner has authorized
+GPL-2.0-or-later only for the separate upstream-derived `FusionSettings.exe` and derivative code, preserving upstream notices and
+corresponding source; unrelated FusionHost/TIP/tray/repository code keeps its own component licensing. `fusion-windows` owns Host,
+pipe, tray and package integration; reusable configtool adaptations live in the owner fork `choicky/fcitx5-configtool` branch
+`windows/fusion-settings` (fork PR #1). The installer remains a single EXE, framework not chosen, and signing/channel remain U4.
+The release candidate (WP8) keeps its entry conditions: U4 decided and WP7 daily-use closure. The installer item is the vehicle for
+WP8 packaging, not a replacement for those conditions, and WP5/WP6/WP7 acceptance is unchanged. Product implementation and
+owner installation/acceptance are separate states; no installation is claimed here.
 
-**Settings-UI feasibility investigated (2026-10-20, two rounds); no UI implemented.** Recorded in
-`docs/windows-settings-ui-feasibility.md`. **Round 1 (measured):** the *unmodified* `fcitx5-configtool` 5.1.16 build
-cannot be configured on this machine — it stops at Qt6 with 4 of 17 declared requirements present, and its top-level
-CMakeLists requires X11/XKeyboardConfig/xkbfile outside every `option()`. **Round 2 (measured from the pinned source):**
-that is not the cost of every reuse route. X11 serves exactly one widget (the keyboard-layout picker,
-`layout/keyboardlayoutwidget.cpp` → `layoutselector.cpp`), a Linux feature this runtime has no input method for; KF6
-serves three option types plus the addon-list delegate, and the pinyin schema has no `Color` or `Font` option; the D-Bus
-dependency is one 60-line `DBusProvider` constructed at `configtool/mainwindow.cpp:30`, with **2 proxy calls for
-settings** (`GetConfig`/`SetConfig`) and 4 for selection; `IsoCodes` is three JSON files. The reusable widget layer
-(`Fcitx5Qt6WidgetsAddons`) links only Qt6 Widgets and `Fcitx5::Utils` — no D-Bus, no KF6, no X11. A **minimal
-upstream-UI adaptation** is therefore the route: build `src/configtool` + `src/lib` with `layout/`, `kcm/` and
-`migrator/` excluded, and replace the transport at its single seam over the product's named pipe. **Round 3 (measured
-2026-10-20, bounded build-and-transport spike):** the retained subset builds and links with task-local Qt 6.8.3/MSVC;
-the planned `QDBusPendingCall::fromCompletedCall` seam was **disproven** (`QDBusPendingReply` rejects a synthesized
-reply's missing signature), and the document's named fallback — a local asynchronous interface at the affected call
-sites — was built instead and drives the unmodified renderer; one real UI round trip ran through the official widget
-layer (`PageSize` 7 → 9 applied, used by the engine, persisted across an orderly restart, no-change apply byte-safe).
-A bounded source check of `fcitx5-macos` corroborates the shared official configuration semantics behind a
-platform-specific GUI. The upstream deltas are exactly two recorded patch files (`fcitx5-configtool` needs a maintained
-fork/patch series; `fcitx5-qt` needs only one plausibly upstreamable MSVC portability fix). The official
-*configuration* path had earlier been proven by an isolated **in-process engine PoC** —
-`Configuration::dumpDescription` plus
-`AddonInstance::setConfig`, `PageSize` 7 → 9 used by the engine and persisted across an orderly restart — which is
-neither a Host IPC path nor real-application UI validation; the spike adds the UI layer over a task-local pipe to an
-isolated engine, still not the production Host path. The UI sources are GPL-2.0-or-later, so a fork carrying them
-puts the settings executable under that licence — an owner decision required before any retained upstream source is
-committed or distributed, and therefore a **prerequisite** for the implementation batch. The settings item stays
-**open and unimplemented in the product**; the next step is that licence decision, then the settings-UI implementation
-batch (the spike's engine service is the reference implementation of the semantics; durable evidence in
-`evidence/settings-ui-spike-2026-10-20/`), and the **EXE installer** keeps its place behind this item. Nothing was
-installed or packaged in these batches.
+**Settings UI implementation status (2026-10-20; D085/D086).** The three-round feasibility record remains historical evidence in
+`docs/windows-settings-ui-feasibility.md`; it is no longer the current implementation status. The owner has authorized GPL-2.0-or-later
+only for the upstream-derived settings executable and derivative code, with upstream notices/corresponding source preserved (D086).
+The reusable configtool adaptations are maintained in `choicky/fcitx5-configtool` branch `windows/fusion-settings`, based on pinned
+upstream `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b`, fork PR #1 at commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`; the
+single fcitx5-qt MSVC portability patch remains product-pinned and separately reviewable. `fusion-windows` branch
+`feature/official-settings-ui-product` adds the production Host settings API without increasing TIP protocol version 4: additive
+settings messages use a capability/version handshake, existing user/session pipe identity checks, bounded payloads and Host
+incarnation fencing. All Fcitx settings access is scheduled on the Host event loop. The official schema-driven ConfigWidget is hosted
+in a separate Qt process with Chinese Apply/Cancel/Reload UI; Pinyin/Shuangpin settings use official per-input-method schemas and
+selection uses InputMethodManager group APIs. Unknown settings survive merge; no-change Apply avoids setter calls; changed Apply and
+selection refuse visibly when active composition/pending engine state makes the operation unsafe; External/subconfiguration actions
+are disabled. Tray Settings and a Start Menu shortcut are included in the owner-test package.
+
+**Validation and delivery state.** Product code compiled in Release with the pinned runtime, Qt 6.8.3/MSVC and exact fork/source pins;
+focused existing protocol/HostServer tests pass (2/2). A hash-manifested owner-test ZIP was built from committed product source:
+`fusion-0.0.0-settings+1f4b749.zip`, 60,053,082 bytes, SHA-256 `CC253577BF472BFEB1215AE500BE78481110FBE01081F033D34B2B5961607590`
+(owner-test artifact generated by the committed packaging script from the final product correction commit `1f4b749`; every one of
+its 148 manifest entries was re-verified after extraction, and the earlier `+4b0918d` package is superseded but retained).
+This is an isolated owner-test artifact, not an installation or owner acceptance. No production Host/tray/browser/profile was
+changed. Product PR and fork PR remain separate and unmerged; the EXE installer remains the next separate item under D085. U4,
+U6, WP7 and P0-A/P0-B/P0-D are not closed.
 
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 

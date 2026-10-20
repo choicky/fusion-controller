@@ -13,6 +13,7 @@
 |---|---|---|---|---|
 | fcitx5-android | Android IME base / modified fork | LGPL-2.1-or-later | 商业使用允许；分发时履行 LGPL，对修改的 covered code 提供对应源码并保留 notices/license | 已知；release 前复核最终版本 |
 | fcitx5 | core | LGPL-2.1-or-later | 同上 | 已知；release 前复核 |
+| `FusionSettings.exe` retained configtool subset | Windows upstream-derived settings executable / derivative UI adapter | **GPL-2.0-or-later** for this executable and derivative settings code only (D086; upstream copyright/SPDX notices preserved) | Owner-test package must ship scoped notices, corresponding source/build instructions, and exact source pins; this does **not** relicense FusionHost/TIP/tray or the repository | Implemented in `fusion-windows` settings PR; fork source `choicky/fcitx5-configtool` PR #1; final release/legal review remains required |
 | fcitx5-chinese-addons | Pinyin/Shuangpin/Auxiliary Filter / modified fork | LGPL-2.1-or-later | 同上；当前 MoQi/Unified Auxiliary Filter 修改属于 fork 修改 | 已知；release 前复核 |
 | LibIME | Pinyin/LM runtime | LGPL-2.1-or-later | 商业使用允许；按实际链接/分发方式履行 LGPL | 已知；release 前复核 |
 | gaboolic/moqima-tables / moqima_gb18030.txt | MoQi table | MIT；固定 commit 6d8ba8f1c57466f358e682baefe11bbd0fe389ab | 可商业使用/再分发；保留 copyright + MIT license | 已验证项目基线 |

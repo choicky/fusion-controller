@@ -1,13 +1,15 @@
 # Windows settings UI — upstream reuse feasibility (D085)
 
-Status: **feasibility established over three rounds (2026-10-20). Round 3 — a bounded build-and-transport
-spike on this machine — built the retained upstream subset with Qt 6.8.3/MSVC, replaced the transport
-at the provider seam, and drove one real round trip through the official widget layer (Pinyin `PageSize`
-7 → 9, applied, used by the engine, persistent across an orderly restart). Route A′ is proven for the
-configuration surface; product integration has not started. The owner's licence decision is a
-prerequisite for introducing retained upstream source into the product; the EXE installer is the next
-separate item.** Evidence: `evidence/settings-ui-spike-2026-10-20/` (index: `final-report.md`).
-Scope: the settings-UI item of D085. Nothing here changes an accepted decision.
+Status: **historical feasibility record, superseded for current implementation status by the Stage 6 plan and product PR.**
+Round 3 established that route A′ can build on Windows and drove one isolated Pinyin `PageSize` 7 → 9
+round trip through the official widget layer. D086 then authorized the scoped GPL-2.0-or-later settings
+implementation. Current product implementation is on `fusion-windows` `feature/official-settings-ui-product`,
+with reusable configtool adaptations on the owner fork `choicky/fcitx5-configtool` branch
+`windows/fusion-settings` (fork PR #1, commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`).
+Use the Stage 6 plan/product PR for implemented, isolated-product-validated and owner-installed status;
+this file retains the feasibility evidence, limitations and provenance. The EXE installer remains separate.
+Evidence: `evidence/settings-ui-spike-2026-10-20/` (index: `final-report.md`). Scope: D085 settings UI only.
+Nothing here changes an accepted decision.
 
 Evidence classes used below: **[measured]** = executed on this machine or read from the pinned
 source; **[documented]** = a public API or behaviour taken from its own documentation, not executed
@@ -133,9 +135,9 @@ a subclass; it must be a different class exposing the same method names returnin
 
 ## 4. The minimal upstream-UI adaptation (route A′)
 
-**Built and exercised in the Round-3 spike (§5); not integrated into the product.** It retains the
+**Historical Round-3 spike; current product implementation is tracked by the Stage 6 plan and PRs.** It retains the
 official UI sources and changes the boundary, rather than importing the whole Linux stack or
-writing a new UI. The spike's experimental target was the official **`ConfigWidget`** — the
+writing a new UI. The spike was not the complete product shell or production Host validation. The spike's experimental target was the official **`ConfigWidget`** — the
 schema-driven option renderer — hosted in a minimal test window. It was **not** the complete
 `configtool` application: no addon list, no input-method page, no application shell or main-window
 chrome.
@@ -216,9 +218,7 @@ every run redirected `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` to a disposable prof
 (`ui-roundtrip.log`), the no-change comparison (`values-comparison.md`), the upstream delta with
 hashes and provenance (`patch-inventory.md`), the window screenshot (`settings-window.png`) and the
 index (`final-report.md`). The working tree — sources, binaries, patched checkouts, profiles —
-stays in the recovery workspace and is not committed; because the retained upstream patches are
-local-only pending the owner's licence decision (§9), that evidence directory alone cannot
-reproduce the patched build.
+stays in the recovery workspace and is not committed. The historical evidence directory is not itself the current product source; reproducible current builds use the pinned owner-fork configtool commit, the product's pinned fcitx5-qt patch and the build/source-access instructions recorded by D086 and the current PRs.
 
 The three uncertainties the two-round record left open (not compiled; the synthesized-reply path;
 the custom types) were measured, and the second answered **against** the expectation:
@@ -305,7 +305,7 @@ page size was read from the engine's candidate list inside the harness.
 
 | # | Route | Reuses | Status |
 | --- | --- | --- | --- |
-| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Built and validated by the Round-3 spike for the configuration surface (Pinyin `PageSize` round trip, persistence, no-change safety); ready for the implementation batch once the licence prerequisite (§9) is decided.** The smallest route that satisfies "reuse upstream first" |
+| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Chosen and implemented** (§9, §10): the licence question was settled by D086, the subset runs in the product as `FusionSettings.exe` against the real Host, and the earlier Round-3 spike remains the evidence that the surface works end to end |
 | A | Full upstream stack: Qt6 + KF6 + X11 + xkbcommon + IsoCodes + rebuilt runtime with keyboard/dbus modules + a session D-Bus | The official UI unmodified | Works, but imports Linux-only features the product does not need and reopens runtime provenance |
 | B | Fusion-authored window over `dumpDescription`/`setConfig` via the existing named pipe | Official schema and apply only | **Not authorized by D085**; also the largest new-code surface for the same user-visible result |
 | C | No UI: settings edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f) | Nothing new | Correct today, but gives the user no settings surface |
@@ -316,48 +316,44 @@ configuration lives under `%APPDATA%\Fcitx5`.
 
 ## 9. Fork, patch scope, and licences [measured]
 
-The Round-3 upstream deltas are exactly two patch files. Their inventory, hashes and provenance are
-committed in `evidence/settings-ui-spike-2026-10-20/patch-inventory.md`; **the patch content itself
-is not committed** (see the licence boundary below).
+The reusable adaptation now lives in the owner-maintained fork:
 
-- `fcitx5-qt` `0285a5d`: **1 file** — `fcitxqtconfiguifactory.cpp` MSVC portability
-  (`std::filesystem::path` → `QString`). This one is plausibly upstreamable as a portable fix; if
-  accepted it removes the need for an fcitx5-qt fork.
-- `fcitx5-configtool` `9bd6022`: **10 files** — the transport seam (`dbusprovider.h/.cpp`), the two
-  `configwidget` call sites, the two KF6→Qt widget replacements, both subset `CMakeLists.txt`, and
-  the new `launchexternal` TU (verbatim extraction from the excluded `addonmodel.cpp`). These
-  changes are inherent to the Windows port (upstream assumes D-Bus + KF6) and **constitute a
-  maintained fork or patch series**; no GitHub fork was created in the spike.
+- `choicky/fcitx5-configtool`, branch `windows/fusion-settings`, base
+  `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b`, fork PR #1,
+  commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`. It carries the subset CMake,
+  asynchronous provider/result declarations and ConfigWidget result signals, KF6→Qt controls,
+  disabled External action surface, and the extracted External helper. FusionHost-specific pipe
+  code is deliberately in `fusion-windows/src/settings/dbusprovider.cpp`, not in this fork.
+- `fcitx5-qt` `0285a5d18367d8f3af80dab7e4819d5555982340`: one separate product patch for
+  `std::filesystem::path` → `QString` MSVC conversion. It remains plausibly upstreamable; no
+  fcitx5-qt fork was created.
 
-Licences of the retained sources/dependencies: configtool `src/lib` **GPL-2.0-or-later**;
-fcitx5-qt widgetsaddons LGPL-2.1-or-later, dbusaddons BSD-3-Clause; Qt 6.8.3 LGPL-3/GPL-2-or-later
-(dynamic link); ECM BSD-3-Clause (build-time only). Neither product repository's outbound licence
-was chosen or changed.
-
-**Licence boundary.** The owner's licence decision is an explicit **prerequisite**: retained
-upstream source may not be committed to, or introduced into, either product repository until it is
-made. Until then the patches stay local to the recovery workspace, and the committed evidence is an
-inventory with hashes — not a distributable patch. This document does not choose a licence.
+The product build pins the exact fork commit and the separate fcitx5-qt patch in
+`cmake/settings-ui/versions.cmake`. Pinned source, notices, corresponding-source archives and build
+instructions are included/linked by the owner-test package. Licences remain component-specific:
+configtool-derived settings executable GPL-2.0-or-later under D086; fcitx5-qt widgetsaddons
+LGPL-2.1-or-later, dbusaddons BSD-3-Clause; Qt shared libraries/plugin use the selected LGPL-3.0-only
+route; pinned Fcitx runtime components retain their upstream LGPL terms. No repository-wide licence
+was chosen.
 
 ## 10. What remains, and the next action
 
-Remaining work for the settings item, in prerequisite order:
+The feasibility investigation is complete and the implementation is delivered on the open product PR. Remaining work is:
 
-1. **The owner's licence decision** (§9) — required *before* step 2, because step 2 introduces
-   retained upstream source into the product. No product licence is chosen here.
-2. **The implementation batch** (smallest viable), once step 1 is settled: port the proven pipe
-   transport into the product (engine-side Get/Set handlers in the product backend on the Fcitx
-   event loop + the `ControllerProxy`/`PendingCall` adapter + the retained widget subset), Pinyin
-   page first. The spike's engine service is the reference implementation of the semantics, and
-   `evidence/settings-ui-spike-2026-10-20/` is the reviewable record of what it proved.
-3. **Selection stays separate** (§6): selecting Pinyin/Shuangpin is input-method-group management,
-   not a config option; it needs its own mapping and is not claimed by anything here. `External`
-   options likewise render but have no Windows launch path — product-integration work, not a
-   validated feature.
-4. **Packaging**: the EXE installer remains the next separate batch under D085 (framework,
-   signing, channel still undecided under U4).
+1. Independent review of the product PR and fork PR is the current step; blockers are resolved on the
+   existing branches without merging automatically.
+2. Executed: Release build of the product, the focused protocol/HostServer tests (2/2), the committed
+   packaging script and a full manifest re-verification of the artifact, and the protocol/Host contract
+   for a partial apply from the other settings page. Not executed: the real product GUI round trip —
+   actual Host schema rendering for Pinyin and Shuangpin, the two-page apply scenario in the window,
+   Cancel, active-composition refusal, packaged launch and shortcut resolution. The bounded self-test
+   for that scenario is compiled into the executable and awaits an owner-run session.
+3. Deliver the hash-manifested owner-test package and record its exact source commit/size/SHA-256;
+   distinguish generated package, isolated-product validation, owner installation and owner acceptance.
+4. The EXE installer remains the next separate D085 item (framework/signing/channel undecided under U4).
 
-The settings item stays **open until actual product integration is complete** and appropriately
-validated. U4, U6, WP7 and the other gates are untouched by this document. A Fusion-authored UI
-remains unauthorized, and the Round-3 spike did not need one: the official widget layer ran on
-Windows as-is (modulo the recorded patches).
+The settings item remains open only for isolated GUI validation and owner acceptance; implementation and
+packaging are complete, and the two correction items (a stale page could write back a shared value, and the
+packaging script's locale copy) are fixed. U4, U6, WP7 and P0-A/P0-B/P0-D remain untouched.
+A Fusion-authored option schema/UI remains unauthorized; the product uses the official schema-driven
+widget layer plus a small product shell.

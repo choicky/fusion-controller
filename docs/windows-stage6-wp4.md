@@ -133,8 +133,13 @@ Evidence (`a3-smoke.txt`):
 **Package form.** A zip whose root maps onto `C:\Program Files\Fcitx5 Fusion\<version>\`: `bin\` (Host, TSF DLL,
 `FusionFcitxHost.dll`, 21 runtime DLLs), `data\` (fcitx5 addon/input-method/pinyin data, `libime` dictionaries),
 `lib\libime\zh_CN.lm`, `tools\` (`register.ps1`, `unregister.ps1`, `check-state.ps1` — reused, not duplicated),
-`install.ps1`, `uninstall.ps1`, `host-state.ps1`, `package.json`. Test executables and `FusionTsfProfile.exe` are not
-packaged. No MSI, no installer toolchain, no signing (U4 stays open; decided with WP8).
+`install.ps1`, `uninstall.ps1`, `host-state.ps1`, `package.json`. The owner-test settings package additionally carries
+`bin\FusionSettings.exe`, Qt 6.8.3 shared DLLs and `bin\plugins\platforms\qwindows.dll`, `bin\qt.conf`, the pinned
+Chinese locale catalogs, scoped settings license notices, corresponding-source archives for the pinned Fcitx runtime,
+and the exact fcitx5-qt patch/source instructions. The installer creates the `Fusion Settings.lnk` Start Menu entry;
+the tray exposes Settings. Test executables and `FusionTsfProfile.exe` are not packaged. No MSI, no installer toolchain,
+no signing (U4 stays open; decided with WP8). The owner-maintained configtool fork source is pinned by exact commit and
+its fork PR remains separately reviewable.
 
 **Manifest.** `package.json` records package name, version, source commit and dirty flag, build time, configuration,
 runtime identity (label, pinned fcitx5 / chinese-addons / libime commits, patch names) and `size` + `sha256` for every
