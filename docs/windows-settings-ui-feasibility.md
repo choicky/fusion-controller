@@ -1,25 +1,28 @@
 # Windows settings UI — upstream reuse feasibility (D085)
 
-Status: **feasibility measured on 2026-10-20; no UI implemented; owner decision required.**
-Scope: the settings-UI item of D085 (2026-10-20). The EXE installer is the following item and is not
-covered here. Nothing in this document changes an accepted decision.
+Status: **feasibility investigated in two rounds (2026-10-20); no UI implemented; owner decision
+required.** Scope: the settings-UI item of D085. The EXE installer is the following item and is not
+covered here. Nothing here changes an accepted decision.
+
+Evidence classes used below: **[measured]** = executed on this machine or read from the pinned
+source; **[documented]** = a public API or behaviour taken from its own documentation, not executed
+here; **[inferred]** = reasoning from the above, not tested; **[unresolved]** = not established.
+
+Round 1 established what the **unmodified** upstream build requires. Round 2 traced **which
+dependency belongs to which feature**, because the unmodified top-level build is not the cost of
+every reuse route — that conflation was the error in the first version of this document.
 
 ## 1. What was asked
 
 D085 schedules an official settings UI that **prefers reusing Fcitx5's own settings UI and
-configuration semantics** over a Fusion-specific configuration surface, and states that
-feasibility on Windows is **not established**: the upstream UI's Windows dependencies and the way it
-would communicate with this Host had to be inspected before an approach was chosen. A Fusion-written
-UI is a fallback, **not authorized** by that decision.
+configuration semantics** over a Fusion-specific configuration surface, and states that feasibility
+on Windows is **not established**. A Fusion-written UI is a fallback, **not authorized** by that
+decision. The batch instruction adds: do not dismiss upstream reuse merely because Qt is absent
+locally or the unmodified top-level CMake requires X11.
 
-The instruction for this batch added the rule that if reuse needs an architectural boundary change or
-proves infeasible, the dependent implementation stops and reports source versions, files/call chain,
-the measured obstacle and the smallest viable alternatives — and that the official UI must not be
-silently replaced by a new Fusion UI.
+## 2. Round 1 — the unmodified build cannot be configured on this machine [measured]
 
-## 2. Measured boundary: the official front end cannot be built or connected here
-
-Inspected upstream, at the versions that match the pinned runtime generation:
+Inspected at the revisions that match the pinned runtime generation:
 
 | Component | Revision | Version |
 | --- | --- | --- |
@@ -29,138 +32,206 @@ Inspected upstream, at the versions that match the pinned runtime generation:
 | fcitx5-chinese-addons | `61474bd3aa9fca26d1c31df93343035697e9f265` | 5.1.15 |
 | libime | `171edcf137001e8eb8274f53ec010058cda70b09` | 1.1.17 |
 
-A real configure of `fcitx5-configtool` in its most favourable configuration
-(`-DENABLE_KCM=OFF -DENABLE_TEST=OFF`, i.e. without the Plasma/Kirigami branch) stops at
-`CMakeLists.txt:21`:
+A real configure with `-DENABLE_KCM=OFF -DENABLE_TEST=OFF` (the most favourable configuration, which
+drops the Plasma/Kirigami branch) stops at `CMakeLists.txt:21`:
 
 ```
 Could not find a package configuration file provided by "Qt6" (requested version 6.4.0)
 ```
 
-A probe project that repeats every declared `find_package` measures 4 of the 17 requirements present
-(ECM, Fcitx5Core, Fcitx5Config, Fcitx5Utils); **Qt6, all four KF6 modules, Fcitx5Qt6DBusAddons,
-Fcitx5Qt6WidgetsAddons, IsoCodes, X11, XKeyboardConfig, PkgConfig and Gettext are absent**, and
-`xkbfile` cannot be probed because pkg-config itself is absent — 13 of 17 missing.
-`Fcitx5ModuleKeyboard`, which the daemon-side `src/modules/dbus` links, is absent as well.
+A probe of every declared requirement: **4 of 17 present** (ECM, Fcitx5Core, Fcitx5Config,
+Fcitx5Utils); absent are Qt6, the four KF6 modules, `Fcitx5Qt6DBusAddons`,
+`Fcitx5Qt6WidgetsAddons`, IsoCodes, X11, XKeyboardConfig, PkgConfig and Gettext, with `xkbfile`
+unprobeable because pkg-config itself is absent.
 
-Three of these absences are structural, not environmental:
+**This is a fact about the unmodified top-level build on this machine.** It is not, by itself, the
+cost of adapting the UI, which is what §3–§5 examine.
 
-1. **X11 is unconditional.** `CMakeLists.txt:82-84` requires `X11`, `XKeyboardConfig` and
-   `pkg-config xkbfile` outside every `option()`, so no configuration removes them.
-   `fcitx5-qt/CMakeLists.txt:45` requires `XKBCommon` unconditionally, and
-   `fcitx5-qt/qt6/CMakeLists.txt:2` requires Qt6 `DBus`.
-2. **The transport does not exist.** Both front ends reach a running Fcitx over D-Bus:
-   `fcitx5-configtool/src/lib/configlib/dbusprovider.h` holds a `FcitxQtControllerProxy`, and the
-   daemon side is `/controller` on `org.fcitx.Fcitx5`
-   (`fcitx5/src/modules/dbus/dbusmodule.cpp:57`, `:784-786`, methods `GetConfig`/`SetConfig`).
-   The pinned runtime ships **no dbus addon** (`runtime-release/data/fcitx5/addon/` has only
-   clipboard, imselector, pinyin, pinyinhelper, punctuation, quickphrase, spell, unicode), and
-   `src/modules/dbus/CMakeLists.txt` links `Fcitx5::Module::Keyboard`, which this runtime does not
-   export because it was built with `-DENABLE_KEYBOARD=OFF` and `-DENABLE_DBUS=OFF`
-   (`tools/fcitx/build-native.ps1:92`).
-3. **The runtime's `fcitx5-configtool` is not a program.** `runtime-release/bin/fcitx5-configtool` is
-   a `/bin/sh` wrapper — a Linux artifact. `bin/Fcitx5Config.dll` is the configuration library, not
-   a UI.
+## 3. Round 2 — where each dependency actually comes from [measured]
 
-Reuse therefore requires a new Qt6/KF6/X11/xkbcommon/IsoCodes dependency stack, a runtime rebuilt
-with the keyboard and dbus modules, and a session D-Bus on Windows. That is a new transport plus a
-new third-party stack: an architectural boundary change, not a Windows adaptation of an existing
-seam.
+### 3.1 The reusable widget layer is Qt-only
 
-**Licence.** Every inspected source directory of `fcitx5-configtool` (`src/configtool`, `src/lib`,
-`src/kcm`) is `GPL-2.0-or-later`, unlike the `LGPL-2.1-or-later` runtime. Importing or forking it
-puts the derived settings front end under GPL-2.0-or-later. Neither product repository currently
-carries a `LICENSE` file, so the product's own outbound licence is itself unstated — that has to be
-settled before GPL code is imported.
+`fcitx5-qt/qt6/widgetsaddons/CMakeLists.txt` builds four sources
+(`fcitxqtconfiguifactory`, `fcitxqtconfiguiplugin`, `fcitxqtconfiguiwidget`,
+`fcitxqtkeysequencewidget`) and links **only** `Fcitx5::Utils`, `Qt6::Core`, `Qt6::Widgets`.
+`fcitxqtkeysequencewidget.cpp` includes `QKeyEvent`, `QToolButton`, `QTimer` and `fcitx-utils/key.h`;
+`fcitxqtconfiguifactory.cpp` uses `QPluginLoader`. **No D-Bus, no KF6, no X11.** This is the layer
+that provides the key-capture widget and the per-addon config-UI plugin interface.
 
-## 3. What is reusable today, officially, on this Host
+### 3.2 X11 belongs to exactly one feature
 
-Two upstream mechanisms work unchanged and are enough for a settings front end to be a *front end*:
+`layout/CMakeLists.txt` builds `layoutlib` from **one file**, `keyboardlayoutwidget.cpp`, linking
+`X11`, `X11Xkblib` and `PkgConfig::XkbFile`. Its only consumer is
+`configwidgetslib/layoutselector.cpp` (`#include "keyboardlayoutwidget.h"`), which is reached from
+`impage.cpp:298` and `:360`. That is the keyboard-layout/variant picker for an input method — a
+Linux XKB feature with no meaning on this product, whose runtime has no keyboard input method at all
+(`-DENABLE_KEYBOARD=OFF`). The unconditional `find_package(X11/XKeyboardConfig/xkbfile)` at
+`CMakeLists.txt:82-84` exists to serve that one widget.
 
-- `fcitx::Configuration::dumpDescription(RawConfig&)` serialises the whole option schema — type,
-  description, default, integer bounds, enum names with i18n — from the addon's own compile-time
-  `FCITX_CONFIGURATION` macros. There is no second option list to maintain.
-- `fcitx::AddonInstance::setConfig(const RawConfig&)` is the official validated apply. The pinyin
-  override (`im/pinyin/pinyin.h:426-430`) does `config_.load(config, true)`,
-  `safeSaveAsIni(config_, "conf/pinyin.conf")` and `populateConfig()` — apply and persistence through
-  Fcitx's own writer, with no Host restart.
+### 3.3 KF6 belongs to three option types and one delegate
 
-Measured on an isolated per-user profile (`USERPROFILE`/`APPDATA`/`LOCALAPPDATA` redirected; the
-owner's profile untouched), with the same static addon set and `--disable=all --enable=...` argv the
-Host uses:
+The retained UI's KF6 includes are five lines:
 
-| Check | Result |
-| --- | --- |
-| Schema from `dumpDescription` | `PageSize` Integer, "Candidates Per Page", default 7, min 3, max 10 |
-| Shuangpin scheme enum | `Ziranma` (default), `MS`, `Ziguang`, `ABC`, `Zhongwenzhixing`, `PinyinJiajia`, `Xiaohe`, `GB Standard` |
-| Engine page size before apply | 7 (read from the engine's own `CandidateList::pageSize()`) |
-| `setConfig` with `PageSize=9` | re-read 9 |
-| Engine page size after apply | 9 |
-| On-disk `conf/pinyin.conf` | `PageSize=9` |
-| Orderly restart | 9, engine 9 |
-| No-change run | `pinyin.conf` byte-identical |
-| `user.dict` / `user.history` | unchanged across an apply |
+| File | Include | Purpose |
+| --- | --- | --- |
+| `configwidgetslib/optionwidget.cpp:17` | `KColorButton` | the `Color` option type (`ColorOptionWidget`, lines 410–470) |
+| `configwidgetslib/fontbutton.cpp:9` | `KFontChooser` | the `Font` option type |
+| `configwidgetslib/addonselector.cpp:14` | `KWidgetItemDelegate` | the add-all-addons list |
+| `configtool/main.cpp:14-15` | `KDBusService`, `KWindowSystem` | optional single-instance, inside `#ifdef CONFIG_QT_UNIQUE_APP_SUPPORT` |
 
-Both `pinyin` and `shuangpin` input methods exist in the runtime
-(`runtime-release/data/fcitx5/inputmethod/{pinyin,shuangpin}.conf`), so Pinyin/Shuangpin selection
-and the Shuangpin scheme are reachable through the official schema alone.
+`main.cpp`'s KF6 use is already conditional and only compiled when the KF6 targets exist
+(`CMakeLists.txt:42-44`). The pinyin schema contains **no `Color` and no `Font` option**
+(`POC.md` §B, full inventory), so two of the three are unreachable for this product.
 
-## 4. Constraints a future front end must honour
+### 3.4 The D-Bus dependency is one class with eleven call sites
 
-These are measured, not assumed:
+`DBusProvider` (`configlib/dbusprovider.h/.cpp`, 60 lines) is constructed in exactly one place —
+`configtool/mainwindow.cpp:30` — and passed to the three pages. It owns an `FcitxQtWatcher` and
+creates an `FcitxQtControllerProxy` on `/controller`. Everything else reaches the daemon through
+`dbus_->controller()->…`.
 
-1. **Describe per input method.** `AddonInstance::getConfig()` returns the pinyin addon's `&config_`,
-   which exposes `ShuangpinProfile` and `ShowShuangpinMode` even for the `pinyin` input method. The
-   per-IM call `InputMethodEngine::getConfigForInputMethod(entry)` returns `&pyConfig_`, where they
-   are hidden (`im/pinyin/pinyin.cpp:2484-2493`). A UI that reads `getConfig()` would offer Shuangpin
-   controls under Pinyin.
-2. **One hide does not reach the description.** `Fuzzy$FuzzyConfig$PartialSp` stays visible for the
-   `pinyin` input method even though `pinyin.cpp:1003` hides it, because
-   `dumpDescriptionImpl` describes a sub-config from `option->subConfigSkeleton()`, which returns a
-   fresh skeleton (`fcitx-config/option.h:384-388`) rather than the live instance. Hidden flags are
-   therefore not authoritative for sub-config options.
-3. **No hide loss across apply.** An earlier reading of `pyConfig_ = config_`
-   (`im/pinyin/pinyin.cpp:1310`) suggested `setConfig` would drop the construction-time hides.
-   Measured: it does not — `Configuration::copyHelper`
-   (`fcitx-config/configuration.cpp:98-107`) copies values into the destination's own option objects,
-   so annotations survive. No fix is needed and none was written.
-4. **The Host must stay the only applier.** WP3 B3f measured that a configuration file edited while
-   the Host runs is overwritten by the Host's next save. Any front end has to apply through the
-   running Host (an IPC request answered on the Fcitx event loop), not by writing files behind it.
-5. **Any IPC extension is a protocol change.** `include/fusion/ipc_protocol.hpp` has
-   `protocol_version = 4` and a `MessageType` enum of `0x01..0x0A`; `parse_header` rejects type bytes
-   outside that range. Adding configuration messages raises the version and needs its own bounded
-   batch.
+Actual proxy calls in the retained UI (not guards): **11**, over 11 distinct methods.
 
-## 5. Smallest viable alternatives
+| Purpose | Methods | Calls |
+| --- | --- | --- |
+| **Settings surface** | `GetConfig`, `SetConfig` | 2 (`configwidget.cpp:71`, `:145`) |
+| **Input-method selection** | `InputMethodGroups`, `InputMethodGroupInfo`, `SetInputMethodGroupInfo`, `AvailableInputMethods` | 4 |
+| Group management, update, restart (droppable) | `AddInputMethodGroup`, `RemoveInputMethodGroup`, `Refresh`, `Restart`, `CheckUpdate` | 5 |
 
-Listed in increasing cost. None is started; D085 leaves the UI's scope undecided beyond "official
-settings for what the product actually exposes", and a Fusion-written UI needs an explicit
-authorization that this record does not give.
+The call idiom is uniform and shallow: `auto call = dbus_->controller()->X(...)`, then
+`new QDBusPendingCallWatcher(call, this)`, then `QDBusPendingReply<T> reply = *watcher`. The proxy
+methods are **not virtual** (it is a generated `QDBusAbstractInterface`), so a replacement cannot be
+a subclass; it must be a different class exposing the same method names returning a
+`QDBusPendingCall`.
 
-| # | Approach | What it reuses | Cost / risk |
+### 3.5 The other requirements are small or data-only
+
+- **IsoCodes** is not a library here: `configlib/iso639.cpp` reads three JSON files named by
+  `ISOCODES_ISO639_{2,3,5}_JSON` and builds a code→name map. Shipping the JSON (or dropping the
+  language-name column) removes it.
+- **PkgConfig / Gettext** are build-time tooling; Gettext is only for the translation catalogs.
+- **Qt6** is the one requirement that cannot be removed by any adaptation: the widgets *are* Qt
+  widgets.
+
+### 3.6 Feature-to-dependency map
+
+| Feature | Sources | Needs |
+| --- | --- | --- |
+| Option rendering from the schema (the hard part) | `configwidgetslib/{configwidget,optionwidget,listoptionwidget,optionaloptionwidget,varianthelper,keylistwidget,verticalscrollarea,erroroverlay,categoryhelper}.cpp` (~2.1k lines) | Qt6 Widgets, `Fcitx5Qt6WidgetsAddons`, KF6 for `Color`/`Font` only |
+| Input-method page (selection) | `configwidgetslib/impage.cpp`, `configlib/imconfig.cpp` | Qt6, the 4 selection methods, `layoutselector` for layouts |
+| Addon list page | `configwidgetslib/addonselector.cpp` | Qt6, KF6 `KWidgetItemDelegate`, 2 addon methods |
+| Keyboard-layout picker | `layout/keyboardlayoutwidget.cpp`, `layoutselector.cpp` | **X11, Xkblib, xkbfile** |
+| KCM (Plasma settings module) | `src/kcm`, `plasmathemegenerator` | Plasma, Kirigami, KCMUtils |
+| Migrators | `src/migrator` | Qt only, not part of the product's scope |
+| Transport | `configlib/dbusprovider.cpp`, `Fcitx5Qt6DBusAddons` | Qt6 DBus + a daemon-side `/controller` |
+
+## 4. The minimal upstream-UI adaptation (route A′)
+
+**Viable in principle, not yet built.** It retains the official UI sources and changes the
+boundary, rather than importing the whole Linux stack or writing a new UI:
+
+1. **Build a subset**: `src/configtool` + `src/lib/{configlib,configwidgetslib}`, with `layout/`,
+   `src/kcm`, `src/migrator` and `plasmathemegenerator` excluded. Excluding `layout/` removes X11,
+   XKeyboardConfig and xkbfile outright; excluding `kcm` removes Plasma/Kirigami/KCMUtils. This is a
+   build-file change, not a source change.
+2. **Replace the transport at its single seam**: keep `DBusProvider`'s interface (`available()`,
+   `canRestart()`, `availabilityChanged`, `controller()`) and implement it over the product's
+   per-user named pipe. The replacement's methods return
+   `QDBusPendingCall::fromCompletedCall(QDBusMessage)` — a public Qt API whose documented purpose is
+   "simulating a pending call, but that has already finished" **[documented]**. Call sites then
+   compile unchanged because they only use `auto` + `QDBusPendingCallWatcher` + `QDBusPendingReply`.
+3. **Serve 2 methods for settings and 4 for selection** from the Host: `GetConfig`/`SetConfig`
+   already map onto `Configuration::dumpDescription` + `AddonInstance::setConfig`, which the PoC
+   proved work on this Host (`POC.md` §B). The four selection methods map onto Fcitx's own
+   input-method-group API in the Host.
+4. **Remove the layout feature** from `impage.cpp` (2 call sites) and drop `layoutselector`.
+5. **KF6**: either ship `KF6WidgetsAddons` + `KF6ItemViews` (both build on Windows), or patch the
+   three spots — replace `KColorButton` with `QToolButton`+`QColorDialog` (~20 lines), drop
+   `fontbutton.cpp`'s `KFontChooser`, drop `addonselector.cpp` (the addon list is not needed when the
+   product exposes one engine's settings).
+6. **IsoCodes**: ship the three JSON files, or drop the language-name column.
+
+What stays untouched is the valuable part: the schema-driven option renderer (~2.1k lines), the
+key-sequence widget, and the official per-addon config-UI plugin interface.
+
+**Costs and obligations.** Qt6 (Core/Gui/Widgets/DBus) becomes a product dependency — LGPLv3,
+dynamically linked, and unavoidable for any upstream-widget route. The UI sources are
+**GPL-2.0-or-later** (`src/configtool`, `src/lib`, `src/kcm`), so a fork carrying them puts the
+settings executable under GPL-2.0-or-later; neither product repository has a `LICENSE` file, so the
+product's own outbound licence has to be settled first. The fork must be recorded with its upstream
+revision and licence text, and carried forward on upstream changes.
+
+## 5. Remaining uncertainties [unresolved]
+
+These are why A′ is "viable in principle", not "proven":
+
+1. **Not compiled.** No Qt6 is installed here, so these sources have never been built with MSVC or
+   run on Windows. Nothing in the source forbids it, but "builds" is unverified.
+2. **The synthesized-reply path is unexecuted.** `fromCompletedCall` is documented, and the call
+   sites only need a `QDBusPendingCall`, but whether a `QDBusPendingCallWatcher` delivers `finished`
+   for a synthesized call with **no session bus at all** was not run. If it does not, the fallback is
+   a small local interface replacing the 11 call sites.
+3. **Custom types.** `GetConfig` returns `QDBusVariant` + `FcitxQtConfigTypeList`, and the values are
+   `QDBusArgument`-marshalled maps (`configwidget.cpp:84`, `:155`). Building a reply message carrying
+   those registered types is plausible but untested.
+4. **Selection was not validated at all.** See §6.
+5. **GPL and the product licence** are a decision, not a technical unknown.
+
+## 6. Selection is not configuration
+
+These are two different surfaces and only one of them has been demonstrated:
+
+- **Configuring the Shuangpin scheme and Pinyin options** is a *configuration* operation. The PoC
+  proved the official path works: `dumpDescription` yields the schema (including
+  `ShuangpinProfile` with its enum), `setConfig` applies it, the engine uses it, it persists.
+- **Selecting Pinyin or Shuangpin** is an *input-method-group* operation
+  (`InputMethodGroupInfo`/`SetInputMethodGroupInfo` over the controller; `Items/0` in Fcitx's
+  `profile`, per WP3). The runtime does register both input methods
+  (`data/fcitx5/inputmethod/{pinyin,shuangpin}.conf`), but **no selection round-trip was performed**,
+  in the UI or in the PoC. WP3 validated selection on the product path through the profile file, not
+  through this UI seam.
+
+## 7. What the engine PoC does and does not prove
+
+`POC.md` §B is an **isolated, in-process engine PoC**: a harness linked against the pinned runtime,
+constructing its own `fcitx::Instance` with the Host's argv on a redirected user profile. It proves
+the *engine* can dump the schema, apply a value, use it and persist it.
+
+It does **not** prove a Host IPC path (no `MessageType` was added, `protocol_version` is still 4), and
+it is **not** real-application UI validation: no window existed, no application was involved, and the
+page size was read from the engine's candidate list inside the harness.
+
+## 8. Routes
+
+| # | Route | Reuses | Status |
 | --- | --- | --- | --- |
-| A | Rebuild the runtime with keyboard + dbus modules, add Qt6/KF6/X11/xkbcommon/IsoCodes, build `fcitx5-qt` + `fcitx5-configtool`, and supply a session D-Bus on Windows | The official UI itself | Largest: new dependency stack, runtime rebuild, a D-Bus daemon on Windows, GPL-2.0-or-later obligations, and the `GetConfig`/`SetConfig` surface has to be served by the Host. Reopens runtime provenance for every later batch |
-| B | A thin native Windows settings window that renders `dumpDescription` and applies through `setConfig` over the existing per-user named pipe | Official schema, official apply, official storage; no option list, no second configuration model | Moderate: a new executable, three new IPC message types and a `protocol_version` bump, tray + Start Menu entries, package layout. The window itself is Fusion-authored — **requires an explicit D085 authorization** |
-| C | No UI: document that settings are edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f), and keep the tray's "open folder" affordance | Nothing new | Smallest, and honest about today's behaviour; leaves the settings requirement without a user-facing surface |
+| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Viable in principle; unbuilt; uncertainties in §5.** The smallest route that satisfies "reuse upstream first" |
+| A | Full upstream stack: Qt6 + KF6 + X11 + xkbcommon + IsoCodes + rebuilt runtime with keyboard/dbus modules + a session D-Bus | The official UI unmodified | Works, but imports Linux-only features the product does not need and reopens runtime provenance |
+| B | Fusion-authored window over `dumpDescription`/`setConfig` via the existing named pipe | Official schema and apply only | **Not authorized by D085**; also the largest new-code surface for the same user-visible result |
+| C | No UI: settings edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f) | Nothing new | Correct today, but gives the user no settings surface |
 
-The measured facts above apply to all three: the schema and apply path are ready, so B does not need
-to invent a configuration model, and C remains correct until either A or B is chosen.
+Note on C: the tray does **not** help here. Its menu opens the **log** folder
+(`%LOCALAPPDATA%\fusion-host`, `windows-daily-use.md` §4), which contains no configuration; the
+configuration lives under `%APPDATA%\Fcitx5`.
 
-## 6. Not done in this batch
+## 9. Not done in this batch
 
-- No UI was built or launched, in either repository, and no product code changed.
-- Nothing was installed or registered; the owner's Host, tray and browsers were not touched.
-- The owner's profile was not read or written (no file under `%APPDATA%\Fcitx5` has an mtime inside
-  the PoC window).
-- Only `PageSize` was applied end to end; no Shuangpin-profile change and no real-application
-  candidate page were observed.
-- `setSubConfig` paths (`dictmanager`, `clearuserdict`, `customphrase`) were not exercised.
-- No Release ZIP was built, because no integration was delivered to package.
+- No dependency installed, no Qt6, no runtime rebuild, no port, no UI built or launched.
+- No product code changed; nothing installed or registered; the owner's Host, tray, browsers and
+  profile untouched.
+- No selection round-trip; only `PageSize` was applied, in-process, in the earlier PoC.
+- `setSubConfig` paths (`dictmanager`, `clearuserdict`, `customphrase`) not exercised.
+- No Release ZIP (nothing to package).
 
-## 7. Next action
+## 10. Next action
 
-The owner chooses between A, B and C. Until then the next scheduled work is unchanged: the settings
-UI item stays open, and the **EXE installer** follows it under D085. B is the only option that can
-produce a usable settings surface without reopening the runtime, and it needs an explicit decision
-that a Fusion-authored window over the official schema is authorized — D085 currently says it is not.
+The recommended next batch is a **bounded build-and-seam spike for A′**, not a full port and not a
+custom UI: build the subset from §4 against a Qt6 MSVC toolchain, replace `DBusProvider` with a
+pipe-backed provider that serves `GetConfig`/`SetConfig` from the Host, and exercise the two
+uncertainties that decide the route — whether a synthesized `QDBusPendingCall` drives the existing
+call sites with no session bus (§5.2), and whether the subset builds unmodified apart from the
+CMake exclusions (§5.1). If both hold, A′ is the route; if not, the fallback is a local interface at
+the 11 call sites, still inside A′.
+
+The settings item stays **open and unimplemented**, and the **EXE installer** remains the next
+scheduled item under D085. A Fusion-authored UI remains unauthorized.

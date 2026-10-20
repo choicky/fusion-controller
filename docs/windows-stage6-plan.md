@@ -9,10 +9,12 @@ mandatory. **U6 is decided** (a new application window starts with Fusion open) 
 (persistent tray status, fault balloon, restart-Host and open-log-directory actions), with the **tray implemented in
 fusion-windows PR #26**; hang detection is a separate pending follow-up and **not** an entry condition for WP8. The
 owner decided the next work on 2026-10-20 (D085): the **official settings UI** first, then the **EXE installer** that
-packages it. The settings-UI feasibility inspection D085 required is complete (2026-10-20, §7): the official front end
-cannot be built or connected on this Host without an architectural boundary change, the official schema and apply path
-were proven on an isolated profile, and **no UI is implemented** pending the owner's choice among the recorded
-alternatives (`docs/windows-settings-ui-feasibility.md`). Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
+packages it. The settings-UI feasibility investigation D085 required is complete (2026-10-20, §7): the unmodified
+upstream build cannot be configured here, but the dependency trace shows a **minimal upstream-UI adaptation** is viable
+in principle and unbuilt — Qt6 is required, and the transport, X11 and KF6 requirements are separable features rather
+than the whole stack. The official schema and apply path were proven by an isolated in-process engine PoC, **no UI is
+implemented**, and the recommended next step is a bounded build-and-seam spike
+(`docs/windows-settings-ui-feasibility.md`). Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
 R25:** Notepad-- 3.4 crashed on Win+Space because the TIP bound to that application's own older `MSVCP140.dll` (fixed in
 fusion-windows PR #21 and **owner-confirmed** on the repair package), idle Return in the same application inserted no newline
 because the shell claimed a key the engine only forwards (fixed in fusion-windows PR #23, merged, and **owner-confirmed on
@@ -179,18 +181,27 @@ and neither starts without its own bounded execution instruction. The release ca
 conditions: U4 decided and the WP7 daily-use closure. The installer item is the vehicle for WP8's packaging, not a
 replacement for those conditions, and WP5/WP6/WP7 acceptance is unchanged.
 
-**Settings-UI feasibility measured (2026-10-20); no UI implemented.** The inspection D085 required is done and is
-recorded in `docs/windows-settings-ui-feasibility.md`. The official front end (`fcitx5-configtool` 5.1.16) cannot be
-built or connected on this Host: its configure stops at Qt6 with only 4 of the 17 declared requirements present, `X11` and
-`xkbfile` are required outside every `option()`, and it needs a daemon-side `/controller` served over D-Bus, which the
-pinned runtime does not build (`-DENABLE_DBUS=OFF`, `-DENABLE_KEYBOARD=OFF`). The official *configuration* mechanisms do
-work and were proven end to end on an isolated profile — `Configuration::dumpDescription` for the control model and
-`AddonInstance::setConfig` for a validated apply with no Host restart, with `PageSize` 7 → 9 visible to the engine and
-persisted across an orderly restart. Reusing the UI itself is therefore an architectural boundary change (new
-Qt6/KF6/X11 stack, runtime rebuild, D-Bus transport), and D085 does not authorize a Fusion-authored window. The three
-alternatives with their cost, the licence constraint (`fcitx5-configtool` is GPL-2.0-or-later) and the measured
-constraints for any future front end are in the same document. The owner's choice among those alternatives is the next
-step for this item; the EXE installer keeps its place behind it, and nothing was installed or packaged in this batch.
+**Settings-UI feasibility investigated (2026-10-20, two rounds); no UI implemented.** Recorded in
+`docs/windows-settings-ui-feasibility.md`. **Round 1 (measured):** the *unmodified* `fcitx5-configtool` 5.1.16 build
+cannot be configured on this machine — it stops at Qt6 with 4 of 17 declared requirements present, and its top-level
+CMakeLists requires X11/XKeyboardConfig/xkbfile outside every `option()`. **Round 2 (measured from the pinned source):**
+that is not the cost of every reuse route. X11 serves exactly one widget (the keyboard-layout picker,
+`layout/keyboardlayoutwidget.cpp` → `layoutselector.cpp`), a Linux feature this runtime has no input method for; KF6
+serves three option types plus the addon-list delegate, and the pinyin schema has no `Color` or `Font` option; the D-Bus
+dependency is one 60-line `DBusProvider` constructed at `configtool/mainwindow.cpp:30`, with **2 proxy calls for
+settings** (`GetConfig`/`SetConfig`) and 4 for selection; `IsoCodes` is three JSON files. The reusable widget layer
+(`Fcitx5Qt6WidgetsAddons`) links only Qt6 Widgets and `Fcitx5::Utils` — no D-Bus, no KF6, no X11. A **minimal
+upstream-UI adaptation** is therefore viable in principle: build `src/configtool` + `src/lib` with `layout/`, `kcm/` and
+`migrator/` excluded, and replace the transport at its single seam with a provider returning
+`QDBusPendingCall::fromCompletedCall` (a documented Qt API for a finished call) over the product's named pipe. It is
+**unbuilt and unproven**: Qt6 is required and absent here, and the synthesized-reply path, the MSVC build and the
+selection round-trip are all unresolved (`docs/windows-settings-ui-feasibility.md` §5–§6). The official *configuration*
+path itself was proven separately by an isolated **in-process engine PoC** — `Configuration::dumpDescription` plus
+`AddonInstance::setConfig`, `PageSize` 7 → 9 used by the engine and persisted across an orderly restart — which is
+neither a Host IPC path nor real-application UI validation. The UI sources are GPL-2.0-or-later, so a fork carrying them
+puts the settings executable under that licence. The settings item stays **open and unimplemented**; the recommended next
+step is a bounded build-and-seam spike for the minimal adaptation (§10 of the feasibility document), and the **EXE
+installer** keeps its place behind this item. Nothing was installed or packaged in these batches.
 
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 
@@ -202,7 +213,7 @@ step for this item; the EXE installer keeps its place behind it, and nothing was
 | U4 | Signing, distribution channel, test package vs release candidate | certificate available or not; channel | **Deliverable format decided 2026-10-20 (D085):** the installer is a single **EXE** (not an MSI, and not a zip plus a script the user runs); the installer framework is **not** chosen. Owner-only test packages first; **still undecided: signing and the distribution channel**, both settled before any external release candidate | No external release candidate; no installer framework is assumed before this row is decided |
 | U5 | Password/private InputScope minimum policy | (a) fail open (TIP does not own keys) for password/private scopes; (b) pass `Password`/`Sensitive` to Fcitx | **Accepted (a) 2026-10-18.** (a) for the first packages — smallest change, no composition/learning in password fields; (b) remains the faithful long-term path (§25 row). Known limitation, accepted with this decision: in the Edge and Firefox runs the minimum outcome came from the existing `GUID_COMPARTMENT_KEYBOARD_DISABLED`/empty-context hard-policy gate, and the InputScope probe read Unknown in Notepad, Edge and Firefox, so the Sensitive-classification path is not demonstrated and a field that neither trips that gate nor yields a readable InputScope is unverified. The R11 follow-up (bounded validation on one minimal case with a known sensitive InputScope) remains open and is not scheduled by this record | Decided — no longer a WP2 gate; distribution stays gated by WP4/U4 |
 | U6 | IME open/close default for a new app context | (a) keep Windows' compartment value; (b) declare open on activation (Activate already writes `KEYBOARD_OPEN=1`, yet run 1 observed closed) | **Decided (b) 2026-10-19: a newly opened application window starts with Fusion open; an explicit Ctrl+Space close stays effective, before or after the first key.** Evidence: the compartment reads open at activation and closed at the first key of a new context (fusion-tsf log, 2026-10-19); **attribution is a hypothesis** — something re-initialises it in between (the application's context initialisation or Windows), and the current evidence does not separate them. Implementation: declare it open once per **new document manager** (the lifecycle event for a new window), never from a key path and never per focus change, so a close is never overwritten | **Implementation status: in fusion-windows PR #20.** **Validation status: real-window confirmation pending** the owner's first installed window check; no claim of verified behaviour | Compartments stay Windows authority (§10); the change only declares the default for a new window |
-| U7 | P0-A/P0-B minimum for the release candidate: user-visible disposition/notification of unresolved responsibility after a failure | decided on WP5 evidence | **Presentation decided 2026-10-19:** a persistent tray status, a fault balloon notification, and actions to restart the Host and open its log directory; no focus stealing, no input content, no repeated per-key notifications; automatic restart is **not** authorized. The minimal design is in `docs/windows-daily-use.md` §4 | **Piece (1) IMPLEMENTED** in fusion-windows PR #26 (head `0094269`, after the independent-review correction batch on top of `2f9c178`): the tray process, one balloon per `running → absent` transition, Restart FusionHost / Open log folder / Exit, one instance per user × session, its own `FusionTray` logon task, and install/upgrade/uninstall/restart-tool integration. The review batch scoped the tray inventory and shutdown to this user × this session × `<install root>\<version>\bin\FusionTray.exe` (a same-named executable elsewhere is reported and left alone), made a cancelled session end resume reporting and gave the tray task the same User32 1077/1073 cancellation trigger the Host task uses, refreshed the tooltip on a Host pid change without reporting an absence, and stopped an uninspectable Host process from becoming a verified absence. Validated with isolated test processes and a stubbed restart tool (40/40 harness checks, `tray_state` unit test with 12 scenarios, CTest 80/82 with the two known Host-singleton failures unchanged) — **not** installed, and the running → absent balloon, the session-end suppression and the installer path were not observed end to end, so the tray's first installed run is still the owner's check. **Piece (2) hang detection (alive-but-unresponsive) is pending:** it needs an additional probe and is **not** part of the minimal version, and it is **not** a WP8 entry condition (owner: Stage 6 implementation; trigger: a reported hang, or a later batch that takes it up). The next work after this batch is the official settings UI, then the EXE installer (D085) |
+| U7 | P0-A/P0-B minimum for the release candidate: user-visible disposition/notification of unresolved responsibility after a failure | decided on WP5 evidence | **Presentation decided 2026-10-19:** a persistent tray status, a fault balloon notification, and actions to restart the Host and open its log directory; no focus stealing, no input content, no repeated per-key notifications; automatic restart is **not** authorized. The minimal design is in `docs/windows-daily-use.md` §4 | **Piece (1) IMPLEMENTED** in fusion-windows PR #26 (head `0094269`, after the independent-review correction batch on top of `2f9c178`): the tray process, one balloon per `running → absent` transition, Restart FusionHost / Open log folder / Exit, one instance per user × session, its own `FusionTray` logon task, and install/upgrade/uninstall/restart-tool integration. The review batch scoped the tray inventory and shutdown to this user × this session × `<install root>\<version>\bin\FusionTray.exe` (a same-named executable elsewhere is reported and left alone), made a cancelled session end resume reporting and gave the tray task the same User32 1077/1073 cancellation trigger the Host task uses, refreshed the tooltip on a Host pid change without reporting an absence, and stopped an uninspectable Host process from becoming a verified absence. Validated with isolated test processes and a stubbed restart tool (40/40 harness checks, `tray_state` unit test with 12 scenarios, CTest 80/82 with the two known Host-singleton failures unchanged). **Installed on 2026-10-20 as `0.0.0-wp7+0094269`: the installation succeeded and the owner confirmed the hover tooltip `Fusion: Host running (pid 41396)`.** The menu commands, the `running → absent` balloon, the session-end suppression and the installer path were **not** exercised, so they remain unobserved end to end. **Piece (2) hang detection (alive-but-unresponsive) is pending:** it needs an additional probe and is **not** part of the minimal version, and it is **not** a WP8 entry condition (owner: Stage 6 implementation; trigger: a reported hang, or a later batch that takes it up). The next work after this batch is the official settings UI, then the EXE installer (D085) |
 
 ### 7.2 Target scope requirements recap
 Pinyin and Shuangpin selection, per-user configuration persistence, and learning/user-dictionary persistence are
@@ -444,7 +455,9 @@ applied here: §8.1 gains the daily-use acceptance rule; §8.2/§8.3 are reclass
 analysis reference for a reported problem; §8.4 becomes incidental observation; WP5/WP6/WP7/WP8 rows, R7/R17/R22 and the
 status line follow. U6 is decided and implemented (the compartment is declared open at activation and once per new
 document manager, released when that manager is destroyed; real-window confirmation is the owner's first installed
-check), U7 presentation is decided with the tray implemented in fusion-windows PR #26 (hang detection pending) and its
+check), U7 presentation is decided with the tray implemented in fusion-windows PR #26 and installed as
+`0.0.0-wp7+0094269` (the owner confirmed the hover tooltip; the menu commands and the balloon were not exercised;
+hang detection pending) and its
 minimal design in `docs/windows-daily-use.md` §4. The daily-use package, the restart tool and the diagnostics opt-in/out are in
 PR #20; nothing was installed by this batch, and no acceptance is claimed before the owner closes the daily-use period.
 
@@ -462,5 +475,7 @@ numbers moved here and out of D084, the daily-use statement that uninstall resta
 removes it), and D085 records the owner's next-work decisions. Validation for this batch: `tray_state` 12 scenarios,
 the isolated harness 40/40 (scoped inventory with a same-named decoy left running, window ownership, `WM_ENDSESSION` 0
 and 1, trigger equality with the installed Host task, marker lifecycle), and CTest 80/82 with the two known `stage4b_*`
-Host-singleton failures unchanged. The tray is still **not installed**, so the balloon, the session-end suppression and
-the installer path remain unobserved end to end and the first installed run is still the owner's check.
+Host-singleton failures unchanged. The tray was then **installed on 2026-10-20 as `0.0.0-wp7+0094269`**: the
+installation succeeded and the owner confirmed the hover tooltip `Fusion: Host running (pid 41396)`. The menu
+commands, the `running → absent` balloon, the session-end suppression and the installer path were **not** exercised,
+so they remain unobserved end to end.
