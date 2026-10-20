@@ -200,7 +200,7 @@ are disabled. Tray Settings and a Start Menu shortcut are included in the owner-
 
 **Validation and delivery state.** Product code compiled in Release with the pinned runtime, Qt 6.8.3/MSVC and exact fork/source pins;
 focused existing protocol/HostServer tests pass (2/2). A hash-manifested owner-test ZIP was built from committed product source:
-`fusion-0.0.0-settings+9fc32e4.zip`, SHA-256 `1F90546E6965FC07AFAD3F3585706DC943F831BF7DB5CB5B11A209B99C1BA199` (owner-test artifact generated from an earlier committed product head; the latest product branch/package identity must be read from PR #27 and its delivery report).
+`fusion-0.0.0-settings+4b0918d.zip`, SHA-256 `FE057F44CC92895A3EE239C2695BAC2BD8C024C15AD4000F40725F40F9375C4E` (owner-test artifact; generated from the final committed product correction head; the current PR head and any later package identity remain in PR #27/delivery evidence).
 This is an isolated owner-test artifact, not an installation or owner acceptance. No production Host/tray/browser/profile was
 changed. Product PR and fork PR remain separate and unmerged; the EXE installer remains the next separate item under D085. U4,
 U6, WP7 and P0-A/P0-B/P0-D are not closed.
