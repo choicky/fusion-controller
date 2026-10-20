@@ -342,18 +342,23 @@ The feasibility investigation is complete and the implementation is delivered on
 
 1. Independent review of the product PR and fork PR is the current step; blockers are resolved on the
    existing branches without merging automatically.
-2. Executed: Release build of the product, the focused protocol/HostServer tests (2/2), the committed
-   packaging script and a full manifest re-verification of the artifact, and the protocol/Host contract
-   for a partial apply from the other settings page. Not executed: the real product GUI round trip —
-   actual Host schema rendering for Pinyin and Shuangpin, the two-page apply scenario in the window,
-   Cancel, active-composition refusal, packaged launch and shortcut resolution. The bounded self-test
-   for that scenario is compiled into the executable and awaits an owner-run session.
-3. Deliver the hash-manifested owner-test package and record its exact source commit/size/SHA-256;
-   distinguish generated package, isolated-product validation, owner installation and owner acceptance.
+2. Executed: Release build of the product, the focused protocol/HostServer tests, the committed
+   packaging script and a full manifest re-verification of the artifact, the protocol/Host contract for
+   a partial apply from the other settings page, and — after the endpoint correction — the real product
+   GUI round trip against an isolated product Host: both pages rendered over the real pipe, a changed
+   value applied and read back from the Host, and the cross-page stale value in both directions. Still
+   not executed: Cancel, active-composition refusal, packaged launch and shortcut resolution.
+3. The hash-manifested owner-test package is delivered: `fusion-0.0.0-settings+5271848.zip`,
+   60,052,053 bytes, SHA-256 `F7D7EFFD5C2C81CBAFDB3F15077225A97D087F4C520FD3050CE6883772DCCE33`, source `5271848`.
+   Generated package, isolated-product validation, owner installation and owner acceptance stay
+   distinct states; the superseded `+1f4b749` package is retained.
 4. The EXE installer remains the next separate D085 item (framework/signing/channel undecided under U4).
 
-The settings item remains open only for isolated GUI validation and owner acceptance; implementation and
-packaging are complete, and the two correction items (a stale page could write back a shared value, and the
-packaging script's locale copy) are fixed. U4, U6, WP7 and P0-A/P0-B/P0-D remain untouched.
+The settings item remains open only for owner installation and acceptance; implementation, packaging and
+isolated GUI validation are complete. Three correction items are fixed: a stale page could write back a
+shared value, the packaging script's locale copy, and — found by the owner's installation of the
+`+1f4b749` package — the client asking for the wrong pipe endpoint, which made the window report
+"FusionHost is unavailable or does not support settings" while the Host was running. U4, U6, WP7 and
+P0-A/P0-B/P0-D remain untouched.
 A Fusion-authored option schema/UI remains unauthorized; the product uses the official schema-driven
 widget layer plus a small product shell.
