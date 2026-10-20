@@ -216,6 +216,54 @@ stale-value scenario in both directions. That is isolated validation, not an ins
 Host/tray/browser/profile was changed, and owner installation and acceptance remain pending. The EXE installer remains the next
 separate item under D085. U4, U6, WP7 and P0-A/P0-B/P0-D are not closed.
 
+**Global configuration + input-method list management (Stage A, 2026-10-20; D082/D085/D086).** Extends the delivered
+Pinyin/Shuangpin per-input-method subset on the same official widget and Host plumbing, without a settings framework and
+without changing TIP protocol version 4. Two capabilities are added behind a `settings_api_version` **1 → 2** bump and four
+additive messages (`SettingsGet/SetImListRequest`/`Response`, `0x15`–`0x18`) that reuse the capability handshake, one-request-
+per-connection, bounded payloads and Host-incarnation fencing already in place; the global page reuses the **existing**
+`GetConfig`/`SetConfig` messages, so it adds no message of its own. (a) **Global configuration** — a third tab renders
+`fcitx://config/global` through the official schema-driven ConfigWidget, and the Host applies it with Fcitx's own sequence
+(`globalConfig().load(raw, partial=true)` → `safeSave()` → `reloadConfig()`), the same delta/merge, no-change short-circuit,
+unknown-value preservation and active-composition refusal as an input-method page; the schema is `dumpDescription()` and the
+values are `save()`, so Linux-only options Fcitx already self-hides (`ConditionalHidden<!hasKeyboard>`, addon/preload lists)
+stay hidden and the Windows-supported-vs-inert mapping is recorded in the evidence, not hard-coded. (b) **Input-method list
+management** — the two-method dropdown is replaced by a management page over the methods the packaged runtime actually
+defines (pinyin, shuangpin): the ordered enabled list (top row = `Items/0` = the active method a bound context follows;
+`DefaultIM` is only the fallback), add from available, remove from enabled, and reorder, written back through the official
+`currentGroup()`/`setGroup()`/`save()`. Removing an entry only drops it from this group's list; it never deletes a method
+definition file or learning data. The empty enabled list and any selection outside the defined set are **refused** by a pure
+product-side validator (`src/fcitx/im_list.hpp`) that closes the two gaps the core leaves open (`setGroup` silently drops
+unknown names; nothing rejects an empty list), rather than being silently persisted. Reusable provider/model declarations for
+the new transport live in the fork (`choicky/fcitx5-configtool` `windows/fusion-settings`); the product re-pins that fork
+commit.
+
+**Shift / raw-input commit — resolved against source, not assumed.** The owner's "Shift (or raw input) commits" request maps
+to the pinyin addon's per-input-method `CommitRawInput` `KeyListOption` on `fcitx://config/inputmethod/pinyin` — it is **not**
+a global setting, and it is already rendered on the Pinyin page by the reused official widget. On the Windows key path only the
+**press-driven** defaults reach the engine while a composition is active, so `Shift+Return` (and the plain `Return` family)
+already commit raw input as configured; no new Shift state machine, no product replay, and ordinary `Shift`+letter, key-up and
+modifier handling are unchanged. `Control`/`Alt`/`Win`-modified and numpad-Enter variants, and any bare-`Shift` trigger, land on
+the D072 §5 **UNFROZEN** "production effect-capable key classification" (a modified key is currently routed as Pass and never
+reaches the engine). Under D082 changing that classification is a decision with evidence requirements, not this stage; it is
+reported as the precise boundary rather than silently implemented. No key-routing code changed here.
+
+**Stage A validation state.** Executed on minis: the new pure-logic CTest family `stage_a_settings`
+(`protocol` / `bounds` / `validator`) builds under the portable `-Wall -Wextra -Wpedantic -Werror` flags and passes (ImList +
+SetImList round-trip and field preservation; over-bound and malformed/trailing-byte lists fail closed; the validator accepts a
+reorder/dedupe and refuses empty and unavailable lists); the existing `wp3_input_methods`, `rg0` and `stage2` families still
+build and pass, and `FusionCore`/`MockBackend`/`FusionMock` still compile against the header changes unchanged. This is the
+Linux-meaningful surface only. **The Qt GUI, the Fcitx Host backend, the Host server and the configtool fork are Windows/MSVC +
+Fcitx sources that do not compile on minis** and are STATIC REVIEW PASS / COMPILE UNVERIFIED here. Required Windows checks —
+MSVC Release build; default + isolated pipe connect; global load/apply/read-back and orderly-restart persistence; no-change
+Apply / Cancel / unknown-value preservation; add/remove/reorder/select persistence and invalid-choice handling; the cross-page
+stale-value regression; composition refusal/retry; and Shift/raw-input plus ordinary `Shift`+letter through the real Windows
+key-down/key-up path — are **NOT RUN** on minis and are handed off for machine 7700. No Linux or mock result is presented as
+Windows validation. **Packaging is pending:** no new owner-test package is produced or claimed by this stage; the current
+available artifact remains `fusion-0.0.0-settings+5271848.zip` (from PR #28), and Stage A has been neither built into a package,
+installed nor registered. Remaining unsupported at this scope: the D072 §5 modifier-held-key classification (see above), general
+addon/dictionary management, and the single-EXE installer (D085 item 2). Handoff record:
+`evidence/stage-a-global-settings-2026-10-20/handoff.md`.
+
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 
 | ID | Decision | Alternatives | Recommendation (with reason) | Consequence if undecided |

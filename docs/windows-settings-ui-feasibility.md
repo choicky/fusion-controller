@@ -6,6 +6,12 @@ round trip through the official widget layer. D086 then authorized the scoped GP
 implementation. Current product implementation is on `fusion-windows` `feature/official-settings-ui-product`,
 with reusable configtool adaptations on the owner fork `choicky/fcitx5-configtool` branch
 `windows/fusion-settings` (fork PR #1, commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`).
+**Stage A (2026-10-20, D082/D085/D086)** extends that surface on `fusion-windows`
+`feature/stage-a-global-settings-im-methods` with global configuration (`fcitx://config/global`) and
+input-method list management over the runtime's actual methods; the fork's reusable list-management
+provider model is on `windows/fusion-settings`. Minis source/protocol/validator checks are done; the
+Windows/MSVC product build and the real-Host checks are NOT RUN (see the Stage 6 plan's Stage A block
+and `evidence/stage-a-global-settings-2026-10-20/handoff.md`).
 Use the Stage 6 plan/product PR for implemented, isolated-product-validated and owner-installed status;
 this file retains the feasibility evidence, limitations and provenance. The EXE installer remains separate.
 Evidence: `evidence/settings-ui-spike-2026-10-20/` (index: `final-report.md`). Scope: D085 settings UI only.

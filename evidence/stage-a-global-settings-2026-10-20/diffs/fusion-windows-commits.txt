@@ -1,0 +1,1 @@
+0a965e2 feat(settings): global configuration and input-method list management
