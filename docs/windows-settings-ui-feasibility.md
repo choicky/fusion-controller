@@ -305,7 +305,7 @@ page size was read from the engine's candidate list inside the harness.
 
 | # | Route | Reuses | Status |
 | --- | --- | --- | --- |
-| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Built and validated by the Round-3 spike for the configuration surface (Pinyin `PageSize` round trip, persistence, no-change safety); ready for the implementation batch once the licence prerequisite (§9) is decided.** The smallest route that satisfies "reuse upstream first" |
+| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Chosen and implemented** (§9, §10): the licence question was settled by D086, the subset runs in the product as `FusionSettings.exe` against the real Host, and the earlier Round-3 spike remains the evidence that the surface works end to end |
 | A | Full upstream stack: Qt6 + KF6 + X11 + xkbcommon + IsoCodes + rebuilt runtime with keyboard/dbus modules + a session D-Bus | The official UI unmodified | Works, but imports Linux-only features the product does not need and reopens runtime provenance |
 | B | Fusion-authored window over `dumpDescription`/`setConfig` via the existing named pipe | Official schema and apply only | **Not authorized by D085**; also the largest new-code surface for the same user-visible result |
 | C | No UI: settings edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f) | Nothing new | Correct today, but gives the user no settings surface |
@@ -338,20 +338,22 @@ was chosen.
 
 ## 10. What remains, and the next action
 
-The feasibility investigation is complete and the implementation batch is active. Remaining work is:
+The feasibility investigation is complete and the implementation is delivered on the open product PR. Remaining work is:
 
-1. Finish independent review of the product PR and fork PR; resolve any blockers without merging
-   automatically.
-2. Run the isolated product settings validation matrix: actual FusionHost schema loading for Pinyin
-   and Shuangpin, PageSize and Shuangpin-scheme round trips/persistence, no-change learning-file
-   identity, Cancel, active-composition refusal, malformed/disconnect/timeout/version mismatch paths,
-   packaged launch and shortcut resolution. Current focused IPC tests are 2/2; owner-process UI
-   validation and package launch are separate evidence.
+1. Independent review of the product PR and fork PR is the current step; blockers are resolved on the
+   existing branches without merging automatically.
+2. Executed: Release build of the product, the focused protocol/HostServer tests (2/2), the committed
+   packaging script and a full manifest re-verification of the artifact, and the protocol/Host contract
+   for a partial apply from the other settings page. Not executed: the real product GUI round trip —
+   actual Host schema rendering for Pinyin and Shuangpin, the two-page apply scenario in the window,
+   Cancel, active-composition refusal, packaged launch and shortcut resolution. The bounded self-test
+   for that scenario is compiled into the executable and awaits an owner-run session.
 3. Deliver the hash-manifested owner-test package and record its exact source commit/size/SHA-256;
    distinguish generated package, isolated-product validation, owner installation and owner acceptance.
 4. The EXE installer remains the next separate D085 item (framework/signing/channel undecided under U4).
 
-The settings item remains open only for implementation review, isolated validation and owner acceptance;
-this document no longer represents it as unimplemented. U4, U6, WP7 and P0-A/P0-B/P0-D remain untouched.
+The settings item remains open only for isolated GUI validation and owner acceptance; implementation and
+packaging are complete, and the two correction items (a stale page could write back a shared value, and the
+packaging script's locale copy) are fixed. U4, U6, WP7 and P0-A/P0-B/P0-D remain untouched.
 A Fusion-authored option schema/UI remains unauthorized; the product uses the official schema-driven
 widget layer plus a small product shell.
