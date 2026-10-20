@@ -65,6 +65,76 @@ received it** (the new pid's log file must exist; a launcher with a cached envir
 - The TSF log (`%LOCALAPPDATA%\fusion-tsf\`) stays a separate developer opt-in (`FUSION_TSF_DIAGNOSTICS=1`).
 - Fcitx's own log is **not** part of this; at debug level it can contain key events.
 
+### R25 browser capture (one-off, per process)
+
+Only while R25 is open: checks a browser field against the **installed** package. It uses the existing
+`FUSION_TSF_DIAGNOSTICS` opt-in for one process, so nothing is added to the user or machine environment.
+
+1. **Save your work and exit every process of the browser you will test** — all windows, plus any background
+   instance. A running browser keeps the `FusionTsf.dll` it loaded at startup, and a new launch would only hand the
+   window to it.
+2. **Start the browser from a Command Prompt**, so the variable lives in that window only. Run the two lines for your
+   browser; the prompt stays busy until the browser exits and the variable dies with it:
+
+   ```
+   set FUSION_TSF_DIAGNOSTICS=1
+   "C:\Program Files\Mozilla Firefox\firefox.exe"
+   ```
+
+   ```
+   set FUSION_TSF_DIAGNOSTICS=1
+   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+   ```
+
+   Use your normal profile. Do not use `setx` or the System/User environment dialog: the capture needs the variable in
+   one process tree only, and a permanent value would silently cover every later process.
+3. **Confirm the new process loaded the installed build** (PowerShell, read-only). Only the browser process that owns
+   the window maps the TIP; its content/renderer children do not:
+
+   ```powershell
+   Get-Process firefox,msedge -ErrorAction SilentlyContinue | ForEach-Object {
+     $dll = try { ($_.Modules | Where-Object ModuleName -eq 'FusionTsf.dll').FileName } catch { '<no access>' }
+     if (-not $dll) { $dll = '-' }
+     '{0}  {1:HH:mm:ss}  {2}' -f $_.Id, $_.StartTime, $dll
+   }
+   ```
+
+   Expect `C:\Program Files\Fcitx5 Fusion\<version>\bin\FusionTsf.dll`. Any other path means an older build is still
+   running: exit it and repeat from step 1. If step 2's prompt returns immediately instead of staying busy, the browser
+   was still running — that launch is invalid, close everything and repeat.
+4. **Firefox, two surfaces.** Address bar: type `nihao`, press `Esc` (this is the control). Then open ChatGPT, click
+   its editor, type `nihao`, press `Esc`. Do not send.
+5. **Edge, two surfaces.** Address bar: type `nihao`, press `Esc`. Then Gmail → **Compose** (empty draft), type
+   `nihao` in the body, press `Esc`, and close the draft without saving. Do not send.
+6. **Report per surface** whether the candidate list was visible and from which keystroke, plus the pid and the
+   version directory. Then close the browser normally; that ends the capture. If the browser keeps a background
+   process alive after its last window closes, exit that too — the variable lives exactly as long as the process that
+   inherited it.
+
+`nihao` is the only thing to type — nothing private, no existing mail or conversation, nothing sent, and no screenshot
+of a mailbox or a chat.
+
+**Logs:** `%LOCALAPPDATA%\fusion-tsf\fusion-tsf-<pid>.log`, one per process; the file appearing is also the proof that
+step 2's variable reached the browser. Content is technical only — stage names, HRESULTs, rectangles, window state; no
+typed text, candidate text, URLs or page content. The lines that decide the next step:
+
+| line | meaning |
+|---|---|
+| `ANCHOR_PROBE stage=ok source=composition` | the composition range had layout and supplied the anchor |
+| `ANCHOR_PROBE stage=ok source=composition-caret` | the composition range had no layout; the caret supplied the anchor (PR #25) |
+| `ANCHOR_PROBE stage=text-ext source=composition hr=0x80040206` | `TS_E_NOLAYOUT` — no range had layout for that keystroke, so the page stays hidden |
+| `ANCHOR_PROBE stage=no-active-view` / `stage=no-range` | the context had no active view, or the selection returned no range — the anchor was not even attempted |
+| `CANDIDATE_VIEW hidden reason=no-anchor` / `no-page` | nothing to anchor to / no candidate page to show |
+| `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility |
+
+**Cleanup:** closing the browser is the cleanup. If a permanent variable was set by mistake, clear it and confirm it is
+empty:
+
+```powershell
+[Environment]::SetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS',$null,'User')
+[Environment]::GetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS','User')
+```
+
 ### U7 minimal design (presentation decided, implementation pending — nothing here exists yet)
 
 Owner process: a small per-user tray process started at logon (its own scheduled task, Medium integrity), not inside the
@@ -107,19 +177,21 @@ No daily report is required, and no feedback is needed for a day without problem
 - **Browsers: the candidate popup is still missing in some fields** (R25 — open, not closed by fusion-windows PR #25).
   Firefox and Edge showed no popup in the affected fields on 2026-10-20 while `nihao` + Space still committed 你好. The
   cause measured that day is that Firefox answers the anchor query with `TS_E_NOLAYOUT` for the whole composition; PR
-  #25 falls back to the caret position, and in fresh processes with the installed package the popup does appear from the
-  second keystroke in the Firefox address bar, the Edge address bar, a page textarea and the Gemini composer. **The
-  affected real pages have not yet been checked with the installed package**, because the browser windows used for the
-  2026-10-20 table had been started before it was installed and were still running older builds. Until that check is
-  done, treat this as open: if a field shows no popup, restart the browser first (see the next bullet) and then report
-  the field. The first letter of a composition cannot be anchored in either browser, so the popup appears from the
-  second key — a one-key gap, not an explanation for a popup that never appears.
+  #25 falls back to the caret position, and in fresh processes with the installed package the popup does appear — in the
+  Firefox and Edge address bars from the first keystroke, in a page textarea and the Gemini composer from the second.
+  **The affected real pages have not yet been checked with the installed package**, because the browser windows used
+  for the 2026-10-20 table had been started before it was installed and were still running older builds. Until that
+  check is done, treat this as open: if a field shows no popup, restart the browser first (see the next bullet) and then
+  run the capture in §4 — it gives the exact steps, the log location and what to report. In web content the first
+  letter of a composition cannot be anchored, so the popup appears from the second key there — a one-key gap, not an
+  explanation for a popup that never appears.
 - **After installing a new package, close and reopen the applications you want to test.** A process keeps the
   `FusionTsf.dll` it loaded at startup, so an already-running browser or editor can still show the previous build's
   behaviour — and only that build's diagnostics — until it is restarted. This is the same loader fact recorded as R28.
   Measured on 2026-10-20: a browser started three days earlier still held a development build, and the Edge process used
-  for that day's report held one that contains no candidate window at all, so its "no popup in the address bar either"
-  result described that old build rather than the installed package.
+  for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
+  `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
+  package.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
