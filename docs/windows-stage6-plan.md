@@ -188,7 +188,7 @@ owner installation/acceptance are separate states; no installation is claimed he
 `docs/windows-settings-ui-feasibility.md`; it is no longer the current implementation status. The owner has authorized GPL-2.0-or-later
 only for the upstream-derived settings executable and derivative code, with upstream notices/corresponding source preserved (D086).
 The reusable configtool adaptations are maintained in `choicky/fcitx5-configtool` branch `windows/fusion-settings`, based on pinned
-upstream `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b`, fork PR #1 at commit `d440322d2c8adf75897d19afa411c48e99e9a4d8`; the
+upstream `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b`, fork PR #1 at commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`; the
 single fcitx5-qt MSVC portability patch remains product-pinned and separately reviewable. `fusion-windows` branch
 `feature/official-settings-ui-product` adds the production Host settings API without increasing TIP protocol version 4: additive
 settings messages use a capability/version handshake, existing user/session pipe identity checks, bounded payloads and Host
@@ -200,7 +200,7 @@ are disabled. Tray Settings and a Start Menu shortcut are included in the owner-
 
 **Validation and delivery state.** Product code compiled in Release with the pinned runtime, Qt 6.8.3/MSVC and exact fork/source pins;
 focused existing protocol/HostServer tests pass (2/2). A hash-manifested owner-test ZIP was built from committed product source:
-`fusion-0.0.0-settings+100e43c.zip`, SHA-256 `AF4C348CB226BDF657515723D30250FFD2E24183581B5F8636FAB5D42D772E9A`.
+`fusion-0.0.0-settings+9fc32e4.zip`, SHA-256 `1F90546E6965FC07AFAD3F3585706DC943F831BF7DB5CB5B11A209B99C1BA199` (owner-test artifact generated from an earlier committed product head; the latest product branch/package identity must be read from PR #27 and its delivery report).
 This is an isolated owner-test artifact, not an installation or owner acceptance. No production Host/tray/browser/profile was
 changed. Product PR and fork PR remain separate and unmerged; the EXE installer remains the next separate item under D085. U4,
 U6, WP7 and P0-A/P0-B/P0-D are not closed.

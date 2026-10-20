@@ -5,7 +5,7 @@ Round 3 established that route A′ can build on Windows and drove one isolated 
 round trip through the official widget layer. D086 then authorized the scoped GPL-2.0-or-later settings
 implementation. Current product implementation is on `fusion-windows` `feature/official-settings-ui-product`,
 with reusable configtool adaptations on the owner fork `choicky/fcitx5-configtool` branch
-`windows/fusion-settings` (fork PR #1, commit `d440322d2c8adf75897d19afa411c48e99e9a4d8`).
+`windows/fusion-settings` (fork PR #1, commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`).
 Use the Stage 6 plan/product PR for implemented, isolated-product-validated and owner-installed status;
 this file retains the feasibility evidence, limitations and provenance. The EXE installer remains separate.
 Evidence: `evidence/settings-ui-spike-2026-10-20/` (index: `final-report.md`). Scope: D085 settings UI only.
@@ -135,9 +135,9 @@ a subclass; it must be a different class exposing the same method names returnin
 
 ## 4. The minimal upstream-UI adaptation (route A′)
 
-**Built and exercised in the Round-3 spike (§5); not integrated into the product.** It retains the
+**Historical Round-3 spike; current product implementation is tracked by the Stage 6 plan and PRs.** It retains the
 official UI sources and changes the boundary, rather than importing the whole Linux stack or
-writing a new UI. The spike's experimental target was the official **`ConfigWidget`** — the
+writing a new UI. The spike was not the complete product shell or production Host validation. The spike's experimental target was the official **`ConfigWidget`** — the
 schema-driven option renderer — hosted in a minimal test window. It was **not** the complete
 `configtool` application: no addon list, no input-method page, no application shell or main-window
 chrome.
@@ -218,9 +218,7 @@ every run redirected `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` to a disposable prof
 (`ui-roundtrip.log`), the no-change comparison (`values-comparison.md`), the upstream delta with
 hashes and provenance (`patch-inventory.md`), the window screenshot (`settings-window.png`) and the
 index (`final-report.md`). The working tree — sources, binaries, patched checkouts, profiles —
-stays in the recovery workspace and is not committed; because the retained upstream patches are
-local-only pending the owner's licence decision (§9), that evidence directory alone cannot
-reproduce the patched build.
+stays in the recovery workspace and is not committed. The historical evidence directory is not itself the current product source; reproducible current builds use the pinned owner-fork configtool commit, the product's pinned fcitx5-qt patch and the build/source-access instructions recorded by D086 and the current PRs.
 
 The three uncertainties the two-round record left open (not compiled; the synthesized-reply path;
 the custom types) were measured, and the second answered **against** the expectation:
@@ -322,7 +320,7 @@ The reusable adaptation now lives in the owner-maintained fork:
 
 - `choicky/fcitx5-configtool`, branch `windows/fusion-settings`, base
   `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b`, fork PR #1,
-  commit `d440322d2c8adf75897d19afa411c48e99e9a4d8`. It carries the subset CMake,
+  commit `0234c64e93f1d61badc1fd3eaad2ba786ca63850`. It carries the subset CMake,
   asynchronous provider/result declarations and ConfigWidget result signals, KF6→Qt controls,
   disabled External action surface, and the extracted External helper. FusionHost-specific pipe
   code is deliberately in `fusion-windows/src/settings/dbusprovider.cpp`, not in this fork.
