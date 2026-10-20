@@ -10,10 +10,11 @@ mandatory. **U6 is decided** (a new application window starts with Fusion open) 
 fusion-windows PR #26**; hang detection is a separate pending follow-up and **not** an entry condition for WP8. The
 owner decided the next work on 2026-10-20 (D085): the **official settings UI** first, then the **EXE installer** that
 packages it. The settings-UI feasibility investigation D085 required is complete (2026-10-20, §7): the unmodified
-upstream build cannot be configured here, but the dependency trace shows a **minimal upstream-UI adaptation** is viable
-in principle and unbuilt — Qt6 is required, and the transport, X11 and KF6 requirements are separable features rather
-than the whole stack. The official schema and apply path were proven by an isolated in-process engine PoC, **no UI is
-implemented**, and the recommended next step is a bounded build-and-seam spike
+upstream build cannot be configured here, but the dependency trace shows a **minimal upstream-UI adaptation** is the
+right route, and a bounded build-and-transport spike has **proven it on Windows** (built, transport replaced at the
+provider seam, one real UI round trip through the official widget layer) — Qt6 is required, and the transport, X11 and
+KF6 requirements are separable features rather than the whole stack. **No UI is integrated into the product**, and the
+next step is the settings-UI implementation batch
 (`docs/windows-settings-ui-feasibility.md`). Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
 R25:** Notepad-- 3.4 crashed on Win+Space because the TIP bound to that application's own older `MSVCP140.dll` (fixed in
 fusion-windows PR #21 and **owner-confirmed** on the repair package), idle Return in the same application inserted no newline
@@ -191,17 +192,25 @@ serves three option types plus the addon-list delegate, and the pinyin schema ha
 dependency is one 60-line `DBusProvider` constructed at `configtool/mainwindow.cpp:30`, with **2 proxy calls for
 settings** (`GetConfig`/`SetConfig`) and 4 for selection; `IsoCodes` is three JSON files. The reusable widget layer
 (`Fcitx5Qt6WidgetsAddons`) links only Qt6 Widgets and `Fcitx5::Utils` — no D-Bus, no KF6, no X11. A **minimal
-upstream-UI adaptation** is therefore viable in principle: build `src/configtool` + `src/lib` with `layout/`, `kcm/` and
-`migrator/` excluded, and replace the transport at its single seam with a provider returning
-`QDBusPendingCall::fromCompletedCall` (a documented Qt API for a finished call) over the product's named pipe. It is
-**unbuilt and unproven**: Qt6 is required and absent here, and the synthesized-reply path, the MSVC build and the
-selection round-trip are all unresolved (`docs/windows-settings-ui-feasibility.md` §5–§6). The official *configuration*
-path itself was proven separately by an isolated **in-process engine PoC** — `Configuration::dumpDescription` plus
+upstream-UI adaptation** is therefore the route: build `src/configtool` + `src/lib` with `layout/`, `kcm/` and
+`migrator/` excluded, and replace the transport at its single seam over the product's named pipe. **Round 3 (measured
+2026-10-20, bounded build-and-transport spike):** the retained subset builds and links with task-local Qt 6.8.3/MSVC;
+the planned `QDBusPendingCall::fromCompletedCall` seam was **disproven** (`QDBusPendingReply` rejects a synthesized
+reply's missing signature), and the document's named fallback — a local asynchronous interface at the affected call
+sites — was built instead and drives the unmodified renderer; one real UI round trip ran through the official widget
+layer (`PageSize` 7 → 9 applied, used by the engine, persisted across an orderly restart, no-change apply byte-safe).
+A bounded source check of `fcitx5-macos` corroborates the shared official configuration semantics behind a
+platform-specific GUI. The upstream deltas are exactly two recorded patch files (`fcitx5-configtool` needs a maintained
+fork/patch series; `fcitx5-qt` needs only one plausibly upstreamable MSVC portability fix). The official
+*configuration* path had earlier been proven by an isolated **in-process engine PoC** —
+`Configuration::dumpDescription` plus
 `AddonInstance::setConfig`, `PageSize` 7 → 9 used by the engine and persisted across an orderly restart — which is
-neither a Host IPC path nor real-application UI validation. The UI sources are GPL-2.0-or-later, so a fork carrying them
-puts the settings executable under that licence. The settings item stays **open and unimplemented**; the recommended next
-step is a bounded build-and-seam spike for the minimal adaptation (§10 of the feasibility document), and the **EXE
-installer** keeps its place behind this item. Nothing was installed or packaged in these batches.
+neither a Host IPC path nor real-application UI validation; the spike adds the UI layer over a task-local pipe to an
+isolated engine, still not the production Host path. The UI sources are GPL-2.0-or-later, so a fork carrying them
+puts the settings executable under that licence — an owner decision required before any retained upstream source is
+committed or distributed. The settings item stays **open and unimplemented in the product**; the next step is the
+settings-UI implementation batch (the spike's engine service is the reference implementation of the semantics), and
+the **EXE installer** keeps its place behind this item. Nothing was installed or packaged in these batches.
 
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 

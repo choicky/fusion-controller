@@ -1,8 +1,13 @@
 # Windows settings UI — upstream reuse feasibility (D085)
 
-Status: **feasibility investigated in two rounds (2026-10-20); no UI implemented; owner decision
-required.** Scope: the settings-UI item of D085. The EXE installer is the following item and is not
-covered here. Nothing here changes an accepted decision.
+Status: **feasibility established over three rounds (2026-10-20). Round 3 — a bounded build-and-transport
+spike on this machine — built the retained upstream subset with Qt 6.8.3/MSVC, replaced the transport
+at the provider seam, and drove one real round trip through the official widget layer (Pinyin `PageSize`
+7 → 9, applied, used by the engine, persistent across an orderly restart). Route A′ is proven for the
+configuration surface and ready for the implementation batch; the UI is not integrated into the product;
+the EXE installer is the next separate item; an owner licence decision is required before retained
+upstream sources can be committed or distributed.** Scope: the settings-UI item of D085. Nothing here
+changes an accepted decision.
 
 Evidence classes used below: **[measured]** = executed on this machine or read from the pinned
 source; **[documented]** = a public API or behaviour taken from its own documentation, not executed
@@ -10,7 +15,8 @@ here; **[inferred]** = reasoning from the above, not tested; **[unresolved]** = 
 
 Round 1 established what the **unmodified** upstream build requires. Round 2 traced **which
 dependency belongs to which feature**, because the unmodified top-level build is not the cost of
-every reuse route — that conflation was the error in the first version of this document.
+every reuse route — that conflation was the error in the first version of this document. Round 3
+built the subset, measured the transport seam, and ran the UI round trip on Windows.
 
 ## 1. What was asked
 
@@ -136,10 +142,15 @@ boundary, rather than importing the whole Linux stack or writing a new UI:
    build-file change, not a source change.
 2. **Replace the transport at its single seam**: keep `DBusProvider`'s interface (`available()`,
    `canRestart()`, `availabilityChanged`, `controller()`) and implement it over the product's
-   per-user named pipe. The replacement's methods return
-   `QDBusPendingCall::fromCompletedCall(QDBusMessage)` — a public Qt API whose documented purpose is
-   "simulating a pending call, but that has already finished" **[documented]**. Call sites then
-   compile unchanged because they only use `auto` + `QDBusPendingCallWatcher` + `QDBusPendingReply`.
+   per-user named pipe. **[measured, Round 3]** The originally planned mechanism — methods returning
+   `QDBusPendingCall::fromCompletedCall(QDBusMessage)` so call sites compile unchanged — **does not
+   work**: the synthesized call and its watcher behave correctly, but `QDBusPendingReply` rejects the
+   reply (`Unexpected reply signature: got "", expected "v"`), because QtDBus computes the reply
+   signature only during wire marshalling and exposes no setter. The working seam is the fallback
+   this document already named: a small local asynchronous interface at the affected call sites —
+   a `ControllerProxy` with `GetConfig`/`SetConfig`/`CanRestart` returning a local `PendingCall`
+   (a QObject with `finished()` and the reply message), and the two `configwidget.cpp` call sites
+   adapted to it. The GUI thread never blocks on pipe I/O.
 3. **Serve 2 methods for settings and 4 for selection** from the Host: `GetConfig`/`SetConfig`
    already map onto `Configuration::dumpDescription` + `AddonInstance::setConfig`, which the PoC
    proved work on this Host (`POC.md` §B). The four selection methods map onto Fcitx's own
@@ -161,21 +172,69 @@ settings executable under GPL-2.0-or-later; neither product repository has a `LI
 product's own outbound licence has to be settled first. The fork must be recorded with its upstream
 revision and licence text, and carried forward on upstream changes.
 
-## 5. Remaining uncertainties [unresolved]
+## 5. Round 3 — the bounded build-and-transport spike [measured]
 
-These are why A′ is "viable in principle", not "proven":
+Executed 2026-10-20 on machine 7700, entirely inside a task directory
+(`…\official-settings-ui\spike\`): task-local Qt 6.8.3 `win64_msvc2022_64` (Qt6DBus included),
+ECM 6.10.0, MSVC 14.51.36231 + Windows SDK 10.0.26100.0; the pinned runtime reused, not rebuilt.
+No system dependency, PATH, installed input method, production Host or owner profile touched;
+every run redirected `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` to a disposable profile. Full
+commands, logs, screenshot and patches: task-dir `evidence/spike3-repro.md`, `REPORT-3.md`.
 
-1. **Not compiled.** No Qt6 is installed here, so these sources have never been built with MSVC or
-   run on Windows. Nothing in the source forbids it, but "builds" is unverified.
-2. **The synthesized-reply path is unexecuted.** `fromCompletedCall` is documented, and the call
-   sites only need a `QDBusPendingCall`, but whether a `QDBusPendingCallWatcher` delivers `finished`
-   for a synthesized call with **no session bus at all** was not run. If it does not, the fallback is
-   a small local interface replacing the 11 call sites.
-3. **Custom types.** `GetConfig` returns `QDBusVariant` + `FcitxQtConfigTypeList`, and the values are
-   `QDBusArgument`-marshalled maps (`configwidget.cpp:84`, `:155`). Building a reply message carrying
-   those registered types is plausible but untested.
-4. **Selection was not validated at all.** See §6.
-5. **GPL and the product licence** are a decision, not a technical unknown.
+The three uncertainties the two-round record left open (not compiled; the synthesized-reply path;
+the custom types) were measured, and the second answered **against** the expectation:
+
+1. **The subset builds and links on Windows.** `Fcitx5Qt6DBusAddons` + `Fcitx5Qt6WidgetsAddons`
+   from the pinned fcitx5-qt (a 40-line replacement CMakeLists adding only those two modules; the
+   top-level build's X11/XKBCommon/Gettext requirements belong to excluded features), `configlib`
+   and `configwidgetslib` from the pinned configtool, and an experimental window — all MSVC, C++20
+   (fcitx-utils `key.h` uses `std::ranges`), with an `<unistd.h>` shim. Source adjustments were in
+   fact required beyond CMake exclusions, as anticipated: the two KF6 widgets became Qt equivalents
+   (`KColorButton` → `QToolButton`+`QColorDialog`, `KFontChooser` → `QFontDialog`), one genuine MSVC
+   portability fix in fcitx5-qt (`std::filesystem::path` → `QString`, two call sites), and
+   `launchExternalConfig` extracted verbatim out of the excluded `addonmodel.cpp` so the `External`
+   option type keeps its upstream behaviour.
+2. **The synthesized-reply route is disproven; the local-interface fallback is proven.** With no
+   session bus at all: `QDBusPendingCall::fromCompletedCall` succeeds, the
+   `QDBusPendingCallWatcher` delivers `finished()`, and custom `QDBusArgument`-marshalled
+   structures plus `QDBusVariant` maps read back through `watcher->reply().arguments()` — but
+   `QDBusPendingReply` rejects the reply (`Unexpected reply signature: got "", expected "v"`).
+   QtDBus computes the signature only during wire marshalling and offers no setter. The seam that
+   actually shipped is the local asynchronous interface at the affected call sites (`ControllerProxy`
+   + `PendingCall`), and it drives the unmodified renderer.
+3. **One real UI round trip through the official widget layer.** The experimental window is the
+   genuine upstream `ConfigWidget` (schema-driven renderer, no local re-implementation), over a
+   task-local named pipe to an isolated engine process (pinned runtime, six static addons, Fcitx's
+   event loop for every engine touch). Load showed the engine's `PageSize` 7; 7 → 9 through the
+   widget layer applied via the `setConfigForInputMethod` path; re-read returned 9; the engine's own
+   candidate list used 9; 9 persisted across an orderly engine restart; a no-change load/apply left
+   the engine value tree and every profile file (config + learning) byte-identical. The official
+   schema served over the seam: 43 value keys, 2 config types, 62 renderable options.
+4. **Pinyin/Shuangpin selection remains unimplemented** (§6) — only the configuration surface is
+   proven.
+
+### 5.1 The fcitx5-macos reference check: shared semantics, platform-specific GUI [measured]
+
+Fcitx5 on macOS ships its **own** SwiftUI settings UI (`fcitx5-macos` `src/config/*.swift`), not the
+Qt configtool — confirming that platform-specific GUIs over shared engine semantics are the
+upstream-sanctioned pattern, not a departure from it. Its C++ bridge (`src/config/config.cpp`)
+implements **exactly the same configuration semantics** the Linux DBus module exposes, which this
+spike's adapter mirrors one-to-one:
+
+- the same three config URIs — `fcitx://config/global`, `fcitx://config/addon/<addon>[/<sub>]`,
+  `fcitx://config/inputmethod/<im>` (`config.h:8-10`);
+- schema from `Configuration::dumpDescription()`, values from `Configuration::save()` → `RawConfig`;
+- the same apply path — `globalConfig().load(cfg, true)` + `safeSave()` + `reloadConfig()`;
+  `addon->setConfig()/setSubConfig()`; `engine->setConfigForInputMethod(entry, cfg)`;
+- engine access scheduled onto the Fcitx thread's event dispatcher and completed through a
+  promise/future (`with_fcitx`, `src/fcitx.h:52-71`) — the same discipline the spike's engine
+  service uses.
+
+The differences are serialization and threading only, and none of them changes our design: macOS
+merges spec+values into one JSON document over a synchronous C ABI and **blocks the calling thread**
+on the future, while our seam keeps schema and values separate (as the upstream Qt renderer expects)
+and keeps the GUI thread asynchronous. Nothing from macOS needed porting to Windows; the check
+corroborates that the spike reused the right, shared official semantics.
 
 ## 6. Selection is not configuration
 
@@ -205,7 +264,7 @@ page size was read from the engine's candidate list inside the harness.
 
 | # | Route | Reuses | Status |
 | --- | --- | --- | --- |
-| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Viable in principle; unbuilt; uncertainties in §5.** The smallest route that satisfies "reuse upstream first" |
+| A′ | **Minimal upstream-UI adaptation** (§4): subset build + transport seam replaced + layout/KF6 reduced | The official UI sources, schema, apply, storage | **Built and validated by the Round-3 spike for the configuration surface (Pinyin page round trip, persistence, no-change safety); ready for the implementation batch.** The smallest route that satisfies "reuse upstream first" |
 | A | Full upstream stack: Qt6 + KF6 + X11 + xkbcommon + IsoCodes + rebuilt runtime with keyboard/dbus modules + a session D-Bus | The official UI unmodified | Works, but imports Linux-only features the product does not need and reopens runtime provenance |
 | B | Fusion-authored window over `dumpDescription`/`setConfig` via the existing named pipe | Official schema and apply only | **Not authorized by D085**; also the largest new-code surface for the same user-visible result |
 | C | No UI: settings edited in `%APPDATA%\Fcitx5\config\fcitx5\conf\pinyin.conf` with the Host stopped (WP3 B3f) | Nothing new | Correct today, but gives the user no settings surface |
@@ -214,24 +273,40 @@ Note on C: the tray does **not** help here. Its menu opens the **log** folder
 (`%LOCALAPPDATA%\fusion-host`, `windows-daily-use.md` §4), which contains no configuration; the
 configuration lives under `%APPDATA%\Fcitx5`.
 
-## 9. Not done in this batch
+## 9. Fork, patch scope, and licences [measured]
 
-- No dependency installed, no Qt6, no runtime rebuild, no port, no UI built or launched.
-- No product code changed; nothing installed or registered; the owner's Host, tray, browsers and
-  profile untouched.
-- No selection round-trip; only `PageSize` was applied, in-process, in the earlier PoC.
-- `setSubConfig` paths (`dictmanager`, `clearuserdict`, `customphrase`) not exercised.
-- No Release ZIP (nothing to package).
+The Round-3 upstream deltas are exactly two patch files (task dir `patches/`):
 
-## 10. Next action
+- `fcitx5-qt` `0285a5d`: **1 file** — `fcitxqtconfiguifactory.cpp` MSVC portability
+  (`std::filesystem::path` → `QString`). This one is plausibly upstreamable as a portable fix; if
+  accepted it removes the need for an fcitx5-qt fork.
+- `fcitx5-configtool` `9bd6022`: **10 files** — the transport seam (`dbusprovider.h/.cpp`), the two
+  `configwidget` call sites, the two KF6→Qt widget replacements, both subset `CMakeLists.txt`, and
+  the new `launchexternal` TU (verbatim extraction from the excluded `addonmodel.cpp`). These
+  changes are inherent to the Windows port (upstream assumes D-Bus + KF6) and **constitute a
+  maintained fork or patch series**; no GitHub fork was created in the spike.
 
-The recommended next batch is a **bounded build-and-seam spike for A′**, not a full port and not a
-custom UI: build the subset from §4 against a Qt6 MSVC toolchain, replace `DBusProvider` with a
-pipe-backed provider that serves `GetConfig`/`SetConfig` from the Host, and exercise the two
-uncertainties that decide the route — whether a synthesized `QDBusPendingCall` drives the existing
-call sites with no session bus (§5.2), and whether the subset builds unmodified apart from the
-CMake exclusions (§5.1). If both hold, A′ is the route; if not, the fallback is a local interface at
-the 11 call sites, still inside A′.
+Licences of the retained sources/dependencies: configtool `src/lib` **GPL-2.0-or-later**;
+fcitx5-qt widgetsaddons LGPL-2.1-or-later, dbusaddons BSD-3-Clause; Qt 6.8.3 LGPL-3/GPL-2-or-later
+(dynamic link); ECM BSD-3-Clause (build-time only). Neither product repository's outbound licence
+was chosen or changed; **an owner licence decision is required before any retained upstream source
+is committed or distributed**, and until then the retained code stays as local experimental patches.
 
-The settings item stays **open and unimplemented**, and the **EXE installer** remains the next
-scheduled item under D085. A Fusion-authored UI remains unauthorized.
+## 10. What remains, and the next action
+
+Remaining work for the settings item, in order:
+
+1. **The implementation batch** (smallest viable): port the proven pipe transport into the product
+   (engine-side Get/Set handlers in the product backend on the Fcitx event loop + the
+   `ControllerProxy`/`PendingCall` adapter + the retained widget subset), Pinyin page first. The
+   engine service in the spike is the reference implementation of the semantics.
+2. **Selection stays separate** (§6): selecting Pinyin/Shuangpin is input-method-group management,
+   not a config option; it needs its own mapping and is not claimed by anything here.
+3. **Packaging**: the EXE installer remains the next separate batch under D085 (framework,
+   signing, channel still undecided under U4).
+4. **The licence decision** (§9) before any retained upstream code is committed or distributed.
+
+The settings item stays **open until actual product integration is complete**. U4, U6, WP7 and the
+other gates are untouched by this document. A Fusion-authored UI remains unauthorized, and the
+Round-3 spike did not need one: the official widget layer ran on Windows as-is (modulo the recorded
+patches).
