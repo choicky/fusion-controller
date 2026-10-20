@@ -9,7 +9,10 @@ mandatory. **U6 is decided** (a new application window starts with Fusion open) 
 (persistent tray status, fault balloon, restart-Host and open-log-directory actions), with the **tray implemented in
 fusion-windows PR #26**; hang detection is a separate pending follow-up and **not** an entry condition for WP8. The
 owner decided the next work on 2026-10-20 (D085): the **official settings UI** first, then the **EXE installer** that
-packages it. Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
+packages it. The settings-UI feasibility inspection D085 required is complete (2026-10-20, §7): the official front end
+cannot be built or connected on this Host without an architectural boundary change, the official schema and apply path
+were proven on an isolated profile, and **no UI is implemented** pending the owner's choice among the recorded
+alternatives (`docs/windows-settings-ui-feasibility.md`). Signing and the distribution channel stay open (U4). **Three owner-reported incidents from the first daily-use sessions are tracked as R35, R36 and
 R25:** Notepad-- 3.4 crashed on Win+Space because the TIP bound to that application's own older `MSVCP140.dll` (fixed in
 fusion-windows PR #21 and **owner-confirmed** on the repair package), idle Return in the same application inserted no newline
 because the shell claimed a key the engine only forwards (fixed in fusion-windows PR #23, merged, and **owner-confirmed on
@@ -175,6 +178,19 @@ a single EXE, with the framework **not** chosen, and signing/channel still U4. N
 and neither starts without its own bounded execution instruction. The release candidate (WP8) keeps its entry
 conditions: U4 decided and the WP7 daily-use closure. The installer item is the vehicle for WP8's packaging, not a
 replacement for those conditions, and WP5/WP6/WP7 acceptance is unchanged.
+
+**Settings-UI feasibility measured (2026-10-20); no UI implemented.** The inspection D085 required is done and is
+recorded in `docs/windows-settings-ui-feasibility.md`. The official front end (`fcitx5-configtool` 5.1.16) cannot be
+built or connected on this Host: its configure stops at Qt6 with only 4 of the 17 declared requirements present, `X11` and
+`xkbfile` are required outside every `option()`, and it needs a daemon-side `/controller` served over D-Bus, which the
+pinned runtime does not build (`-DENABLE_DBUS=OFF`, `-DENABLE_KEYBOARD=OFF`). The official *configuration* mechanisms do
+work and were proven end to end on an isolated profile — `Configuration::dumpDescription` for the control model and
+`AddonInstance::setConfig` for a validated apply with no Host restart, with `PageSize` 7 → 9 visible to the engine and
+persisted across an orderly restart. Reusing the UI itself is therefore an architectural boundary change (new
+Qt6/KF6/X11 stack, runtime rebuild, D-Bus transport), and D085 does not authorize a Fusion-authored window. The three
+alternatives with their cost, the licence constraint (`fcitx5-configtool` is GPL-2.0-or-later) and the measured
+constraints for any future front end are in the same document. The owner's choice among those alternatives is the next
+step for this item; the EXE installer keeps its place behind it, and nothing was installed or packaged in this batch.
 
 ### 7.1 Owner decisions (U1, U2, U3 and U5 owner-accepted 2026-10-18; the others are not assumed accepted)
 
