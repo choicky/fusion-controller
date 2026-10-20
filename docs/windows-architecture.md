@@ -590,7 +590,8 @@ Stage 6    Packaging / release / soak                       PLAN PROPOSED — �
            `runtime-wp3-20261018`）；WP4 已在其范围内收口（2026-10-19；U2 (b) Accepted 2026-10-18；走查 run
            `wp4-run-20261019-130037` 全部通过；R34 RESOLVED；证据见 `docs/windows-stage6-wp4.md`）；
            **WP7 日常使用准备已授权**（D084：WP5/WP6 经日常使用验收；U6 已实现但真机确认待做，U7 托盘已实现
-           （fusion-windows PR #26，head `0094269`，含独立评审修正批次），挂起检测是独立后续项、**不是** WP8
+           （fusion-windows PR #26，head `0094269`，含独立评审修正批次）并已以 `0.0.0-wp7+0094269` 安装（所有者
+           确认悬停提示 `Fusion: Host running (pid 41396)`；菜单项与气泡未验证），挂起检测是独立后续项、**不是** WP8
            前置条件）；WP8 仍依赖 U4（签名/渠道）
            （`docs/windows-stage6-plan.md`、`docs/windows-stage6-wp3.md`、`docs/windows-stage6-wp4.md`、
            `docs/windows-daily-use.md`）
@@ -606,15 +607,21 @@ P0-A / P0-B / P0-D 仍 OPEN（§24）
 独立登录任务，以及安装/升级/卸载/重启工具的集成；独立评审后托盘清单与关闭范围收紧到"本用户×本会话×
 `<安装根>\<版本>\bin\FusionTray.exe`"，会话结束被取消时恢复上报并让托盘任务共用 Host 任务的 User32 1077/1073
 触发条件，Host pid 变化只刷新身份不伪造消失，无法检视的相关进程不再被当作"已消失"；以隔离测试进程与桩重启工具验证，
-未安装、未停生产 Host，故气泡、会话结束抑制与安装器路径尚未端到端观察）；**挂起检测是后续独立工作，尚未实现，
+随后于 2026-10-20 以 `0.0.0-wp7+0094269` **完成安装**，所有者确认悬停提示 `Fusion: Host running (pid 41396)`；菜单项、
+气泡、会话结束抑制与安装器路径**未**实际验证，仍未端到端观察）；**挂起检测是后续独立工作，尚未实现，
 且不是 WP8 的前置条件**；WP8 还依赖 U4（签名/渠道）。
 
 **后续工作次序（2026-10-20，D085）。** 最小托盘批次之后先做**官方设置界面**，再做承载它的 **EXE 安装包**。设置界面
-优先复用上游 Fcitx 的既有设置界面与配置语义，不另建 Fusion 专属配置模型；上游界面的 Windows 依赖与它同本 Host 的
-通信方式须先核查，**可行性尚未证明**，实现路线未定。安装包交付物形态已定为单个 **EXE**（不是 MSI，也不是解压后跑
-脚本的 zip），安装框架未定；签名与分发渠道仍未决（U4 仍 OPEN）。这两项不改变 WP7 日常使用验收与 U6 决定，也不改变
-最小托盘的范围（无自动重启、无挂起检测、无新的生命周期框架）。U1 的"只经 Fcitx 配置文件选择"与 §25 的
-"broad product UI" 排除条款，仅就这两项被**部分取代**（D085）；官方配置格式、存储位置与用户数据策略不变。
+优先复用上游 Fcitx 的既有设置界面与配置语义，不另建 Fusion 专属配置模型。**可行性已按 D085 核查（2026-10-20，两轮）**：
+未改动的上游构建在本机无法配置（停在 Qt6，17 项声明依赖仅 4 项具备），但依赖追踪表明这不是所有复用路线的代价——
+X11 只服务一个键盘布局控件（本 runtime 无键盘输入法，该功能无意义），KF6 只服务三种选项类型与一个列表委托，D-Bus
+依赖收敛在一个 60 行 `DBusProvider`（设置 2 处调用、选择 4 处调用），因此**"最小上游界面适配"在原理上可行、尚未构建**；
+Qt6 是不可避免的新依赖，且上游界面源码为 GPL-2.0-or-later。官方 schema 与 apply 路径另经**进程内引擎 PoC**证实
+（`PageSize` 7 → 9 被引擎采用并跨重启持久），但那不是 Host IPC 路径、也不是真机界面验证。界面**尚未实现**，路线未定，
+建议的下一步是受限的"构建 + 接缝"验证（`docs/windows-settings-ui-feasibility.md`）。安装包交付物形态已定为单个 **EXE**
+（不是 MSI，也不是解压后跑脚本的 zip），安装框架未定；签名与分发渠道仍未决（U4 仍 OPEN）。这两项不改变 WP7 日常使用
+验收与 U6 决定，也不改变最小托盘的范围（无自动重启、无挂起检测、无新的生命周期框架）。U1 的"只经 Fcitx 配置文件
+选择"与 §25 的"broad product UI"排除条款，仅就这两项被**部分取代**（D085）；官方配置格式、存储位置与用户数据策略不变。
 ## 23. Decision classification
 
 ### ACCEPTED（D072）
@@ -850,7 +857,7 @@ gate 记录的范围内；fusion-windows PR #11 与 PR #12 均已合并）。** 
 另有明确的执行指令才可开始。该计划不是 Accepted Decision，不改变本文的 OPEN/UNFROZEN 项，也不复制上表；其输入包括
 多应用 out-of-process 兼容性验证债（§25 Stage 4 收口、§18）、上表以 Stage 6 为 trigger 的 DEFER 项（如精确 caret
 锚定）、上面的 pinned-runtime 发现核验（已由 WP1 完成），以及安装/注册/签名/soak/阈值测量（§21、§25 Stage 4"不属于"条款）。
-WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）。WP3 亦已在其范围内收口：选择只经 Fcitx 既有配置文件，存储落在 Fcitx 标准每用户路径，学习与选项跨重启持久（B3a–B3g、Notepad A–E 通过，候选 `a720319`，运行于新 runtime `runtime-wp3-20261018`；WP2 结论仍取自已记录的 `runtime-wp1-20261017`，未在新 runtime 上复跑），已知限制为无热键切换（R19）、强制终止丢失未保存改动、登出/关机保存取决于启动方式（R26）（`docs/windows-stage6-wp3.md`）；后续工作包仍须各自的明确授权；**U2 与 U6 已决定**（U6 真机确认待所有者的首次安装窗口检查），**U7 托盘已实现**（fusion-windows PR #26，head `0094269`，含独立评审修正批次；挂起检测是独立后续项，不是 WP8 前置条件），**U4 仍待决定**（后续工作次序见 D085：先官方设置界面，再做承载它的 EXE 安装包）。
+WP1 已合并并在其范围内收口；WP2 已在其范围内收口（所有者 2026-10-18 决定 U3 (a)、U5 (a)），最终候选 Notepad A–E 与 Edge 密码框检查通过，Firefox 密码框检查也已通过（最低保护结果），技术检查已完成，U5 的已知限制（InputScope 读为 Unknown、Sensitive 分类未证明）随该决定一并接受（`docs/windows-stage6-wp2.md`；`docs/windows-stage6-plan.md` §7.1）。WP3 亦已在其范围内收口：选择只经 Fcitx 既有配置文件，存储落在 Fcitx 标准每用户路径，学习与选项跨重启持久（B3a–B3g、Notepad A–E 通过，候选 `a720319`，运行于新 runtime `runtime-wp3-20261018`；WP2 结论仍取自已记录的 `runtime-wp1-20261017`，未在新 runtime 上复跑），已知限制为无热键切换（R19）、强制终止丢失未保存改动、登出/关机保存取决于启动方式（R26）（`docs/windows-stage6-wp3.md`）；后续工作包仍须各自的明确授权；**U2 与 U6 已决定**（U6 真机确认待所有者的首次安装窗口检查），**U7 托盘已实现并已安装**（fusion-windows PR #26，head `0094269`，含独立评审修正批次；以 `0.0.0-wp7+0094269` 安装后所有者确认悬停提示 `Fusion: Host running (pid 41396)`，菜单项与气泡未验证；挂起检测是独立后续项，不是 WP8 前置条件），**U4 仍待决定**（后续工作次序见 D085：先官方设置界面，再做承载它的 EXE 安装包）。
 
 **暂不应做：** freeze final wire protocol；freeze permanent identifiers；freeze recovery/timing thresholds；freeze
 未决 Host topology；无证据即冻结 §16 candidate renderer 的进程/位置；借其他阶段的工作偷跑 P0-A / P0-B 的最终

@@ -158,7 +158,7 @@ was set by mistake, remove it at User scope and confirm it is empty:
 [Environment]::GetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS','User')
 ```
 
-### The Fusion tray (U7 — implemented in `0.0.0-wp7+0094269`)
+### The Fusion tray (U7 — installed as `0.0.0-wp7+0094269`)
 
 The decided presentation (D084) now exists as `FusionTray.exe` in the installed version directory. It is started at logon by
 its own scheduled task (`FusionTray`, Medium integrity, interactive token) — not from inside the Host (a crashed Host
@@ -167,6 +167,9 @@ quietly, so an upgrade cannot leave two icons.
 
 **What it shows.** Hover the icon: `Fusion: Host running (pid N)` or `Fusion: Host not running`. "Running" is a process
 fact, **not** a health claim: an alive-but-unresponsive Host still reads as running (see the hang-detection note below).
+On the first installed package (`0.0.0-wp7+0094269`, 2026-10-20) the owner confirmed this tooltip read
+`Fusion: Host running (pid 41396)`. That is the whole of the installed confirmation so far: the commands below, the
+balloon and the session-end behaviour were **not** exercised.
 
 **What it does.** Right-click the icon:
 
