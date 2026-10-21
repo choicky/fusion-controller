@@ -201,9 +201,9 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **515 checks pass** with an isolated Host on a disposable **writable** profile (423 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for a reconnect, the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, and read/apply/read-back with incarnation stability |
+| tested | **546 checks pass** with an isolated Host on a disposable **writable** profile (454 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, and read/apply/read-back with incarnation stability |
 | UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+ae02af0.zip`, 139 010 202 B, SHA-256 `375AA998…D70CC0`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable exercised against an isolated Host (edit → close → save → read back) |
+| packaged | **yes** — `fusion-0.0.0-winui3+502d5ec.zip`, 139 010 396 B, SHA-256 `C64A259D…45A5F2`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable launched against an isolated Host (endpoint resolved from `--pipe-name`, window activated, page loaded and refreshed). `fusion-0.0.0-winui3+ae02af0.zip` (139 010 202 B) is retained as the previous package and is superseded |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -257,12 +257,16 @@ it, so the last edit was lost with no dialog; close and reload now commit throug
 in-flight request is refused with the reason instead of discarding drafts under it. Retry recreated the drafts, and a
 connection lost after a successful load offered no retry at all. The key-tag reflow found no chips after the first layout, so
 a resize never reflowed — rebuilding rows from a layout callback faults, and deferring it touches replaced elements, so the
-rows are a small `WrapPanel` and the layout system does the wrapping.
+rows are a small `WrapPanel` and the layout system does the wrapping. One more was found after that round closed: a
+reconnect refreshed the list's baseline while always keeping the cached order, so a list nobody had edited came back as a
+local edit and a later save could submit an unintended reversal; the refresh now adopts the Host's order when the draft was
+clean and keeps the requested order only when there was a real local edit, with three scripted-peer cases for clean/changed,
+pending/unchanged and pending/already-applied.
 
 The round also closed the validation debt that mattered most: the global configuration now saves **successfully** against an
 isolated Host on a disposable writable profile, survives an orderly restart, and a save with nothing pending rewrites no file
 under that profile. Earlier rounds could only assert the client's handling of the Host's `safeSave()` failure, because a Host
-started without a user configuration directory has nowhere to save to. Packaging, installation and owner acceptance remain
+started without a user configuration directory has nowhere to save to. Installation and owner acceptance remain
 open. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
 existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
 older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a

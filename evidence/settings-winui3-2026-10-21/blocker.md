@@ -12,7 +12,7 @@ have to rediscover it.
 | `Microsoft.WindowsAppSDK` | **2.5.1**, restored and verified |
 | `Microsoft.Windows.SDK.BuildTools` | **10.0.28000.2705**, restored and verified |
 | WinUI build | **works** — the app compiles, launches and shows a `WinUIDesktopWin32WindowClass` window |
-| Packaging | **works** — `fusion-0.0.0-winui3+ae02af0.zip`, 652 manifest entries, every hash re-verified against the extracted tree |
+| Packaging | **works** — `fusion-0.0.0-winui3+502d5ec.zip`, 652 manifest entries, every hash re-verified against the extracted tree |
 
 ## Running a Host that can save
 

@@ -78,7 +78,9 @@ draft under it.
 
 **If the Host is not there.** At startup the window says so and offers **重试连接**. Once connected, the same **重试连接**
 appears if the Host goes away mid-session, and **重新加载** re-reads everything and asks first if anything is unsaved. A
-retry keeps your pending edits; only an explicit reload discards them.
+retry keeps your pending edits; only an explicit reload discards them. A part of the window you had not edited follows the
+Host instead: if the input-method order changed elsewhere, a retry shows the Host's order rather than presenting the old one
+as an unsaved change you would later save back.
 
 **What the pages do not claim.** A binding stored here is a configuration value; whether that key reaches the engine depends
 on the input path. Combinations with Ctrl/Alt/Win, modifier-only keys and keypad Enter are not delivered on this path, so

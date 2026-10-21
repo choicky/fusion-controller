@@ -321,7 +321,7 @@ disposition.
 | design (this document) | done |
 | core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
 | WinUI views (`src/settings-winui3/FusionSettings.App`) | **implemented, compiled, launched, driven** — four pages, every item below has a location |
-| packaged | yes — `fusion-0.0.0-winui3+ae02af0.zip` (139 010 202 B, SHA-256 `375AA998…D70CC0`, 652 manifest entries re-verified) |
+| packaged | yes — `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B, SHA-256 `C64A259D…45A5F2`, 652 manifest entries re-verified) |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -346,10 +346,11 @@ diagnostics, and every item in §1–§3 has a place in it:
 - **Editable means editable through the asking view's schema.** A row's setter is bound to the configuration that page
   renders, so a Global control cannot reach the Pinyin draft, and the save splits the shared draft across the URIs whose
   schemas describe its fields.
-- **Checks**: **515** with an isolated Host on a disposable **writable** profile (423 without one). The workspace path is
+- **Checks**: **546** with an isolated Host on a disposable **writable** profile (454 without one). The workspace path is
   driven against a real Host — Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the
   method list, a failed start and its retry — a scripted peer covers an uncertain method-list write (applied / not applied /
-  reread failed) and a reconnect with edits retained, and the window itself was driven through UI Automation for
+  reread failed) and the three reconnect cases for the list (a clean list adopting a changed Host order, a pending one
+  keeping its request, and a request the Host already reflects), and the window itself was driven through UI Automation for
   edit-then-close, close during an in-flight save, a reconnect that saves afterwards, and key-tag reflow at three widths with
   an add and a remove after a resize.
 - **A successful global save is RUN**, on a Host whose per-user configuration and data paths resolve inside a disposable

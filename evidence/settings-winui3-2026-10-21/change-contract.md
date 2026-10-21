@@ -3,7 +3,7 @@
 > **Scope of this record.** It bounded the **first** batch of this task: the D087 decision, the migration inventory, and
 > the first implementation attempt. The statements below that say "nothing is compiled" and "only source-level gates can
 > run" describe **that batch**, not the current state. Current outcome: the client is **implemented, compiled, tested and
-> packaged** in fusion-windows PR #32 — core, WinUI views, 515 checks with an isolated Host on a writable disposable profile,
+> packaged** in fusion-windows PR #32 — core, WinUI views, 546 checks with an isolated Host on a writable disposable profile,
 > and the corrected save path exercised through the packaged executable. It is **not installed and not owner-accepted**. See
 > `migration-inventory.md` §6 and the Stage 6 plan's settings section for the per-level state. The contract's scope,
 > must-preserve list and hard stops still govern the remaining work.
@@ -16,7 +16,7 @@ configuration store or changing engine semantics.
 (b) A reviewable migration inventory covering every exposed option, not only the ones the design prototype shows.
 (c) The WinUI 3 client implementation and its packaging — **blocked in that batch** on the missing package feed, see
 `blocker.md`. In that batch nothing was compiled, packaged, installed or accepted; the core has since been implemented and
-tested, and packaging, installation and acceptance remain open.
+tested, packaging is complete, and installation and acceptance remain open.
 
 **Authority / inputs.**
 - Owner instruction of 2026-10-21 (C# + WinUI 3 preferred; task-oriented navigation; preserve official capabilities
