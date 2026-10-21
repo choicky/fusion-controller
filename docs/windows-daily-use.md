@@ -367,14 +367,19 @@ No daily report is required, and no feedback is needed for a day without problem
   run, the fault balloon and the install/upgrade/uninstall handling are described in §5 "The Fusion tray", including what
   has not been observed yet.
 - **Fusion Settings changes less than the schema shows.** 全局设置 renders Fcitx's whole global schema, but the hotkey,
-  input-status/panel and password-field categories have no effect on this product (Fusion never gives a lone modifier or a
-  `Ctrl`/`Alt`/`Win` combination to the engine, `Ctrl+Space` is Windows input switching, there is no Fcitx panel, and the
+  input-status/panel and password-field categories have no effect on this product (Fusion never gives a
+  `Ctrl`/`Alt`/`Win` combination to the engine, and a lone modifier only as the 临时切换输入法 binding below, `Ctrl+Space`
+  is Windows input switching, there is no Fcitx panel, and the
   Windows input-scope policy applies first) — the page says so in one sentence. `Shift`+`Return` commits raw input only
-  because the Pinyin `CommitRawInput` option lists it. **A lone `Shift` does not switch between Chinese and English** —
-  Fcitx's own `Hotkey/AltTriggerKeys` (a lone `Shift_L`) cannot fire here: the TIP never relays a modifier-only key, and
-  Fusion's contexts are created *inactive* in Fcitx, while that binding only works from an active context. This is open as
-  plan R38 with the measurement behind it; nothing here is a promise that it will change. `Shift`+key combinations are
-  unaffected — they are ordinary text input. A lone `Shift` does not commit raw input either, and
+  because the Pinyin `CommitRawInput` option lists it. **A lone `Shift` is the "temporarily switch input method" key.** That
+  is the official setting "系统快捷键 → 临时切换输入法" (`Hotkey/AltTriggerKeys`, `Shift_L` unless you change it): tap it
+  once and the keys go to the application — English, nothing composed — and tap it again and you are back in the input
+  method you were using, Shuangpin or Pinyin, without changing any scheme. It is not a way to rotate between schemes and
+  not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
+  `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
+  setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine, but
+  not yet checked inside an application** (plan R38): install a package from `+e537927` or later, click into a text field
+  and tap the key the settings page shows. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer

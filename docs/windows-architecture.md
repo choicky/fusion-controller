@@ -257,6 +257,17 @@ prior EFFECT unresolved
   状态过滤会吞掉用户自己配置的全局热键（stage3c 以 F6 = `Hotkey/TriggerKeys` 实测：空闲时引擎消费该键且无文档回调）。
   这是 R36（Notepad-- idle Return）与 R37（编辑键）的窄修复，**不是**新的通用键位策略，也不构成“非字符键都要组合
   状态”的一般规则；本节的 pass/drain 契约不变。
+- **修饰键的按下/释放与官方开关（当前事实，2026-10-22，R38）：** 一个**单独的 Shift** 不再被 T 拒绝——它是
+  `Hotkey/AltTriggerKeys`（官方“临时切换输入法”）的候选绑定，而“以 T 为准”的应用在 T 返回 FALSE 后不会再投递 K，
+  按下就永远到不了引擎。适配分三处，均不建立自己的中英文状态：① `translate_key` 给左右 Shift 各自的 keysym
+  （`VK_SHIFT` 用扫描码区分），**只有 Shift** 的释放会以新的 `KeyRelease` 刺激回投，且仅当这次按下是本层转发的、
+  中间没有别的按键（Shift+字母是应用自己的文本，引擎看不到，因此这一事实由前端提供）；② 绑定上下文通过公共
+  `Instance::activate()` 进入 active，输入法用 `setCurrentInputMethod(DefaultIM, local)` 固定，所以切换前后解析到
+  同一方案；③ 组的 `Items/0` 放**另一个**输入法（上游放键盘布局），使 `canTrigger()`（= 列表长度 > 1）成立、
+  `DefaultIM` 不再被改写成 `Items/1`，并让切换时 Fcitx 看到方案变化从而调用引擎的 `deactivate()`（其 `reset()`
+  清掉预编辑）。`Items[1..]` 仍是用户的列表与顺序；只有一项时也能切换。**inactive 的“直接交给应用”由前端实现**
+  （`inactive_passthrough`），因为本运行时没有编译 keyboard 输入法，而 Linux 上那正是 inactive 的含义。
+  未覆盖：其它修饰键、系统级热键、按住修饰键的完整语义，均未因此获得支持。
 - **不存在普遍回调保证**：不得表述为 “K always exists” 或 “sync EditSession always succeeds”。
 
 ### 7.3 回调不可用 / drain 无法在 PASS 前到达所需 terminal
