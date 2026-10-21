@@ -588,6 +588,41 @@ Accepted by the owner on 2026-10-20 through the bounded implementation instructi
 
 Implementation/package/validation state is tracked in the Stage 6 plan and product PRs, not in this Accepted Decision. U4, U6, WP7 and P0-A/P0-B/P0-D remain unchanged.
 
+## D087 — Windows settings UI: Fusion-owned C# + WinUI 3 presentation (supersedes D085's presentation clause only)
+
+Decided by the owner on 2026-10-21.
+
+**Presentation technology.** The Windows settings surface is a **Fusion-owned C# + WinUI 3** application. This
+supersedes exactly one clause of D085 — "The settings UI reuses upstream first … A Fusion-written UI is a fallback, not
+the default, and it is not authorized here." That clause is replaced: the **presentation layer is Fusion-written**, while
+upstream Fcitx remains the authority for **configuration semantics** (schema, defaults, storage, apply path), not for the
+widget technology.
+
+**Accepted with it.** The task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
+lower-frequency settings under "More settings" sections rather than one advanced dump, and the interaction rules the
+owner stated for the key editor, shared Pinyin/Shuangpin state and saving.
+
+**Unchanged.** D085's **work order** (settings UI, then the EXE installer), its **EXE** deliverable form, official Fcitx
+configuration formats, storage in Fcitx's standard per-user paths, the prohibition on an additional Fusion configuration
+store, the user-data policy (upgrade keeps data; uninstall leaves it unless chosen), and every other U1 constraint. U4
+(signing/channel) stays open; the installer framework stays undecided; no merge, installation, registration or publication
+is authorized by this record.
+
+**D086 is not changed.** Its scoped GPL-2.0-or-later authorization remains attached to the retained upstream-derived
+`FusionSettings.exe` and the `fcitx5-configtool`-derived sources. The new client is Fusion-owned code and does **not**
+inherit that authorization, and this decision selects **no repository-wide licence**. While the upstream-derived
+executable continues to ship, its notices, corresponding source and build instructions remain required; whether it is
+retained or retired is a packaging decision taken with its own evidence.
+
+**Out of scope.** No engine-semantic change, no new configuration store, no TSF key-routing policy (the bare-Shift
+boundary stays unresolved), no EXE installer implementation, no machine installation.
+
+**Status.** Designed only. The client is **not implemented**: this machine has no .NET SDK and the NuGet and SDK download
+hosts are unreachable, so nothing could be compiled, packaged or validated
+(`evidence/settings-winui3-2026-10-21/blocker.md`). The migration inventory
+(`evidence/settings-winui3-2026-10-21/migration-inventory.md`) is the reviewable coverage record. Implementation,
+compilation, packaging and owner acceptance are tracked in the Stage 6 plan and product PRs, not in this decision.
+
 ## Current authority rule
 
 For current post-release product state, use the compact current-state/current-

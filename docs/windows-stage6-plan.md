@@ -186,7 +186,15 @@ The release candidate (WP8) keeps its entry conditions: U4 decided and WP7 daily
 WP8 packaging, not a replacement for those conditions, and WP5/WP6/WP7 acceptance is unchanged. Product implementation and
 owner installation/acceptance are separate states; no installation is claimed here.
 
-**Settings UI — consolidated current status (2026-10-21; D085/D086).** This is the single current record. The three-round feasibility
+**Settings UI — consolidated current status (2026-10-21; D085/D086, presentation superseded by D087).** This is the single current record.
+**Direction change (2026-10-21, D087).** The owner has replaced the *presentation technology only*: the Windows settings surface is to be a
+Fusion-owned **C# + WinUI 3** client with task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
+while official Fcitx configuration semantics, storage, defaults and the settings-before-installer order stay as they are. D086's scoped
+licence remains attached to the retained upstream-derived executable and does not extend to the new client. The Qt client recorded below is
+still the **shipped** settings surface — nothing has replaced it — and the WinUI 3 client is **not implemented**: this machine has no .NET SDK
+and the NuGet/SDK hosts are unreachable, so it could not be compiled, packaged or validated
+(`evidence/settings-winui3-2026-10-21/blocker.md`). The option-coverage design is in
+`evidence/settings-winui3-2026-10-21/migration-inventory.md`; it is a design record, not implemented behaviour. The three-round feasibility
 investigation stays historical evidence in `docs/windows-settings-ui-feasibility.md`, and the per-correction detail lives in
 `evidence/stage-a-global-settings-2026-10-20/` (`change-contract.md`, `correction-inventory.md`, `capability-mapping.md`, `handoff.md`).
 Implementation, compilation, isolated validation, packaging, owner installation and owner acceptance are separate states; the first four
