@@ -30,19 +30,68 @@ IME was not selected, not that a new window failed to open.
 
 ## 2. Opening Fusion Settings
 
-The owner-test package includes `FusionSettings.exe` and the installer creates **Fusion → Fusion Settings** in the Start Menu. The tray's **Settings** command launches the same installed executable. These entries are package integration, not the later single-EXE installer, and they do not install/register anything by themselves.
+The package installs **Fusion → Fusion Settings** in the Start Menu, and the tray opens the same executable from its
+**Settings** command and from a left click. The client lives in `bin\settings\` because it carries its own .NET and
+Windows App SDK runtimes; nothing else needs to be installed for it to start.
 
-Fusion Settings talks to the current user's/current session's `FusionHost` over the existing user/session-scoped pipe. It does not start a second engine or restart the Host. If the Host is absent, the UI reports that it is unavailable; if the Host disconnects, times out, or rejects the settings API version, the operation is shown as unsuccessful and the UI tells the user to reload/retry rather than claiming success. **Known and fixed defect:** the `0.0.0-settings+1f4b749` package could show "FusionHost is unavailable or does not support settings" in an otherwise empty window while the Host was running, because the client resolved `\\.\pipe\<sid>-<session>` instead of the Host's `\\.\pipe\FusionHost-v1-<sid>-<session>`; `0.0.0-settings+5271848` and later resolve the correct endpoint, so on that older package the message does not mean the Host is stopped.
+Fusion Settings talks to the current user's and current session's `FusionHost` over the existing user/session-scoped pipe.
+It does not start a second engine, restart the Host, or register anything. If the Host is absent the window says so and
+stays usable; if it disconnects, times out or refuses the settings API version, the operation is reported as unsuccessful
+rather than as done.
 
-- **Pinyin settings / Shuangpin settings:** each page is rendered from Fcitx's official per-input-method schema and writes through the Host's official configuration path. Options you do not submit are preserved; a key that no Fcitx schema knows is dropped when Fcitx next saves that file, which is Fcitx's own behaviour rather than something this UI adds.
-- **Global settings:** a third page renders Fcitx's official `fcitx://config/global` schema and applies it through Fcitx's own global sequence. It opens with a sentence naming the categories that do **not** take effect on Windows: global hotkeys (Fusion never hands a lone modifier or a `Ctrl`/`Alt`/`Win` combination to the engine, and `Ctrl+Space` belongs to Windows input switching), input-status and panel options (this product has no Fcitx panel — the candidate window is its own projection), password-field options (the Windows input-scope policy applies first), and `ActiveByDefault`/`resetStateWhenFocusIn`, which only partly apply. Those options stay visible because the schema is Fcitx's; the sentence is what tells you they are inert. Options Fcitx already hides on a keyboardless build stay hidden.
-- **Input-method list (the row above the pages):** the ordered enabled list, top row first. The **first row is the method a bound context follows** (`Items/0`); `DefaultIM` remains only the fallback. **添加 >** adds a method from the available list, **< 移除** removes the selected enabled one, **上移 / 下移** reorder, and **应用输入方式列表** writes the result through Fcitx's official group API. Removing an entry only drops it from this list — it never deletes a method definition or learning data. A list that is empty, or that names anything this Host does not define, is refused with "The input-method list must contain at least one method this Host defines, and every entry must be available."
-- **Apply:** applies the options you changed on the current page; the Host merges them onto its live configuration and confirms the resulting state before the UI reports success. Options you did not touch on that page are not submitted, so applying on one page cannot revert a shared option that another page changed earlier — the other page shows the new value once it is applied or reloaded. A no-change Apply is a no-op for the engine setter and must not rewrite learning files. The input-method list has its own apply button and is not part of this.
-- **While composing:** if a composition or strict pending engine state is active, **应用** and **应用输入方式列表** return a visible retry condition instead of resetting or silently committing the composition. Finish or clear the composition and apply again.
-- **Cancel / Reload:** both re-read the input-method list **and all three pages** from the Host, so they discard unapplied edits everywhere, not only on the visible page. Neither writes configuration. Reload before switching pages if you are unsure what is still unapplied.
-- **External/subconfiguration actions:** disabled in this Windows package with an explanation. Dictionary management is not included in this batch.
+**The four pages.**
 
-The current package is an owner-test artifact only. Product implementation, isolated validation, owner installation and owner acceptance are separate status claims; none of the latter two is implied by this guide.
+- **输入方式** — the ordered list of methods, with the first entry marked **当前** because that is the method a bound
+  context follows. **上移 / 下移** reorder, **移除** leaves the group, and **添加** takes a method from the available list.
+  Removing an entry never deletes a method definition or learning data. The fallback method (`DefaultIM`) is shown but not
+  edited here. The 正在编辑 selector at the bottom chooses *which* method's settings you are editing — it does **not** switch
+  the active input method.
+- **按键** — one row per action, each holding the alternative bindings for it. Three tags are shown with **N 个更多** for the
+  rest; **编辑** reveals the per-tag **替换** and remove buttons; **添加按键** records a new binding (press the keys, **Esc**
+  cancels and changes nothing). **恢复默认** writes the Host's own default for that action into the draft — nothing reaches the
+  Host until Save. A binding this build cannot interpret is shown in italics and kept as it is, not replaced. A repeated or
+  cross-action binding is reported in a warning line and left alone: which one wins is the engine's business. The **，/。**
+  preset edits the same `PrevPage`/`NextPage` lists and asks whether to replace or extend them. **系统快捷键** and
+  **系统回退翻页** are separate sections: the first is the system's own shortcuts, the second is the core's fallback paging,
+  and neither is the Pinyin engine's paging keys.
+- **候选与输入** — candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and 系统输入行为. The 外部工具 section
+  lists the upstream tools this package does not ship, with the reason.
+- **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
+
+**Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
+configuration, and the global configuration has its own. The bar at the bottom always shows whether anything is pending.
+**保存** sends only what changed, one request per configuration, and reports each result separately — a refusal on one does
+not discard the other, and an unapplied edit stays in the draft. **放弃修改** throws the draft away. Closing the window with
+unsaved edits asks first. Changing pages never loses edits.
+
+A save that changes nothing sends no request at all. Clearing every binding of an action, or emptying a rule list, is a
+change and saves like any other. If the Host is busy composing, the save is refused with a visible message: finish the
+composition and save again. If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
+so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
+the reread does not confirm stay pending. It never silently retries.
+
+**While a request is running** the pages are read-only and the buttons are disabled, so nothing can change under a request
+that has already been sent. Typing in a field commits when you leave it, and both Save and closing the window commit it for
+you, so the value you just typed is the value that is saved — and the question "close without saving?" is only asked after
+that last edit has been counted. Closing while a save is in progress is refused with a message rather than discarding the
+draft under it.
+
+**If the Host is not there.** At startup the window says so and offers **重试连接**. Once connected, the same **重试连接**
+appears if the Host goes away mid-session, and **重新加载** re-reads everything and asks first if anything is unsaved. A
+retry keeps your pending edits; only an explicit reload discards them. A part of the window you had not edited follows the
+Host instead: if the input-method order changed elsewhere, a retry shows the Host's order rather than presenting the old one
+as an unsaved change you would later save back.
+
+**What the pages do not claim.** A binding stored here is a configuration value; whether that key reaches the engine depends
+on the input path. Combinations with Ctrl/Alt/Win, modifier-only keys and keypad Enter are not delivered on this path, so
+those bindings can be saved but will not fire. The 按键 page says so where it matters. The 关于与诊断 page repeats it.
+
+Packages before this one shipped the Qt client with a different layout (Pinyin/Shuangpin/Global pages and an apply-per-page
+button). This package does **not** contain it: the build has the Qt client switched off, so the only settings entry is the
+one described above, and going back to the Qt client means going back to an earlier package.
+
+The current package is an owner-test artifact only. Implementation, isolated validation, packaging, owner installation and
+owner acceptance are separate status claims, and this guide does not imply the last two.
 
 ## 3. Restarting the Host
 

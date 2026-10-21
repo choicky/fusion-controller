@@ -5,9 +5,12 @@ meant to live in the new navigation.
 
 **What exists.** The client's **core** is implemented, compiled and tested (fusion-windows
 `src/settings-winui3/FusionSettings.Core`): framing, codecs, endpoint naming, connection and handshake, the shared
-draft/baseline model, key chords and lists, the key-editor state machine, and the input-method draft. The **WinUI views are
-not written**, because `Microsoft.WindowsAppSDK` cannot be restored here (`blocker.md`). So a "disposition" below is a
-design decision plus, where the core implements it, a tested behaviour — never a claim that a settings window shows it.
+draft/baseline model, key chords and lists, the key-editor state machine, the input-method draft, and the workspace that
+routes an edit, splits a save and reconciles an uncertain write. The **WinUI views are implemented too**
+(`FusionSettings.App`): the four pages render, and an edit has been driven through the compiled window and through the
+packaged executable, with the Host read back afterwards. So a "disposition" below is a design decision plus, where the
+client implements it, a behaviour that has been exercised — but a rendered page is not the same claim as a setting that
+changes product behaviour, which is still the NV rows' open question.
 
 ## 0. Method
 
@@ -309,7 +312,7 @@ The row counts add up as they should: §2.1 has 17 option rows, §2.3 has 16, §
 The headline total is a bookkeeping check, not a product feature: completeness here means every item above has a
 disposition.
 
-## 6. What this inventory does and does not establish
+## 6. Coverage as implemented
 
 **Completion level of the client, by layer:**
 
@@ -317,21 +320,49 @@ disposition.
 |---|---|
 | design (this document) | done |
 | core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
-| WinUI views | **not written** — `Microsoft.WindowsAppSDK` cannot be restored (`blocker.md`) |
-| packaged / installed / owner-accepted | no |
+| WinUI views (`src/settings-winui3/FusionSettings.App`) | **implemented, compiled, launched, driven** — four pages, every item below has a location |
+| packaged | yes — `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B, SHA-256 `C64A259D…45A5F2`, 652 manifest entries re-verified) |
+| installed | **no** |
+| owner-accepted | **no** |
 
-- **Implemented and tested**: the transport, framing, codecs, endpoint naming, connection and handshake, the shared
-  draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft. **371 checks pass**
-  — 336 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read → apply →
-  read-back, a key-list round trip, the shared-configuration claim, IM list and selection, incarnation stability, and the
-  Host refusing an unknown URI).
-- **Corrected in the same pass**, because review found the first version got them wrong: the draft no longer stores a
-  schema (one draft per addon, one schema per view); a mutation whose request had started returns `Indeterminate` rather
-  than claiming nothing was written; an unparsable key binding is preserved instead of becoming empty; a newer Host's API
-  version is accepted and an older one refused; and the node budget counts each node once instead of twice.
-- **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client running
+**Where each group landed.** The accepted navigation is Input methods · Keys · Candidates and input · About and
+diagnostics, and every item in §1–§3 has a place in it:
+
+| Group | Items | Where it is now |
+|---|---|---|
+| Input-method operations | 5 | Input methods: the enabled list with ↑/↓/remove, the available list with add, `Items/0` marked 当前 |
+| Pinyin/Shuangpin options | 37 | Keys: 翻页 · 候选导航 · 候选选择 · 上屏 · 短语选字 · 快捷短语 · 学习（忘记词语）· 更多设置. Candidates and input: 候选 · 预编辑 · 学习 · 双拼 · 更多设置 |
+| Fuzzy children | 21 | Candidates and input → 模糊音, one section for the nested container |
+| External links | 5 | Candidates and input → 外部工具, listed with the reason they are unavailable |
+| Global `Hotkey` children | 17 | Keys → 系统快捷键 and 系统回退翻页 |
+| Global `Behavior` children | 12 | Candidates and input → 系统输入行为 |
+| Value-tree-only (`V`) | 5 | no location, by design — no view describes them and the draft refuses to write them |
+
+- **The engine's paging keys and the system's fallback paging keys are separate sections** with the difference stated in
+  the UI, because they are two different options with two different consumers.
+- **The table is enforced, not advisory.** Each page renders only the rows whose placement names it; an option the table
+  does not place falls back to 更多设置 of its own configuration, so a Host that adds a field never becomes invisible and is
+  never duplicated. Before the correction round the page was not consulted at all, so every page rendered every root option.
+- **Editable means editable through the asking view's schema.** A row's setter is bound to the configuration that page
+  renders, so a Global control cannot reach the Pinyin draft, and the save splits the shared draft across the URIs whose
+  schemas describe its fields.
+- **Checks**: **546** with an isolated Host on a disposable **writable** profile (454 without one). The workspace path is
+  driven against a real Host — Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the
+  method list, a failed start and its retry — a scripted peer covers an uncertain method-list write (applied / not applied /
+  reread failed) and the three reconnect cases for the list (a clean list adopting a changed Host order, a pending one
+  keeping its request, and a request the Host already reflects), and the window itself was driven through UI Automation for
+  edit-then-close, close during an in-flight save, a reconnect that saves afterwards, and key-tag reflow at three widths with
+  an add and a remove after a resize.
+- **A successful global save is RUN**, on a Host whose per-user configuration and data paths resolve inside a disposable
+  profile (`FUSION_FCITX_SKIP_USER_PATH` unset, `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` redirected). The value is changed
+  through the workspace, saved, reread, and then confirmed again after the Host is stopped through its stop event and started
+  against the same profile; a second save with nothing pending rewrites no file under that profile. The earlier failure-path
+  assertion — that the client reports the Host's `safeSave()` failure and keeps the edit — is retained for the no-path Host,
+  which is what a Host without a user configuration directory can demonstrate.
+- **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client used
   against the product Host, which is an owner step.
 - **Not established**: whether the conditional rows can be made to work. That needs either a different delivery path (a TSF
   routing change, out of scope here) or the missing addons.
-- **Not claimed**: that a stable-incarnation check exercises every fencing failure, or that an in-memory reread is restart
-  persistence. Neither was tested.
+- **Not claimed**: that storing or rereading a paging binding proves the key pages candidates through a TSF application.
+  Those are different claims and only the first was checked. Also not claimed: that a stable-incarnation check exercises
+  every fencing failure, or that an in-memory reread is restart persistence.
