@@ -1,13 +1,22 @@
 # Change contract — Windows settings UI, C# + WinUI 3 (2026-10-21)
 
+> **Scope of this record.** It bounded the **first** batch of this task: the D087 decision, the migration inventory, and
+> the first implementation attempt. The statements below that say "nothing is compiled" and "only source-level gates can
+> run" describe **that batch**, not the current state. Current outcome: the client **core** is implemented, compiled and
+> tested in fusion-windows PR #31 (368 checks, 35 of them against a real Host on an isolated pipe); the **WinUI views**
+> are still not written because `Microsoft.WindowsAppSDK` cannot be restored here. See `migration-inventory.md` §6 and the
+> Stage 6 plan's settings section for the per-level state. The contract's scope, must-preserve list and hard stops still
+> govern the remaining work.
+
 **Goal.** Replace the presentation layer of the Windows settings surface with a Fusion-owned **C# + WinUI 3** client
 that drives the same Host settings protocol and the same official Fcitx configuration, without adding a second
 configuration store or changing engine semantics.
 
 **Deliverable (this batch).** (a) The accepted decision that supersedes D085's presentation clause only (D087).
 (b) A reviewable migration inventory covering every exposed option, not only the ones the design prototype shows.
-(c) The WinUI 3 client implementation and its packaging — **blocked on this machine**, see
-`blocker.md`; nothing in this batch is compiled, packaged, installed or accepted.
+(c) The WinUI 3 client implementation and its packaging — **blocked in that batch** on the missing package feed, see
+`blocker.md`. In that batch nothing was compiled, packaged, installed or accepted; the core has since been implemented and
+tested, and packaging, installation and acceptance remain open.
 
 **Authority / inputs.**
 - Owner instruction of 2026-10-21 (C# + WinUI 3 preferred; task-oriented navigation; preserve official capabilities
@@ -42,8 +51,9 @@ files and learning data are unchanged by the UI itself.
 **Hard stop (not hit).** No new configuration store; no second materialization authority; no engine-semantic change;
 no repository-wide licence selection.
 
-**Validation.** See §5 of the instruction; on this machine only the source-level gates can run (see `blocker.md`).
-Anything not executed is recorded as NOT RUN, never as passed.
+**Validation.** See §5 of the instruction. In the first batch only source-level gates could run (see `blocker.md`); the
+core now builds and its checks run. Anything not executed is recorded as NOT RUN, never as passed — in particular no WinUI
+compilation, no packaging and no product-path acceptance.
 
 **Commit / push / PR policy.** One coherent PR per independently reviewable task on `feature/*` or `docs/*` branches from
 `main`; no merge, no CI dispatch, no installation.

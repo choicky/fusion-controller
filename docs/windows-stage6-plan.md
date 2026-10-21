@@ -200,7 +200,7 @@ still the **shipped** settings surface — nothing has replaced it.
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core layer only** — `src/settings-winui3/FusionSettings.Core`: framing, codecs, endpoint naming, connection/handshake, draft/baseline model, key-chord and key-list model, key-editor state machine, input-method draft. The WinUI views are **not written**. |
 | compiled | core **yes** (.NET SDK 10.0.402, zero package references); views **no** — `Microsoft.WindowsAppSDK` cannot be restored |
-| tested | **215 checks pass**, of which 35 run against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal) |
+| tested | **368 checks pass**, of which 35 run against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal). The other 333 are focused, including a controlled pipe peer for mutation outcomes and handshake versions |
 | packaged | no — a settings package without a settings executable would misrepresent the product |
 | installed | no |
 | owner-accepted | no |
@@ -212,7 +212,16 @@ The remaining blocker is one dependency, not the design: no reachable feed serve
 The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
 indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one
 keysym, two names); `[`/`]`/`;` arrive as `bracketleft`/`bracketright`/`semicolon`; `Behavior` exposes 12 children, not 17;
-`CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 items. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
+`CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 items, with the five value-tree-only fields
+(the four `CloudPinyin*` values and `FirstRun`) classified separately and given no editable location.
+
+**Correction round (2026-10-21, fusion-windows PR #31).** Review found five defects in the core, all now fixed with
+regression coverage: the draft stored a schema and so let one Pinyin view adopt the other's; a mutation whose request had
+started was reported as "nothing written"; an unparsable key binding was replaced with an empty one; the handshake rejected
+a Host newer than the client instead of accepting it; and the node budget charged each node twice. None of these changes the
+option coverage, the Host protocol or the Host's own protections. **The WinUI views are still not written**, and packaging,
+installation and owner acceptance remain open — they wait on the NuGet prerequisite recorded in `blocker.md`, which is
+separate from these code corrections. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
 existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
 older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a
 launch guard stops repeated clicks from stacking windows during startup. Right-click keeps the full menu and the launch path is unchanged.

@@ -627,9 +627,11 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 
 新客户端分两层，边界与 Qt 客户端相同：**表现层**只读 schema、只写差异；**核心层**（`src/settings-winui3/FusionSettings.Core`）承担帧与编解码、端点命名、连接与握手、以及草稿/基线状态。Host、TIP、引擎与 `settings_protocol.hpp` 一行未改，新客户端与 Qt 客户端是同一个协议的两个消费者：每连接一请求、`settings_api_version` 握手、用户/会话身份校验、Host incarnation 围栏与载荷上界都照旧。
 
-**共享状态模型。** 草稿按**底层配置对象**而非公开 URI 归类：`pinyin` 与 `shuangpin` 两个 URI 指向同一个 `PinyinEngineConfig`（实测：两者返回**同一棵 43 键值树**，但 schema 视图分别为 41 与 43 个选项），因此按 URI 分草稿会产生两份同值副本，保存较旧的一份会回退另一份。草稿只保存**未提交的改动**并对照已确认基线，于是「只提交改动」「无变更不发请求」「重连不覆盖草稿」「部分成功保留未应用的改动」都是结构性质而不是补丁式守卫；视图 schema 未描述的选项不可编辑，所以任一视图都不会写入自己看不到的字段（例如 `CloudPinyin*`、`FirstRun`）。按键列表按 Host 实际下发的形态处理：带序号映射（或空标量），顺序即语义（`ChooseCharFromPhrase` 的第 N 个绑定选择第 N 个字），重复只报告不重写。
+**共享状态模型。** 草稿只持有**值**（已确认基线 + 未提交改动），不持有 schema；schema 属于发问的视图，每次编辑都按该视图的 snapshot 校验，因此「一个草稿、两个视图、两份 schema」是结构性质而不是约定。草稿按**底层配置对象**而非公开 URI 归类：`pinyin` 与 `shuangpin` 两个 URI 指向同一个 `PinyinEngineConfig`（实测：两者返回**同一棵 43 键值树**，但 schema 视图分别为 41 与 43 个选项），因此按 URI 分草稿会产生两份同值副本，保存较旧的一份会回退另一份。草稿只保存**未提交的改动**并对照已确认基线，于是「只提交改动」「无变更不发请求」「重连不覆盖草稿」「部分成功保留未应用的改动」都是结构性质而不是补丁式守卫；视图 schema 未描述的选项不可编辑，所以任一视图都不会写入自己看不到的字段（例如 `CloudPinyin*`、`FirstRun`）。按键列表按 Host 实际下发的形态处理：带序号映射（或空标量），顺序即语义（`ChooseCharFromPhrase` 的第 N 个绑定选择第 N 个字），重复只报告不重写；无法解析的既有绑定保留原文（**opaque**）而不是变成空绑定，否则编辑相邻项就会把它删掉。
 
-**当前随包发布的仍是上文所述的 Qt 客户端**；新客户端目前只到核心层——已实现、已编译、已测试，表现层因本机取不到 `Microsoft.WindowsAppSDK` 而无法编译（`evidence/settings-winui3-2026-10-21/blocker.md`）。选项覆盖与各层完成度见 `evidence/settings-winui3-2026-10-21/migration-inventory.md` 与 Stage 6 计划的设置章节。
+**写结果的不确定性。** 只读失败就是失败；写不同：一旦请求帧开始下发，Host 就可能已经应用，因此丢回复、截断、断连、超时或调用方在该点之后取消都返回 `Indeterminate` 并标记「可能已应用」，绝不表示「没有写入」。帧未开始前的失败是确定的 `Unreachable`；连接阶段超时（对端无人监听）报告「无 Host」而不是「Host 慢」。不自动重放：调用方重读后对账。
+
+**当前随包发布的仍是上文所述的 Qt 客户端**；新客户端目前只到核心层——已实现、已编译、已测试（368 项检查，其中 35 项跑在隔离管道上的真实 Host），表现层因本机取不到 `Microsoft.WindowsAppSDK` 而无法编译（`evidence/settings-winui3-2026-10-21/blocker.md`）。选项覆盖与各层完成度见 `evidence/settings-winui3-2026-10-21/migration-inventory.md` 与 Stage 6 计划的设置章节。
 **端点归一化（2026-10-20，PR #28）。** 所有者首次安装后报告设置窗口空白、提示 Host 不可用。原因是 `FusionSettings.exe` 连接 `\\.\pipe\<sid>-<session>`，而 Host 监听 `\\.\pipe\FusionHost-v1-<sid>-<session>`：客户端把整个 `default_pipe_name_prefix`（设备路径与产品标识一次减掉）都剥掉了，而 Qt 的 `QLocalSocket` 自己会补 `\\.\pipe\`。修正只剥离设备路径、保留完整逻辑名，并拒绝空或畸形端点；Host 管道名、TIP 协议 v4、用户/会话身份校验与 incarnation 围栏均未变，configtool fork 不需要改动。`+1f4b749` 包因此被取代并保留作对照。
 安装包交付物形态已定为单个 **EXE**
 （不是 MSI，也不是解压后跑脚本的 zip），安装框架未定；签名与分发渠道仍未决（U4 仍 OPEN）。这两项不改变 WP7 日常使用

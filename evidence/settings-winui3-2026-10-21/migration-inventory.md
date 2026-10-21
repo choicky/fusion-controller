@@ -1,8 +1,13 @@
 # Migration inventory — Windows settings (C# + WinUI 3)
 
 Status: **design inventory, corrected 2026-10-21.** It records what the schema actually contains and where each item is
-meant to live in the new navigation. **Nothing here is implemented**: the client is not compiled (see `blocker.md`), so
-"disposition" is a design decision, not an observed behaviour.
+meant to live in the new navigation.
+
+**What exists.** The client's **core** is implemented, compiled and tested (fusion-windows
+`src/settings-winui3/FusionSettings.Core`): framing, codecs, endpoint naming, connection and handshake, the shared
+draft/baseline model, key chords and lists, the key-editor state machine, and the input-method draft. The **WinUI views are
+not written**, because `Microsoft.WindowsAppSDK` cannot be restored here (`blocker.md`). So a "disposition" below is a
+design decision plus, where the core implements it, a tested behaviour — never a claim that a settings window shows it.
 
 ## 0. Method
 
@@ -22,8 +27,9 @@ Three facts are kept separate for every row, because they fail independently:
 
 Disposition vocabulary: **R** reachable in the design (schema + consumer + a delivery path that exists) · **C** conditional
 limitation, stated in the row (consumer exists, but the triggering event is not delivered on this path) · **X**
-external/sub-configuration link to another configuration surface · **H** hidden by upstream, not exposed · **NV** not
-validated (no runtime test executed; the default for anything not measured).
+external/sub-configuration link to another configuration surface · **H** hidden by upstream, not exposed · **V** present
+in the value tree but in no schema, so there is no editable location and the client never writes it · **NV** not validated
+(no runtime test executed; the default for anything not measured).
 
 A row marked **R** means "the design exposes it"; it does **not** mean the value was observed to take effect. Nothing in
 this document is a product-validation claim.
@@ -59,6 +65,13 @@ drafts of one value, and saving the stale one would revert the other. Method-spe
 place or hide options differently (e.g. `OptionalHideInDescription` entries live under More), but a field hidden in one view
 is never fabricated there, and the value edited in either view is the same one.
 
+**How the core implements it.** `SettingsDraft` holds the **values** — a confirmed baseline and a set of pending edits —
+and no schema. Each edit takes the requesting view's snapshot, so the editable-field check is explicitly that view's, and
+adopting or refreshing a reply from either view cannot replace the other view's schema. One draft, two schemas: a
+Shuangpin-specific field is editable through the Shuangpin view and refused by the Pinyin view, while both share one
+pending set and one change set. A field that no view describes (the four `CloudPinyin*` values, `FirstRun`) is therefore not
+writable from anywhere.
+
 ### 2.1 Engine, candidates and preedit
 
 | Path | Type · default · constraints | Consumer | New location | Disposition |
@@ -71,10 +84,6 @@ is never fabricated there, and the value edited in either view is the same one.
 | `ChaiziEnabled` | bool · `true` | pinyin engine | Candidates and input · More | R |
 | `ExtBEnabled` | bool · `true` on desktop | pinyin engine | Candidates and input · More | R |
 | `StrokeCandidateEnabled` | bool · `true` | pinyin engine | Candidates and input · stroke candidates | R |
-| `CloudPinyinEnabled` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — the `cloudpinyin` addon is **not** in the packaged set, so the value is stored but the feature cannot act here |
-| `CloudPinyinIndex` | int · `2` · 1–10 | cloudpinyin addon | Candidates and input · More | C — same missing addon |
-| `CloudPinyinAnimation` | bool · `true` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
-| `KeepCloudPinyinPlaceHolder` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
 | `PreeditMode` | enum · `ComposingPinyin` on desktop | pinyin engine | Candidates and input · preedit mode | R |
 | `PreeditCursorPositionAtBeginning` | bool · `true` | pinyin engine | Candidates and input · preedit cursor | R |
 | `PinyinInPreedit` | bool · `false` | pinyin engine | Candidates and input · show full pinyin | R |
@@ -84,6 +93,18 @@ is never fabricated there, and the value edited in either view is the same one.
 | `BackspaceBehaviorOnPrediction` | enum · `BackspaceWhenNotUsingOnScreenKeyboard` | pinyin engine | Candidates and input · prediction · more | R |
 | `SwitchInputMethodBehavior` | enum · `CommitPreedit` | pinyin engine | Keys · action when switching input method | R |
 | `Learning` | bool · `true` | pinyin engine | Candidates and input · learning | R |
+
+**Value-tree-only fields (no editable UI location).** Five keys are present in the configuration's value tree but are
+described by **no** schema in this runtime, so no view can display them and the core refuses to write them. They are
+recorded here so a later schema change is noticed, not to give them a screen:
+
+| Path | Type · default | Why it is not exposed | Disposition |
+|---|---|---|---|
+| `CloudPinyinEnabled` | bool · `false` | `cloudpinyin` addon is not in the packaged set, so the engine still stores the value but exposes no option for it | **V** — value-tree only; never written |
+| `CloudPinyinIndex` | int · `2` · 1–10 | same | **V** |
+| `CloudPinyinAnimation` | bool · `true` | same | **V** |
+| `KeepCloudPinyinPlaceHolder` | bool · `false` | same | **V** |
+| `FirstRun` | bool · `true` | hidden upstream (`HiddenOption`); the first-run flow is not part of this product | **V** |
 
 ### 2.2 Fuzzy pinyin — `Fuzzy` (nested container)
 
@@ -146,7 +167,6 @@ with the wire name would show a binding as changed when the user had not touched
 | `WordCandidateLimit` | int · `15` · ≥0 (`0` = all) | Candidates and input · More | R |
 | `LongWordLengthLimit` | int · `4` · 0–10 | Candidates and input · More | R |
 | `QuickPhraseTriggerRegex` | `std::vector<std::string>` of regular expressions · defaults `.(/\|@)$`, `^(www\|bbs\|forum\|mail)\.`, `^(http\|https\|ftp\|telnet\|mailto):` · no constraint beyond `RegexConstrain` per entry | Keys · quick phrase · trigger patterns (one expression per line) | R — a list of patterns, not a key list; each entry is validated as a regular expression and order is preserved |
-| `FirstRun` | hidden bool · `true` | — | H |
 
 ### 2.5 External and sub-configuration links (exact URIs)
 
@@ -278,23 +298,40 @@ Reading the totals:
   `DefaultPageSize`, `AllowInputMethodForPassword`, `ShowPreeditForPassword`, `AutoSavePeriod` — each has a consumer, none
   was measured in the product.
 
-**Five keys are in the value tree but in no schema** and are therefore not counted: `CloudPinyinEnabled`,
-`CloudPinyinIndex`, `CloudPinyinAnimation`, `KeepCloudPinyinPlaceHolder` and `FirstRun`. The client must never write them —
-they are not visible in any view, so a write would change a setting the user could not see. The draft layer enforces this
-by refusing an edit to an option the view does not describe.
+**Five keys are in the value tree but in no schema** and are therefore **not counted** in the table: the four
+`CloudPinyin*` values and `FirstRun`. They carry disposition **V** and are listed in §2.1 with no editable location. The
+client must never write them — they are not visible in any view, so a write would change a setting the user could not see.
+The draft layer enforces this structurally: an edit is only accepted against the requesting view's schema, so a field no
+view describes is refused by every view.
+
+The row counts add up as they should: §2.1 has 17 option rows, §2.3 has 16, §2.4 has 4 — 37 in the Pinyin/Shuangpin group.
 
 The headline total is a bookkeeping check, not a product feature: completeness here means every item above has a
 disposition.
 
 ## 6. What this inventory does and does not establish
 
-- **Implemented and tested** (fusion-windows `src/settings-winui3/FusionSettings.Core`): the transport, framing, codecs,
-  endpoint naming, draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft.
-  215 checks pass, including 35 against a real Host on an isolated pipe.
-- **Not implemented**: the WinUI 3 presentation. No WinUI assembly can be built in this environment, because
-  `Microsoft.WindowsAppSDK` cannot be restored (`blocker.md`). The option coverage above is therefore a design plus a
-  tested core, not a finished settings window.
+**Completion level of the client, by layer:**
+
+| Layer | State |
+|---|---|
+| design (this document) | done |
+| core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
+| WinUI views | **not written** — `Microsoft.WindowsAppSDK` cannot be restored (`blocker.md`) |
+| packaged / installed / owner-accepted | no |
+
+- **Implemented and tested**: the transport, framing, codecs, endpoint naming, connection and handshake, the shared
+  draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft. **368 checks pass**
+  — 333 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read → apply →
+  read-back, a key-list round trip, the shared-configuration claim, IM list and selection, incarnation stability, and the
+  Host refusing an unknown URI).
+- **Corrected in the same pass**, because review found the first version got them wrong: the draft no longer stores a
+  schema (one draft per addon, one schema per view); a mutation whose request had started returns `Indeterminate` rather
+  than claiming nothing was written; an unparsable key binding is preserved instead of becoming empty; a newer Host's API
+  version is accepted and an older one refused; and the node budget counts each node once instead of twice.
 - **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client running
   against the product Host, which is an owner step.
 - **Not established**: whether the conditional rows can be made to work. That needs either a different delivery path (a TSF
   routing change, out of scope here) or the missing addons.
+- **Not claimed**: that a stable-incarnation check exercises every fencing failure, or that an in-memory reread is restart
+  persistence. Neither was tested.
