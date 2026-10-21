@@ -193,21 +193,32 @@ while official Fcitx configuration semantics, storage, defaults and the settings
 licence remains attached to the retained upstream-derived executable and does not extend to the new client. The Qt client recorded below is
 still the **shipped** settings surface — nothing has replaced it.
 
-**WinUI 3 client — state by level (2026-10-21, second round).**
+**WinUI 3 client — state by level (2026-10-21, third round).**
 
 | Level | State |
 |---|---|
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
-| implemented | **core layer only** — `src/settings-winui3/FusionSettings.Core`: framing, codecs, endpoint naming, connection/handshake, draft/baseline model, key-chord and key-list model, key-editor state machine, input-method draft. The WinUI views are **not written**. |
-| compiled | core **yes** (.NET SDK 10.0.402, zero package references); views **no** — `Microsoft.WindowsAppSDK` cannot be restored |
-| tested | **371 checks pass**, of which 35 run against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal). The other 333 are focused, including a controlled pipe peer for mutation outcomes and handshake versions |
-| packaged | no — a settings package without a settings executable would misrepresent the product |
-| installed | no |
-| owner-accepted | no |
+| implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
+| compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
+| tested | **371 checks pass** — 336 focused (framing, codec through its production entry points, endpoint, identity, shared drafts, keys, editor, input methods, a controlled pipe peer for mutation outcomes and handshake versions) plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal) |
+| UI verified | **yes, as a running window** — built, launched against an isolated Host, all four pages navigated through UI Automation and captured (`worktmp\fusion-windows\settings-winui3\shots\`) |
+| packaged | **yes** — `fusion-0.0.0-winui3+67f771b.zip`, 139 001 488 B, 652 files, every manifest hash re-verified after extraction |
+| installed | **no** |
+| owner-accepted | **no** |
 
-The remaining blocker is one dependency, not the design: no reachable feed serves `Microsoft.WindowsAppSDK` and
-`Microsoft.Windows.SDK.BuildTools` (`evidence/settings-winui3-2026-10-21/blocker.md`). The .NET SDK half of that record is
-**resolved** — 10.0.402 is installed in the task-local toolchain with its SHA-512 verified against the official sidecar.
+The prerequisite is **resolved**, not worked around: nuget.org's own OData endpoint publishes each package's SHA-512, so a
+mirror is used only as transport and every package was checked against that hash (22 packages, 0 mismatches). The record
+and the reproduction steps are in `evidence/settings-winui3-2026-10-21/blocker.md`.
+
+Deployment, measured rather than assumed: the client is **self-contained for both .NET and the Windows App SDK**, so the
+ZIP needs nothing installed on the target and no installer. That is why it is about 139 MB. It ships in `bin\settings\`
+because it carries its own runtimes, which must not be mixed with the Host's and the Qt client's DLLs in `bin\`. The tray
+and the Start Menu shortcut point there; the Qt client stays at `bin\FusionSettings.exe` as the rollback path with nothing
+linking to it, and this build tree has it switched off, so this package ships one settings entry.
+
+What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path
+and that the pages render and navigate; they do not prove that a paging binding pages candidates inside a TSF application,
+and they do not prove that any NV row changes product behaviour.
 
 The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
 indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one

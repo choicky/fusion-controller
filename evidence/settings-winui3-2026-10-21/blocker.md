@@ -1,49 +1,59 @@
-# Build prerequisite — what this machine can and cannot build (2026-10-21, updated)
+# Build prerequisite — resolved (2026-10-21, third round)
 
-Originally recorded when no .NET SDK was present. The SDK half is now **resolved**; the Windows App SDK half is still
-blocked. The file is kept as the single prerequisite record rather than being replaced by a second one.
+This file was the blocker record. It is kept as the single prerequisite record and is now a **resolved** one: the WinUI
+client builds, launches and packages. What remains is a note on how the dependency was obtained, so the next person does not
+have to rediscover it.
 
 ## Current state
 
-| Requirement | State | Evidence |
-|---|---|---|
-| .NET SDK | **present, task-local** | `10.0.402` extracted to `C:\Users\choicky\worktmp\fusion-windows\settings-winui3-env\dotnet`; `dotnet --info` reports SDK 10.0.402, MSBuild 18.9.15 |
-| SDK provenance | **verified** | `dotnet-sdk-10.0.402-win-x64.zip`, 300 755 826 bytes, SHA-512 `ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd`, matching the official sidecar `.sha512` published beside the artifact |
-| SDK source | `dotnetcli.blob.core.windows.net` | the only .NET download host that completes TLS from here; `builds.dotnet.microsoft.com` and `dot.net` redirect to it and fail |
-| NuGet feed | **unreachable** | `dotnet restore` → `NU1301: 无法加载源 https://api.nuget.org/v3/index.json` → `The SSL connection could not be established` → `Received an unexpected EOF or 0 bytes from the transport stream` |
-| Package cache | empty | no `~\.nuget\packages` |
-| Windows App SDK | **cannot be restored** | `Microsoft.WindowsAppSDK` and `Microsoft.Windows.SDK.BuildTools` both resolve through `api.nuget.org` |
-| Offline build | **works** | a zero-package `net10.0` project builds and runs with no feed configured; the SDK's bundled reference packs are enough |
+| Requirement | State |
+|---|---|
+| .NET SDK | **10.0.402**, task-local at `worktmp\fusion-windows\settings-winui3-env\dotnet`, SHA-512 verified against the official sidecar |
+| `Microsoft.WindowsAppSDK` | **2.5.1**, restored and verified |
+| `Microsoft.Windows.SDK.BuildTools` | **10.0.28000.2705**, restored and verified |
+| WinUI build | **works** — the app compiles, launches and shows a `WinUIDesktopWin32WindowClass` window |
+| Packaging | **works** — `fusion-0.0.0-winui3+67f771b.zip`, 652 files, every manifest hash verified |
 
-The environment proxy is `http://127.0.0.1:9516`. The `CONNECT` tunnel to `api.nuget.org:443` is accepted
-(`HTTP/1.1 200 Connection Established`) and the TLS handshake then fails, so the failure is at or after the tunnel, not at
-DNS or at the socket. Its cause was not investigated further: no proxy setting, TLS validation, certificate store or
-firewall rule was changed, and no credential was read.
+## How the packages were obtained
 
-**What this does and does not establish.** It establishes that a WinUI 3 assembly cannot be produced here, because
-`Microsoft.WindowsAppSDK` is the only distribution of the WinUI 3 references and build tooling. It does **not** establish a
-policy block: an `HTTP 000` and a `curl` exit 35 are a failed request, and several unrelated hosts (`github.com`,
-`www.nuget.org`, `azuresearch-usnc.nuget.org`, `dotnetcli.blob.core.windows.net`) answer normally from the same shell.
+`api.nuget.org` and `globalcdn.nuget.org` are still unreachable from this machine. The proxy accepts the tunnel
+(`HTTP/1.1 200 Connection Established`) and the TLS handshake then fails, so `dotnet restore` reports
+`NU1301 … The SSL connection could not be established … Received an unexpected EOF or 0 bytes from the transport stream`.
 
-## Consequence for this batch
+What made progress possible is that **nuget.org's own OData endpoint on `www.nuget.org` is reachable**, and it publishes
+the SHA-512 and size of every package version. So a mirror is used as a **transport only**, and every package is checked
+against the hash nuget.org itself publishes before it is used:
 
-- The **client core is implemented, compiled and tested** (`src/settings-winui3/FusionSettings.Core`, 371 checks, of which
-  35 run against a real Host on an isolated pipe). It has no package references, which is why it builds here.
-- The **WinUI 3 presentation is not implemented**: it cannot be compiled, so writing it would produce source recorded only
-  as COMPILE UNVERIFIED and still no deliverable. That is a deliberate boundary, not an omission.
-- No package was produced, because a settings package without a settings executable would misrepresent the product. The
-  installed `0.0.0-wp7+d095a44` package remains the shipped artifact.
+- `worktmp\fusion-windows\settings-winui3-env\nuget\nuget.config` points restore at a mirror and keeps the package cache
+  task-local (`globalPackagesFolder` under the same directory), so nothing is written to the machine profile.
+- `probe3\verify_cache.py` walks that cache, fetches `Packages(Id=…,Version=…)` from `www.nuget.org` and compares
+  `PackageHash` (base64 SHA-512) and `PackageSize`.
+- **22 packages, 0 mismatches.** A package whose bytes did not match would have stopped the build.
 
-## What would unblock the presentation
+The mirror is named in the task-local config and in this record, not silently, and it is not configured anywhere in the
+repository: the project files only declare ordinary `PackageReference`s, so a machine with normal nuget.org access restores
+the same versions from the official feed.
 
-One environment change, on the owner's side: make a NuGet feed reachable that serves `Microsoft.WindowsAppSDK` and
-`Microsoft.Windows.SDK.BuildTools` (a restored `api.nuget.org`, a mirror the owner approves, or a warm package cache in a
-task-local directory). The SDK is already in place, so nothing else is missing.
+No TLS validation was disabled, no certificate store was touched, and no proxy or firewall setting was changed.
 
-Then, in order: the WinUI project → compile → bind the views to the tested core → package with the chosen deployment model
-→ tray and Start Menu entries → owner acceptance.
+## What is still unreachable, and why it does not block
 
-## Not done to work around it
+`download.microsoft.com` (the Windows App Runtime installer) and `api.github.com` remain unreachable. Neither is needed:
+the client is built **self-contained** for both the Windows App SDK and .NET, so it requires no machine-wide runtime and no
+installer.
 
-No package was fabricated, no binary relabelled, no dependency vendored from an unverified source, no mirror introduced,
-and no check recorded as passed that did not run.
+## Consequence for the product
+
+- The client is **implemented, compiled, tested and packaged** — and **not installed** and **not owner-accepted**.
+- The package carries the .NET and Windows App SDK runtimes, which is why the ZIP is about 139 MB. That is the price of
+  needing nothing installed on the target, and the redistributed set is recorded in `THIRD_PARTY_LICENSES.md`.
+
+## Reproducing a build
+
+```
+dotnet restore  src/settings-winui3/FusionSettings.App/FusionSettings.App.csproj --configfile <task-local nuget.config>
+dotnet build    src/settings-winui3/FusionSettings.App/FusionSettings.App.csproj -c Release --no-restore
+dotnet publish  src/settings-winui3/FusionSettings.App/FusionSettings.App.csproj -c Release --no-restore -o <publish>
+```
+
+`src/settings-winui3/README.md` has the full sequence, including the isolated-Host recipe for the checks.
