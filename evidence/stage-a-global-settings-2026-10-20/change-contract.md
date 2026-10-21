@@ -134,15 +134,21 @@ kept apart on purpose: implemented ≠ compiled ≠ tested ≠ packaged ≠ inst
   Qt 6.8.3 and `runtime-wp3-20261018`; `ninja` reports no work to do afterwards. The Windows-side
   compile that this contract could only mark unverified is therefore **verified**.
 - **Tested.** `ctest` over `stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0`
-  and `stage2`: **36 of 37 pass**. `stage4a_ipc_integration` does **not** pass: it is fixed to the
-  production pipe, so it types into whatever installed Host owns that pipe, and it fails
-  deterministically at its `nihao`+Space commit assertion (a commit is produced, but not `你好`). The
-  code it exercises is byte-identical to base `fe23f07`. Recorded as not passing — not excused.
-  Real Host + GUI round trip against an isolated Host on a unique pipe with a disposable profile
-  passes: three pages load, a changed value applies and reads back, an orderly restart restores the
-  value, the enabled order `shuangpin,pinyin` and the pinyin learning files from the profile, a
-  no-change Apply leaves the profile byte-identical, and empty/unavailable list entries are refused
-  with the documented message.
+  and `stage2`: **37 of 37 pass**, with `stage4a_ipc_integration` **skipped** — that mode now requires
+  an explicit isolated endpoint and connects to nothing without one, so CTest reports a skip instead of
+  a successful integration run. Through `tools/settings/run-isolated-stage-a.ps1` (a real Host on a
+  unique pipe, disposable profile, endpoint passed explicitly) the unchanged assertions **pass**:
+  `PASS integration with real Fcitx over IPC`, `PASS integration candidate select committed the
+  projected candidate`. Its earlier failure was the production endpoint it was fixed to, not a product
+  defect.
+  In the same isolated session: three pages load, a changed value applies and reads back, an orderly
+  restart restores the value, the enabled order `shuangpin,pinyin` and the pinyin learning files; Cancel
+  discards an unsaved Global edit and refreshes the baseline; Reload fetches a value a second client
+  changed on the Host behind the page; switching tabs keeps an unsaved edit; a no-change Apply leaves
+  the profile byte-identical; empty/unavailable list entries are refused with the documented message.
+  Preservation was measured on content: the schema-known but unsubmitted `ShowInputMethodInformation` and
+  pinyin `SpellEnabled` survived, a key no schema knows was dropped by Fcitx's own save, and
+  `user.dict`/`user.history` were byte-identical across the settings-only session.
 - **Packaged.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
   `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, from clean committed source
   `2e28a88d8beb0548070cc8073cbb80b8174d8c66` with `sourceDirty=false`. All 148 manifest entries were

@@ -146,15 +146,31 @@ validation and are not counted here.
 3. Global page: load / apply / read-back, and persistence across an orderly Host restart —
    **EXECUTED and passing** (a `Behavior/DefaultPageSize` probe value applied and read back; the
    restart check re-read all three pages from the profile).
-4. No-change Apply short-circuit; Cancel/reload; unknown + learning-data preservation — **EXECUTED and
-   passing** (the profile was byte-identical after a no-change Apply; the pinyin learning files were
-   present in the profile after the restart; Cancel/Reload now re-read the list and all three pages).
+4. No-change Apply short-circuit; Cancel/reload; unknown + learning-data preservation — **EXECUTED**, split
+   by what each check actually proves:
+   - **No-change Apply:** the profile tree hash was identical either side of the pass, and the list
+     apply reported no re-save.
+   - **Cancel/Reload on the Global page:** Cancel discarded an unsaved edit, restored the Host's value
+     and refreshed the baseline; Reload fetched a value a second client had changed on the Host behind
+     the page (7 → 9 while the page was dirty) and refreshed the baseline; switching tabs kept an
+     ordinary unsaved edit. These are the assertions the buttons' own code path performs.
+   - **Configuration the apply does not submit:** seeded `Behavior/ShowInputMethodInformation=False`
+     and pinyin `SpellEnabled=False` both survived. A key no schema knows
+     (`FusionStageAUnknownProbe`) did **not** survive in either file: Fcitx's own save writes the
+     schema, so unknown keys are dropped. That is Fcitx semantics, and "unexposed values are
+     preserved" was only ever true of schema-known options this UI does not submit.
+   - **Learning data:** `pinyin/user.dict` (339 B) and `user.history` (61 B), produced by the
+     integration run in the same disposable profile, were byte-identical (SHA-256) before and after
+     the settings-only session. File existence is not used as evidence anywhere in this record.
 5. Input-method management: add / remove / reorder / select persistence; invalid-choice
    (empty / unavailable) handling — **EXECUTED and passing** (reorder → remove → add-back ended on a
    changed order that survived the restart; empty and `fusion-unavailable-probe` were both refused
    with the documented message).
-6. Cross-page stale-value regression (global page vs IM page) — **EXECUTED and passing** (the
-   cross-page scenario that motivated the shared-configuration fix is part of the same harness).
+6. Pinyin/Shuangpin shared-value regression — **EXECUTED and passing**, as Pinyin/Shuangpin. The
+   scenario loads both per-input-method pages, applies a change on one, and asserts the other is not
+   reverted and shows the new value once applied or reloaded. It is **not** a Global-page-versus-input-
+   method test: nothing in this batch exercises that pairing, and no scenario was invented to justify
+   the name.
 7. Composition refusal / retry on any apply/switch during an active composition — **NOT RUN**; it
    needs a live composing context and was not driven through a TSF-registered application.
 8. Shift / raw-input commit and **ordinary Shift+letter** through the real Windows key-down/key-up
@@ -162,17 +178,35 @@ validation and are not counted here.
    unimplemented (§4).
 
 `ctest` over `stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0` and `stage2`
-is **36 of 37**: `stage4a_ipc_integration` is **not passing**. That test is fixed to the production
-pipe, so it types into whatever installed Host owns it; it fails deterministically at its
-`nihao`+Space commit assertion (a commit is produced, but not `你好`), and the code it exercises is
-byte-identical to base `fe23f07`. It is an environment-bound test, not a regression signal for this
-batch, and it is recorded as failing rather than excused.
+is **37 of 37 passed**, with `stage4a_ipc_integration` reported by CTest as **skipped**. That mode now
+requires an explicit isolated endpoint (`FUSION_STAGE4A_INTEGRATION_PIPE`) and prints `SKIP` instead of
+connecting without one, because it types into whichever Host owns the endpoint it is given and the
+default endpoint is the installed product Host; the CTest entry carries `SKIP_REGULAR_EXPRESSION` so a
+skip is reported as a skip rather than as a successful integration run. Run through
+`tools/settings/run-isolated-stage-a.ps1` — which starts a Host on a unique pipe with a disposable
+profile and hands the endpoint over — the unchanged assertions pass:
+`PASS integration with real Fcitx over IPC` and
+`PASS integration candidate select committed the projected candidate`, in 0.4 s. Its earlier failure
+was the production endpoint it was fixed to, not a product defect, and against a controlled profile it
+passes; that is the result this record keeps. The script also proves the safe default (no endpoint →
+`SKIP`, exit 0), the refusal of this user's production endpoint in both the logical-name and full-path
+spellings before any request, the refusal of a malformed endpoint, and — by fingerprinting the owner's
+learning files around those attempts — that the refusal never reached the production Host.
 
 Windows entry points: Host handlers `handle_settings_get_im_list` / `handle_settings_set_im_list`
 (`src/host/host_server.cpp`, gated by `settings_capable`, `close_after_settings_request = true`,
 `envelop_response` incarnation fencing); backend `settings_get_im_list` / `settings_set_im_list` +
 global branch (`src/fcitx/backend.cpp`); GUI Global tab + IM-management panel (`src/settings/main.cpp`);
 payload codecs (`include/fusion/settings_protocol.hpp`, `src/settings/dbusprovider.cpp`).
+
+Running the real-engine test, and the safe default: `stage4a integration` reads
+`FUSION_STAGE4A_INTEGRATION_PIPE`, prints `SKIP integration (...)` and exits 0 when it is unset, and
+throws before the first request when the endpoint is this user's production pipe. `ctest -R
+stage4a_ipc_integration` therefore reports *skipped* unless the build was configured with
+`-DFUSION_STAGE4A_INTEGRATION_PIPE=<isolated name>`. The supported way to run it for real is
+`tools/settings/run-isolated-stage-a.ps1 -BuildDir <build> -ProfileRoot <disposable> -PipeName <unique>`,
+which starts the Host itself, passes the endpoint, stops it through the named stop event and prints a
+JSON result.
 
 ## 7. Packaging and remaining work
 
@@ -199,17 +233,28 @@ untouched. Every settings write in this batch went through a unique pipe to an i
 disposable profile, so no Stage A apply targeted the owner's configuration, and no production
 Host/tray/browser was stopped or restarted.
 
-One side effect is recorded rather than left implicit: the repository's own
-`stage4a_ipc_integration` test is fixed to the production pipe by design, so running the suite types
-through whatever installed Host owns that pipe and appends to that user's pinyin history. That is a
-test-design property of the existing suite, not a settings change, and it is one reason the test's
-result is environment-bound (§6). Only the three intended task branches were pushed.
+**A test side effect that already happened, and the fix.** Until this batch the repository's
+`stage4a_ipc_integration` connected to the default endpoint, so running the suite typed through the
+installed Host and appended to that user's pinyin history. It did so during the previous batch on this
+machine. The side effect is recorded rather than erased: the owner's
+`%APPDATA%\Fcitx5\pinyin\user.dict` and `user.history` carry those entries and were **not** restored,
+because they may also contain legitimate owner changes. The mode now requires an explicit isolated
+endpoint, skips without one, and refuses this user's production endpoint in both spellings before
+sending anything; `tools/settings/run-isolated-stage-a.ps1` is the supported way to run it, and it
+fingerprints the owner's learning files around the refusal checks to show they stayed untouched.
+
+**One observation without an attribution.** The owner's `pinyin.conf` held `PageSize=9` where an
+earlier state held 7. Nothing in this batch establishes what wrote it: no Stage A code writes 9 outside
+a disposable profile, and the installed settings window, an earlier package and the owner's own use are
+all equally consistent with the file. It is recorded as unattributed and was not modified.
+
+Only the three intended task branches were pushed.
 
 ## 9. Artifacts in this directory
 
 - `change-contract.md` — bounded Stage A change contract, with the executed outcome appended.
-- `correction-inventory.md` — C1–C9, the consolidated correction batch and what was deliberately not
-  changed.
+- `correction-inventory.md` — C1–C9 (the consolidated correction batch), C10/C11 (this closure batch),
+  and what was deliberately not changed.
 - `capability-mapping.md` — global/IM option-by-option mapping and the Shift/raw-input account.
 - `diffs/fusion-windows-stage-a.diff` — cumulative product diff `fe23f07..2e28a88` (the real diff, not
   a summary).

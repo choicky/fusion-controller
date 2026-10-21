@@ -56,18 +56,31 @@ All nine entries were applied in one batch, then built and exercised.
 | C2 | product `src/settings/main.cpp` — `ReloadChain` walks `{pinyin_, shuangpin_, global_}`, every loaded flag reset, success only when all three loaded |
 | C3 | product `src/settings/main.cpp` — `globalPageNote()` attached to the Global tab through `makePage(uri, page, note)` |
 | C4 | controller `capability-mapping.md` §1, `windows-stage6-plan.md`, `handoff.md` §4 — numpad Enter as `VK_RETURN`, lone Shift explicitly not implemented, "resolved" and "STATIC REVIEW PASS" claims removed |
-| C5 | product `tools/settings/prepare-settings-sources.ps1` and `tools/package/build-package.ps1` — `[ \t\r]*$` on every pin anchor |
-| C6 | product `.gitattributes` (`*.patch -text`) plus normalized patch bytes, so a CRLF checkout stays byte-exact |
-| C7 | product `third_party/settings-ui/SOURCE-ACCESS.txt` — fork PR #2 and `abc2c66` |
+| C5 | product `include/fusion/settings_protocol.hpp`, `src/host/host_server.cpp`, `src/settings/dbusprovider.cpp` — `settings_api_min_version`, range handshake in the Host, `api >= settings_api_version` in the client |
+| C6 | product `third_party/settings-ui/SOURCE-ACCESS.txt` — fork PR #2 and `abc2c66` |
+| C7 | product `tools/settings/prepare-settings-sources.ps1` and `tools/package/build-package.ps1` — `[ \t\r]*$` on every pin anchor; `.gitattributes` (`*.patch -text`) plus normalized patch bytes, so a CRLF checkout stays byte-exact |
 | C8 | controller `windows-stage6-plan.md` — one consolidated settings section replaces four overlapping status/validation/limitations paragraphs; `windows-daily-use.md`, `windows-architecture.md`, `windows-settings-ui-feasibility.md`, `ROADMAP.md`, `THIRD_PARTY_LICENSES.md` reconciled |
 | C9 | product `src/settings/main.cpp` — Global and list steps in `--self-test`, plus read-only `--self-test-verify` with `--expect-im-list` |
 
-Two further corrections were needed once the packaging ran and are recorded with C5/C7 rather than as
+Two further corrections were needed once the packaging ran and are recorded under C6/C7 rather than as
 new findings: the manifest's `settings.commit`/`repository`/`branch` were literals (the commit was
 stale at `0234c64`), so they now come from `cmake/settings-ui/versions.cmake`, and that file gained
 `FUSION_SETTINGS_CONFIGTOOL_BRANCH` so the branch has one declared source.
 
-Result: product head `2e28a88` (Release build clean, 36/37 focused CTest, isolated Host + GUI
+Result: product head `2e28a88` (Release build clean, focused CTest green, isolated Host + GUI
 validation passing, package `fusion-0.0.0-settings+2e28a88.zip`), controller head on PR #52, fork
-unchanged at `abc2c66`. The one failing test and the two unrun checks are named in `handoff.md` §6;
-none of them is presented as passing.
+unchanged at `abc2c66`. The checks that were unrun at that point are named in `handoff.md` §6 and are
+not presented as passing.
+
+## Closure batch (2026-10-21) — test isolation and evidence accuracy
+
+Two issues, both raised by review of the batch above. No new product defect: the C1–C9 corrections
+stay closed and none was reopened.
+
+| ID | Finding | Disposition |
+|---|---|---|
+| C10 | `tests/stage4a_ipc.cpp` `test_integration()` called `make_ipc_backend(timeout)` with no endpoint, so it connected to the default pipe — the installed product Host and the user's live profile. CTest set `FUSION_FCITX_SKIP_USER_PATH=1` on the *test* process, which cannot change the environment or profile of a Host that is already running; describing that as isolation was wrong. | The mode now requires `FUSION_STAGE4A_INTEGRATION_PIPE`, prints `SKIP` and connects to nothing without it, refuses this user's production endpoint in both the logical-name and full-path spellings before the first request, and connects with the device path `IpcBackend` actually needs. The CTest entry carries `SKIP_REGULAR_EXPRESSION` so a skip is reported as skipped; the misleading `ENVIRONMENT` property is gone, and `FUSION_STAGE4A_INTEGRATION_PIPE` is a cache variable for a configured run. New `tools/settings/run-isolated-stage-a.ps1` starts the Host on a unique pipe with a disposable profile and passes the endpoint. Assertions unchanged. |
+| C11 | Committed validation statements claimed more than their evidence: "Cancel/reload; unknown + learning-data preservation — EXECUTED and passing" bundled checks that had not run (Cancel/Reload was not exercised; "preservation" rested on file existence); the shared-value scenario was labelled a Global-versus-IM cross-page test; `stage4a_ipc_integration`'s failure was excused as "not a regression" because its source was unchanged; a `PageSize=9` observation was attributed to the owner without evidence. | Cancel/Reload is now a self-test step with its own assertions (edit discarded, baseline refreshed, a value changed on the Host behind the page fetched by Reload, tab switch keeping an edit). Preservation is measured on content: schema-known unsubmitted options survive, a key no schema knows is dropped by Fcitx's own save, learning files are byte-identical. The shared-value scenario is named Pinyin/Shuangpin. The integration test is executed against a controlled profile and passes, which replaces the inference. The `PageSize=9` note is recorded as unattributed. |
+
+Both are test/evidence changes: no shipped runtime code changed, so the `+2e28a88` package is retained
+and still names `2e28a88` as its source.

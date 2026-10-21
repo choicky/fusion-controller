@@ -206,12 +206,14 @@ drops unknown names; nothing rejects an empty list) instead of persisting them. 
 one-request-per-connection, bounded payloads and Host-incarnation fencing already in place; a Host accepts any client API in `[1, 2]`
 and refuses a newer one.
 
-**Invariants the three tabs share.** Unknown values survive the merge (`merge_schema_values` recurses through nested list/optional/
-external types); a no-change Apply performs no setter call; a changed Apply and a list change refuse visibly while an active composition
-or pending engine state makes them unsafe; unrelated groups and dictionaries/learning data are untouched; every Fcitx access is
-scheduled on the Host event loop; and Reload re-reads **all three** pages — the earlier build reloaded only Pinyin and Shuangpin, so
-Cancel and Reload left the Global page's edits and baseline untouched while reporting success. `External`/subconfiguration actions are
-disabled, and Tray Settings plus a Start Menu shortcut ship in the package.
+**Invariants the three tabs share.** Options an apply does not submit survive it (`merge_schema_values` recurses through nested
+list/optional/external types, and the page submits only the top-level options it changed) — measured in this batch on a seeded profile;
+keys the schema does not know are a different case and are **not** preserved, because Fcitx's own save writes the schema, and that was
+measured too rather than assumed. A no-change Apply performs no setter call; a changed Apply and a list change refuse visibly while an
+active composition or pending engine state makes them unsafe; unrelated groups and dictionaries/learning data are untouched; every
+Fcitx access is scheduled on the Host event loop; and Reload re-reads **all three** pages — the earlier build reloaded only Pinyin and
+Shuangpin, so Cancel and Reload left the Global page's edits and baseline untouched while reporting success. `External`/subconfiguration
+actions are disabled, and Tray Settings plus a Start Menu shortcut ship in the package.
 
 **Global options Windows does not honour are explained, not hidden.** The Global tab carries one sentence per category: global hotkeys
 (trigger/activate/deactivate/page/candidate-move/`ModifierOnlyKeyTimeout`) — Fusion never hands a lone modifier or a Ctrl/Alt/Win
@@ -231,17 +233,27 @@ that classification is a D082 decision with evidence requirements, not this stag
 
 **Executed validation on Windows 7700.** Release build of `FusionSettings.exe`, `FusionHost.exe`, `FusionTray.exe`, `FusionTsf.dll` and
 `FusionFcitxHost.dll` with MSVC 14.51.36231, SDK 10.0.26100.0, Qt 6.8.3 and the pinned `runtime-wp3-20261018`. `ctest` over
-`stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0` and `stage2` is **36 of 37**: `stage4a_ipc_integration` is
-**not passing**. That test is fixed to the production pipe, so it types into whatever installed Host owns it; the failure is a content
-mismatch at its `nihao`+Space commit assertion (a commit is produced, but not `你好`), it reproduces deterministically, and the code it
-exercises is byte-identical to base `fe23f07`. It is an environment-bound test rather than a regression signal for this batch, and it
-is not reported as passing. A real Host + GUI round trip was executed against an isolated product Host on a unique pipe with a
-disposable profile (the default-endpoint normalization was corrected and validated in PR #28 and is unchanged here): the three pages
-load over the real pipe; a changed value applies and reads back from the Host; an orderly restart proves the value, the enabled order
-(`shuangpin,pinyin`) and the pinyin learning files come back from the profile; a no-change Apply leaves the profile byte-identical;
-empty and unavailable list entries are refused with "The input-method list must contain at least one method this Host defines, and
-every entry must be available." No production Host/tray/browser/profile was changed. The live key-down/key-up test through a
-TSF-registered application was **not run**, so no keyboard claim rests on it.
+`stage_a_settings` (protocol/bounds/validator), `wp3_input_methods`, `rg0` and `stage2` is **37 of 37 passed**, with
+`stage4a_ipc_integration` reported by CTest as **skipped**: that mode now requires an explicit isolated endpoint and connects to
+nothing without one, because it types into whichever Host owns the endpoint it is given and the default endpoint belongs to the
+installed product Host. The same test is **executed and passing** through `tools/settings/run-isolated-stage-a.ps1`, which starts a
+Host on a unique pipe with a disposable profile and hands the endpoint over: `PASS integration with real Fcitx over IPC` and
+`PASS integration candidate select committed the projected candidate`, in 0.4 s. Its earlier failure was that production endpoint, not a
+product defect: against a controlled profile the unchanged assertions pass. The script also proves the safe default (no endpoint →
+`SKIP`, exit 0), the refusal of this user's production endpoint in both the logical-name and full-path spellings before any request
+(with the owner's learning files fingerprinted unchanged across the attempt), and the refusal of a malformed endpoint.
+
+**Isolated session results.** In that one isolated session: the three pages load over the real pipe and a changed value applies and
+reads back from the Host; an orderly restart returns the value, the enabled order (`shuangpin,pinyin`) and the pinyin learning files
+from the profile; **Cancel** discards an unsaved Global edit, restores the Host's value and refreshes the baseline; **Reload** fetches a
+value a second client changed on the Host behind the page (7 → 9 with the page dirty) and refreshes the baseline; switching tabs keeps
+an ordinary unsaved edit; a no-change Apply leaves the profile byte-identical; empty and unavailable list entries are refused with "The
+input-method list must contain at least one method this Host defines, and every entry must be available."; reorder → remove → add-back
+ends on the reordered list. Preservation was measured on content, not existence: the seeded schema-known but unsubmitted
+`ShowInputMethodInformation=False` and pinyin `SpellEnabled=False` both survived, while a key no schema knows
+(`FusionStageAUnknownProbe`) was dropped by Fcitx's own save in both files; the engine's `user.dict` (339 B) and `user.history` (61 B)
+were byte-identical (SHA-256) before and after the settings-only session. No production Host/tray/browser/profile was changed. The live
+key-down/key-up test through a TSF-registered application was **not run**, so no keyboard claim rests on it.
 
 **Package.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
 `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, built by the committed packaging script from the clean committed
