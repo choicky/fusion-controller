@@ -344,6 +344,19 @@ No daily report is required, and no feedback is needed for a day without problem
   fusion-windows PR #23 (merged) leaves an idle Enter to the application. **Confirmed by the owner on 2026-10-20 with
   `0.0.0-wp7+24914ff`:** the `nihao` → Space → Enter sequence inserts the newline again. Enter during a composition,
   and candidate selection, are unchanged.
+- **WeChat: Backspace, Delete and the arrow keys stopped working after Chinese text was committed** (R37, owner report
+  2026-10-22). They neither deleted nor moved the caret while Fusion was the Chinese method, and worked again after
+  `Win+Space` to another input method or `Ctrl+Space` to English. This is the same shape as the Notepad-- Enter problem
+  above: the shell claimed a key the engine could only hand back, so an application that treats the test callback as the
+  decision received the key and then dropped it. fusion-windows PR #34 stops the TIP from claiming those keys while the
+  engine has nothing to do with them (no composition, no candidate page, no unfinished work), and keeps them
+  engine-owned while composing. **It is implemented and verified on the engine, but it is not in an installed package
+  and has not been checked in WeChat** — install `fusion-0.0.0-winui3+9028a3f.zip`, restart WeChat, commit Chinese text
+  and then try Backspace, Delete and Left/Right (and Up/Down on text with several lines), with Notepad as the
+  comparison. If a key is still lost, the capture is the usual per-process one: `set FUSION_TSF_DIAGNOSTICS=1`, restart
+  that application, and read its log — a key the TIP still claims is followed by a `CLASSIFY` line, while a key left to
+  the application shows `TEST_KEY` alone (the `vk=`/`eligible=` detail is redacted, so the following `CLASSIFY` line is
+  what tells them apart).
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
