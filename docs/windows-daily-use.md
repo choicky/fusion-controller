@@ -353,11 +353,11 @@ No daily report is required, and no feedback is needed for a day without problem
   PR #34 claims those keys only while they really are engine work (a composition, a candidate page, unfinished work) and
   keeps them engine-owned while composing; every other key keeps the admission it had before, including the function
   keys you may have bound as Fcitx global hotkeys — the first version of the fix would have blocked those.
-  **Implemented, compiled, checked against the engine and packaged; not installed, not checked in WeChat, not accepted.**
-  Install `fusion-0.0.0-winui3+3ebf048.zip`, restart WeChat, commit Chinese text and then try Backspace, Delete,
-  Left/Right and Up/Down on text with several lines; Notepad is the comparison. If a key is still lost, take the ordinary
-  per-process capture from §5 and read its log: a key the TIP still claims is followed by a `CLASSIFY` line, while a key
-  left to the application shows `TEST_KEY` alone.
+  **Owner-confirmed on 2026-10-22:** after installing the package built from that change, the owner reports the WeChat
+  editing keys work again. That confirmation covers these keys in WeChat; it is not a claim about every key in every
+  application, and it does not turn the WeChat-side mechanism into a measured fact — it was never captured. If a key is
+  ever lost again, take the ordinary per-process capture from §5 and read its log: a key the TIP still claims is followed
+  by a `CLASSIFY` line, while a key left to the application shows `TEST_KEY` alone.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
@@ -370,7 +370,11 @@ No daily report is required, and no feedback is needed for a day without problem
   input-status/panel and password-field categories have no effect on this product (Fusion never gives a lone modifier or a
   `Ctrl`/`Alt`/`Win` combination to the engine, `Ctrl+Space` is Windows input switching, there is no Fcitx panel, and the
   Windows input-scope policy applies first) — the page says so in one sentence. `Shift`+`Return` commits raw input only
-  because the Pinyin `CommitRawInput` option lists it; a **lone `Shift` does not commit** and is not implemented, and
+  because the Pinyin `CommitRawInput` option lists it. **A lone `Shift` does not switch between Chinese and English** —
+  Fcitx's own `Hotkey/AltTriggerKeys` (a lone `Shift_L`) cannot fire here: the TIP never relays a modifier-only key, and
+  Fusion's contexts are created *inactive* in Fcitx, while that binding only works from an active context. This is open as
+  plan R38 with the measurement behind it; nothing here is a promise that it will change. `Shift`+key combinations are
+  unaffected — they are ordinary text input. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
