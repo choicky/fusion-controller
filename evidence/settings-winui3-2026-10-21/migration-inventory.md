@@ -5,9 +5,12 @@ meant to live in the new navigation.
 
 **What exists.** The client's **core** is implemented, compiled and tested (fusion-windows
 `src/settings-winui3/FusionSettings.Core`): framing, codecs, endpoint naming, connection and handshake, the shared
-draft/baseline model, key chords and lists, the key-editor state machine, and the input-method draft. The **WinUI views are
-not written**, because `Microsoft.WindowsAppSDK` cannot be restored here (`blocker.md`). So a "disposition" below is a
-design decision plus, where the core implements it, a tested behaviour — never a claim that a settings window shows it.
+draft/baseline model, key chords and lists, the key-editor state machine, the input-method draft, and the workspace that
+routes an edit, splits a save and reconciles an uncertain write. The **WinUI views are implemented too**
+(`FusionSettings.App`): the four pages render, and an edit has been driven through the compiled window and through the
+packaged executable, with the Host read back afterwards. So a "disposition" below is a design decision plus, where the
+client implements it, a behaviour that has been exercised — but a rendered page is not the same claim as a setting that
+changes product behaviour, which is still the NV rows' open question.
 
 ## 0. Method
 
