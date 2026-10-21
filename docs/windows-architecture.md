@@ -249,10 +249,14 @@ prior EFFECT unresolved
   `OnTestKeyDown`（trace 中无任何 Test 回调入口事件）；Word 投递，且 Word T drain 1/1 成功——Word 中
   `OnTestKeyDown` 返回 FALSE 后不再投递该 Enter 的 `OnKeyDown`。**correctness 不得依赖 T。**
 - **T 的声明不得超出引擎的实际工作（当前事实，2026-10-22）：** T 返回 TRUE 是在**请求应用把该键交给 TIP**，而应用
-  一旦照办，K 里回答 “not eaten” **无法追回**该键。因此 T 只对“引擎会有工作可做”的键返回 TRUE：带字符的键（原始
-  输入、标点、Space）总是如此；不带字符的键（Backspace/Delete/方向/Home/End/PageUp/PageDown/Tab/Return）只在存在
-  composition、候选页、未结算工作或非 Clear 的 PASS barrier 时如此，否则引擎只能 ForwardKey。这是 R36（Notepad--
-  idle Return）与 R37（微信上屏后编辑键）共有的缺陷形状，不是新策略，也不改变本节的 pass/drain 契约。
+  一旦照办，K 里回答 “not eaten” **无法追回**该键，所以对“引擎只会把它交回应用”的键，T 不得声明。这条规则只覆盖
+  实测确认的那一小类键：**Backspace、Delete、四个方向键、Home、End，以及 Return**；并且只在不存在 composition、
+  候选页、未结算工作或非 Clear 的 PASS barrier 时这样处理，存在这些状态时它们照旧由引擎拥有——引擎正是在非空输入的
+  同一分支里删除、移动和导航这些键。**其余键保留 R37 之前的准入行为**，尤其 F1–F24 等无修饰功能键和 Tab/PageUp/
+  PageDown：Fcitx 的全局快捷键处理（`Hotkey/*`）在**没有任何 composition 时同样会消费按键**，把这些键一律按组合
+  状态过滤会吞掉用户自己配置的全局热键（stage3c 以 F6 = `Hotkey/TriggerKeys` 实测：空闲时引擎消费该键且无文档回调）。
+  这是 R36（Notepad-- idle Return）与 R37（编辑键）的窄修复，**不是**新的通用键位策略，也不构成“非字符键都要组合
+  状态”的一般规则；本节的 pass/drain 契约不变。
 - **不存在普遍回调保证**：不得表述为 “K always exists” 或 “sync EditSession always succeeds”。
 
 ### 7.3 回调不可用 / drain 无法在 PASS 前到达所需 terminal
@@ -829,7 +833,7 @@ gate 记录的范围内；fusion-windows PR #11 与 PR #12 均已合并）。** 
   | `ActionableCandidateList` / `TabbedCandidateList` | DEFER WITH REASON | 否 | 可选能力接口；pinyin 的 action = 忘词/置顶/删除自定义短语（用户词库管理），tab = 音节/笔画筛选；classic-ui 与 dbusfrontend 均不消费。owner：§16 renderer 决定 + 所有者产品请求；依赖：在同一 PageFence/stimulus identity 下扩展非键 stimulus，禁止合成键 |
   | preedit 点击 / `InvokeActionEvent` | DEFER WITH REASON | 否 | 依赖上面的 preedit 光标投影与 composition range 上的 TSF mouse sink。trigger：preedit 投影合并后的所有者请求 |
   | `cursorRect` / scale-factor | DEFER WITH REASON | 否 | 当前 presentation 在 TSF 侧经 `GetActiveView`/`GetTextExt` 锚定，Host 内无 Fcitx UI 消费者。owner：§16；trigger：选定 Host 侧 renderer 或 Host 模块消费 `cursorRect` |
-  | 键盘-候选 UX（无修饰键） | 已解决（Stage 3C 路由 + PR #11 投影） | 否 | 数字/Space 选择、`-`/`=`/PageUp/PageDown 翻页、方向/Home/End、Tab、Esc、Backspace 均以 keysym 到达 Fcitx，高亮/页状态以 STATE 回投。**当前事实（2026-10-22）：**这只在引擎确有该键的工作时成立（存在 composition、候选页、未结算工作或非 Clear 的 PASS barrier）；无 composition 时引擎对这些键只能 Forward，T 不再声明它们，键留给应用（R36/R37，plan §4；fusion-windows PR #34）。字符键不受此限：它们在无 composition 时仍是引擎输入（标点由引擎翻译） |
+  | 键盘-候选 UX（无修饰键） | 已解决（Stage 3C 路由 + PR #11 投影） | 否 | 数字/Space 选择、`-`/`=`/PageUp/PageDown 翻页、方向/Home/End、Tab、Esc、Backspace 均以 keysym 到达 Fcitx，高亮/页状态以 STATE 回投。**当前事实（2026-10-22）：**其中 Backspace/Delete/四个方向键/Home/End（以及 Return）只在引擎确有该键的工作时才由 T 声明（存在 composition、候选页、未结算工作或非 Clear 的 PASS barrier）；无 composition 时引擎对这些键只能 Forward，T 把键留给应用（R36/R37，plan §4；fusion-windows PR #34）。**其余键的准入未变**：字符键在无 composition 时仍是引擎输入（标点由引擎翻译），F1–F24 等无修饰功能键照旧到达 Fcitx，因为全局热键可在无 composition 时被消费 |
   | 修饰键组合（Ctrl/Alt/Win）引擎绑定 | NEEDS SEPARATE EVIDENCE/DECISION | 否 | 现为平台策略 Pass，如 Ctrl+7 忘词、Ctrl+←/→ 永不到达 Fcitx。问题（D082 key admission）：哪些组合是真实 TSF / §10 preserved-key 约束，哪些只是被预先扣留；证据：TSF preserved-key/系统快捷键 census 对照 pinyin 默认绑定 |
   | `commitStringWithCursor` / `InputContextV2` | NEEDS SEPARATE EVIDENCE/DECISION | 否 | 仅非默认 `TypePairedPunctuationsTogether` 可达；无该 capability 时 pinyin 退回 commit + 合成 `forwardKey(Left)`，Windows 视为非原始 Forward 而 fail-closed（CancelledRecovery，无 replay）。问题：是否升 V2 并把 commit + 文档内 caret 作为一个 EFFECT；证据：所有者是否在 Windows 支持成对标点，及目标应用同一 EditSession 内插入后置 caret 的可靠性 |
   | surrounding text | NEEDS SEPARATE EVIDENCE/DECISION | 否 | 维持 fence 为合法默认。问题：是否以 TSF 只读 readback + 有序 EFFECT 的 `deleteSurroundingText` 声明 `SurroundingText`；证据：Host 引擎依赖面与目标应用的合法 readback/delete（§8） |
