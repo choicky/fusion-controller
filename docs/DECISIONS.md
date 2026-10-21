@@ -552,7 +552,9 @@ must not be assumed by the implementation.
 semantics over writing a Fusion-specific configuration surface. Whether that is feasible on Windows is **not
 established**: the upstream UI's Windows dependencies and the way it would communicate with this product's Host must be
 inspected before an implementation approach is chosen. A Fusion-written UI is a fallback, not the default, and it is not
-authorized here.
+   authorized here. *(Partially superseded 2026-10-21 by D087: the presentation layer is now a Fusion-owned C# + WinUI 3 client.
+   Everything else in this decision — official configuration formats and storage, no additional configuration store, the user-data policy,
+   the settings-before-EXE-installer order, the EXE deliverable form and U4 remaining open — remains effective.)*
 
 **Partial supersession.** Exactly two accepted statements are narrowed:
 
@@ -617,11 +619,8 @@ retained or retired is a packaging decision taken with its own evidence.
 **Out of scope.** No engine-semantic change, no new configuration store, no TSF key-routing policy (the bare-Shift
 boundary stays unresolved), no EXE installer implementation, no machine installation.
 
-**Status.** Designed only. The client is **not implemented**: this machine has no .NET SDK and the NuGet and SDK download
-hosts are unreachable, so nothing could be compiled, packaged or validated
-(`evidence/settings-winui3-2026-10-21/blocker.md`). The migration inventory
-(`evidence/settings-winui3-2026-10-21/migration-inventory.md`) is the reviewable coverage record. Implementation,
-compilation, packaging and owner acceptance are tracked in the Stage 6 plan and product PRs, not in this decision.
+**Status.** The presentation change is **accepted**; implementation state is tracked in the Stage 6 plan and the product
+PRs, not here. The option-coverage design is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
 
 ## Current authority rule
 

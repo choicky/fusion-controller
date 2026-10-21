@@ -1,206 +1,249 @@
 # Migration inventory — Windows settings (C# + WinUI 3)
 
-Status: **design inventory**, produced before any client code. Nothing in this table is implemented, compiled or
-validated; the column "new location" is the accepted navigation target, not an existing screen. The blocking reason is
-in `blocker.md`.
+Status: **design inventory, corrected 2026-10-21.** It records what the schema actually contains and where each item is
+meant to live in the new navigation. **Nothing here is implemented**: the client is not compiled (see `blocker.md`), so
+"disposition" is a design decision, not an observed behaviour.
 
-## 0. Method and sources
+## 0. Method
 
-Every row was read from the pinned sources on this machine, not from the current UI's labels:
+Read from the pinned sources on this machine:
 
-- Pinyin/Shuangpin engine schema: `fcitx5-chinese-addons` `61474bd3aa9fca26d1c31df93343035697e9f265`,
-  `im/pinyin/pinyin.h` (`PinyinEngineConfig`, `FuzzyConfig`) — the configuration object behind
-  `fcitx://config/inputmethod/pinyin`.
-- Global schema: `fcitx5` `a7f2528773ebfec98a20c49b6eea2333110b1c88`, `src/lib/fcitx/globalconfig.cpp` — behind
-  `fcitx://config/global`.
-- Input-method group: `fcitx://config/inputmethod` (group `Items`, `DefaultIM`), as implemented in Stage A
-  (`settings_api_version` 2, `src/fcitx/im_list.hpp`).
-- Transport: `include/fusion/settings.hpp` + `settings_protocol.hpp` — a lossless `dumpDescription()` view
-  (name, type, description, default, properties) plus `save()` values. **The client must be schema-driven**; the
-  tables below exist to prove coverage and to decide placement, not to hard-code editors.
+- `fcitx5-chinese-addons` `61474bd3aa9fca26d1c31df93343035697e9f265` — `im/pinyin/pinyin.h` (the `PinyinEngineConfig`
+  object behind `fcitx://config/inputmethod/pinyin`).
+- `fcitx5` `a7f2528773ebfec98a20c49b6eea2333110b1c88` — `src/lib/fcitx/globalconfig.cpp` (`Hotkey` and `Behavior`
+  containers behind `fcitx://config/global`) and `src/lib/fcitx/instance.cpp` (the consumers).
+- Packaged runtime `runtime-wp3-20261018` — `data/fcitx5/addon/*.conf` decides which addons actually exist.
 
-Storage for all three URIs is Fcitx's own per-user configuration (`%APPDATA%\Fcitx5\config`), written by the Host
-through the existing `SetConfig` path. No new store is introduced.
+Three facts are kept separate for every row, because they fail independently:
 
-Legend — **Status**: `S` supported and reachable in the design · `NA` in the schema but has no effect on this Windows
-path (must be shown with an explanation, not hidden silently) · `DEF` deferred, reason given · `VER` needs a Windows
-check before it is claimed.
+1. **Schema** — the option exists, with its official type/default/constraints.
+2. **Consumer** — the Fcitx code that reads it (file and role).
+3. **Delivery** — whether the event that triggers that consumer can reach it through this product's TSF path.
 
-## 1. Input methods — `fcitx://config/inputmethod`
+Disposition vocabulary: **R** reachable in the design (schema + consumer + a delivery path that exists) · **C** conditional
+limitation, stated in the row (consumer exists, but the triggering event is not delivered on this path) · **X**
+external/sub-configuration link to another configuration surface · **H** hidden by upstream, not exposed · **NV** not
+validated (no runtime test executed; the default for anything not measured).
 
-| Item | Type / default | Old UI | New location | Status |
+A row marked **R** means "the design exposes it"; it does **not** mean the value was observed to take effect. Nothing in
+this document is a product-validation claim.
+
+## 1. Input-method management — `fcitx://config/inputmethod`
+
+Not a `Config` schema but a group of operations (`settings_api_version` 2). Listed so that operations are not counted as
+configuration fields.
+
+| Item | Semantics | Old UI | New location | Disposition |
 |---|---|---|---|---|
-| Group membership (`Items`) | ordered list of IM names; product default = the runtime's methods | list page, "current group" table | Input methods · group list | S |
-| Active method (`Items/0`) | first entry of the group; follows bound contexts | list page, first row | Input methods · active badge | S |
-| Fallback method (`DefaultIM`) | string; empty = none | list page, combo | Input methods · "Fallback method" | S |
-| Order | positional | drag/up-down buttons | Input methods · drag handle + keyboard move | S |
-| Add/remove | membership only; removing never deletes the method definition or learning data | add/remove buttons | Input methods · Add…/Remove | S |
-| Activation vs editing | — | editing a method's settings does not activate it | method card → "Configure" opens the method page without changing `Items/0` | S (design rule) |
+| Group membership (`Items`) | ordered list of method names in the group | list page | Input methods · group list | R (already implemented in the current client) |
+| Active method (`Items/0`) | the method a bound context follows | first row | Input methods · active badge | R |
+| Fallback method (`DefaultIM`) | fallback only, **not** the active method | combo | Input methods · fallback | R |
+| Order | positional | up/down | Input methods · drag / keyboard move | R |
+| Add / remove | membership only; never deletes a method definition or learning data | buttons | Input methods · add/remove | R |
 
-## 2. Pinyin and Shuangpin — `fcitx://config/inputmethod/pinyin` (one shared schema)
+Editing a method's settings must not change `Items/0`. These are **operations over the official group**, not `SetConfig`
+writes of a schema field, and must not be presented as one atomic save with option edits.
 
-Pinyin and Shuangpin are **the same engine configuration**. The client must hold **one** draft for these options and
-expose it from both the Pinyin page and the Shuangpin page; there is no second copy and no per-profile storage.
+## 2. Pinyin and Shuangpin — `fcitx://config/inputmethod/pinyin`
 
-### 2.1 Engine and candidates
+One shared engine configuration. Shuangpin is a *profile value* inside it, not a separate schema, so a single draft per
+option serves both views; the views may show different subsets, but must not keep separate copies.
 
-| Option | Type / default | New location | Status |
-|---|---|---|---|
-| `ShuangpinProfile` | enum, default Ziranma | Candidates and input · Shuangpin profile | S |
-| `ShowShuangpinMode` | bool, true | Candidates and input · More settings | S |
-| `PageSize` | int 3–10, default 7 | Candidates and input · Candidates per page | S |
-| `SpellEnabled` | bool, true | Candidates and input · English candidates | S |
-| `SymbolsEnabled` | bool, true | Candidates and input · Symbol candidates | S |
-| `ChaiziEnabled` | bool, true | Candidates and input · More settings | S |
-| `ExtBEnabled` | bool, true (desktop) | Candidates and input · More settings | S |
-| `StrokeCandidateEnabled` | bool, true | Candidates and input · Stroke candidates | S |
-| `CloudPinyinEnabled` | bool, false | Candidates and input · More settings (needs a network check) | VER |
-| `CloudPinyinIndex` | int 1–10, default 2 | Candidates and input · More settings | S |
-| `CloudPinyinAnimation` | bool, true | Candidates and input · More settings | S |
-| `KeepCloudPinyinPlaceHolder` | bool, false | Candidates and input · More settings | S |
-| `CloudPinyin` (sub-config) | URI `fcitx://config/addon/cloudpinyin` | Candidates and input · "Configure Cloud Pinyin" | DEF — separate addon page; not part of this surface |
-| `PreeditMode` | enum, default ComposingPinyin (desktop) | Candidates and input · Preedit mode | S |
-| `PreeditCursorPositionAtBeginning` | bool, true (desktop) | Candidates and input · Preedit cursor | S |
-| `PinyinInPreedit` | bool, false | Candidates and input · Show full pinyin in preedit | S |
-| `Prediction` | bool, false on desktop | Candidates and input · Prediction | S |
-| `KeepCurrentContext` | bool, true | Candidates and input · Prediction · More | S |
-| `PredictionSize` | int 3–100, default 49 | Candidates and input · Prediction size | S |
-| `BackspaceBehaviorOnPrediction` | enum, default BackspaceWhenNotUsingOnScreenKeyboard | Candidates and input · Prediction · More | S |
-| `SwitchInputMethodBehavior` | enum, default CommitPreedit | Keys · "Action when switching input method" | S |
-| `Learning` | bool, true | Candidates and input · Learning | S |
+### 2.1 Engine, candidates and preedit
 
-### 2.2 Fuzzy pinyin (`Fuzzy` sub-config)
-
-All 19 switches live under `Fuzzy` in the same URI. Design: one "Fuzzy pinyin" expander on the Candidates and input
-page, grouped as *initial/final pairs* and *segmentation*, with the defaults shown.
-
-| Option | Default | Option | Default |
-|---|---|---|---|
-| `VE_UE` (ue → ve) | true | `AN_ANG` | false |
-| `NG_GN` (common typo) | true | `EN_ENG` | false |
-| `LowerCaseMatchLetter` | true | `IAN_IANG` | false |
-| `Inner` (xian → xi'an) | true | `IN_ING` | false |
-| `InnerShort` (qie → qi'e) | true | `U_OU` | false |
-| `PartialFinal` (e → en/eng/ei) | false | `UAN_UANG` | false |
-| `PartialSp` (shuangpin > 4) | false | `C_CH` | false |
-| `V_U` | false | `F_H` | false |
-| | | `L_N` | false |
-| | | `L_R` | false |
-| | | `S_SH` | false |
-| | | `Z_ZH` | false |
-| `Correction` (CorrectionLayout) | None on desktop | — | — |
-
-Status: `S` for all; `PartialSp` and `Correction` are shown in "More settings" (they are `OptionalHideInDescription`
-upstream, i.e. advanced).
-
-### 2.3 Pinyin key bindings (`KeyListOption`, ordered, multiple values)
-
-| Option | Default keys | Positional? | New location | Status |
+| Path | Type · default · constraints | Consumer | New location | Disposition |
 |---|---|---|---|---|
-| `ForgetWord` | Control+7 | no | Keys · Learning | S |
-| `PrevPage` | *(empty)* | no | Keys · Paging | S |
-| `NextPage` | *(empty)* | no | Keys · Paging | S |
-| `PrevCandidate` | Shift+Tab | no | Keys · Candidate navigation | S |
-| `NextCandidate` | Tab | no | Keys · Candidate navigation | S |
-| `CurrentCandidate` | *(empty)* | no | Keys · Candidate navigation | S |
-| `CommitRawInput` | Return, KP_Enter, Control+Return, Control+KP_Enter, Shift+Return, Shift+KP_Enter, Control+Shift+Return, Control+Shift+KP_Enter | no | Keys · Commit | S (with the Windows caveat below) |
-| `SecondCandidate` … `ThirdCandidate` | positional digit keys | **yes** — N-th key selects N-th candidate | Keys · Candidate selection | S, order preserved |
-| `UseKeypadAsSelection` | bool, false | — | Keys · Candidate selection | S |
-| `ChooseCharFromPhrase` | *(empty)* | no | Keys · Phrase selection | S |
-| `ChooseLastCharFromPhrase` | `Key`, *(schema default)* | — | Keys · Phrase selection | S |
-| `BackSpaceToUnselect` | bool, true | — | Keys · Phrase selection | S |
-| `FilterByStroke` | *(empty)* | no | Keys · More | S |
-| `QuickPhraseKey` | `Key`, default `;` | — | Keys · Quick phrase | S |
-| `VAsQuickphrase` | bool, false | — | Keys · Quick phrase | S |
-| `QuickPhrase` (external) | URI `fcitx://config/addon/quickphrase` | — | Keys · Quick phrase · Manage | DEF — separate tool, not implemented on Windows |
+| `ShuangpinProfile` | enum · `Ziranma` | pinyin engine | Candidates and input · Shuangpin profile | R |
+| `ShowShuangpinMode` | bool · `true` | pinyin engine | Candidates and input · More | R |
+| `PageSize` | int · `7` · 3–10 | pinyin engine | Candidates and input · candidates per page | R |
+| `SpellEnabled` | bool · `true` | pinyin engine (spell addon) | Candidates and input · English candidates | R |
+| `SymbolsEnabled` | bool · `true` | pinyin engine | Candidates and input · symbol candidates | R |
+| `ChaiziEnabled` | bool · `true` | pinyin engine | Candidates and input · More | R |
+| `ExtBEnabled` | bool · `true` on desktop | pinyin engine | Candidates and input · More | R |
+| `StrokeCandidateEnabled` | bool · `true` | pinyin engine | Candidates and input · stroke candidates | R |
+| `CloudPinyinEnabled` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — addon packaged, network path never exercised here; NV |
+| `CloudPinyinIndex` | int · `2` · 1–10 | cloudpinyin addon | Candidates and input · More | C |
+| `CloudPinyinAnimation` | bool · `true` | cloudpinyin addon | Candidates and input · More | C |
+| `KeepCloudPinyinPlaceHolder` | bool · `false` | cloudpinyin addon | Candidates and input · More | C |
+| `PreeditMode` | enum · `ComposingPinyin` on desktop | pinyin engine | Candidates and input · preedit mode | R |
+| `PreeditCursorPositionAtBeginning` | bool · `true` | pinyin engine | Candidates and input · preedit cursor | R |
+| `PinyinInPreedit` | bool · `false` | pinyin engine | Candidates and input · show full pinyin | R |
+| `Prediction` | bool · `false` on desktop | pinyin engine | Candidates and input · prediction | R |
+| `KeepCurrentContext` | bool · `true` | pinyin engine | Candidates and input · prediction · more | R |
+| `PredictionSize` | int · `49` · 3–100 | pinyin engine | Candidates and input · prediction size | R |
+| `BackspaceBehaviorOnPrediction` | enum · `BackspaceWhenNotUsingOnScreenKeyboard` | pinyin engine | Candidates and input · prediction · more | R |
+| `SwitchInputMethodBehavior` | enum · `CommitPreedit` | pinyin engine | Keys · action when switching input method | R |
+| `Learning` | bool · `true` | pinyin engine | Candidates and input · learning | R |
 
-**Windows caveat (measured earlier, unchanged by this UI):** `KP_Enter` entries never match because the TSF path
-delivers the main Return keysym, and Ctrl/Alt combos are not delivered to the engine (`routes_key` refuses modified
-keys). The editor must show these bindings as the engine stores them, and must not claim they take effect. This is
-recorded in `windows-architecture.md` §22 and is not changed by the settings task.
+### 2.2 Fuzzy pinyin — `Fuzzy` (nested container)
 
-### 2.4 Advanced engine values
+`Fuzzy` holds 20 switches plus `Correction`. The container is **not** an additional setting; only its children are edited.
 
-| Option | Type / default | New location | Status |
+| Child | Default | Child | Default |
 |---|---|---|---|
-| `Number of sentence` (`Nbest`) | int, *(schema default)* | Candidates and input · More settings | S |
-| `WordCandidateLimit` | int, *(schema default)* | Candidates and input · More settings | S |
-| `LongWordLengthLimit` | int, *(schema default)* | Candidates and input · More settings | S |
-| `CustomPhrase` (external) | URI `fcitx://config/addon/customphrase` | Candidates and input · More settings · Manage custom phrases | DEF — separate tool |
-| `DictManager` (external) | URI `fcitx://config/addon/dictmanager` | Candidates and input · More settings · Manage dictionaries | DEF — separate tool |
-| `FirstRun` | hidden bool, true | — | not surfaced (upstream hides it) |
+| `VE_UE` | `true` | `AN_ANG` | `false` |
+| `NG_GN` | `true` | `EN_ENG` | `false` |
+| `LowerCaseMatchLetter` | `true` | `IAN_IANG` | `false` |
+| `Inner` | `true` | `IN_ING` | `false` |
+| `InnerShort` | `true` | `U_OU` | `false` |
+| `PartialFinal` | `false` | `UAN_UANG` | `false` |
+| `PartialSp` | `false` | `C_CH` | `false` |
+| `V_U` | `false` | `F_H` | `false` |
+| | | `L_N` | `false` |
+| | | `L_R` | `false` |
+| | | `S_SH` | `false` |
+| | | `Z_ZH` | `false` |
+| `Correction` | `None` on desktop | — | — |
+
+All children: **R**, on Candidates and input · fuzzy pinyin (advanced items under More).
+
+### 2.3 Key bindings — every entry is an **ordered list of alternative bindings** for its named action
+
+| Path | Default | Positional? | Consumer | New location | Disposition |
+|---|---|---|---|---|---|
+| `ForgetWord` | `Control+7` | no | pinyin engine | Keys · learning | R |
+| `PrevPage` | `minus`, `Up`, `KP_Up`, `Page_Up` | no | pinyin engine | Keys · paging | R |
+| `NextPage` | `equal`, `Down`, `KP_Down`, `Page_Down` | no | pinyin engine | Keys · paging | R |
+| `PrevCandidate` | `Shift+Tab` | no | pinyin engine | Keys · candidate navigation | R |
+| `NextCandidate` | `Tab` | no | pinyin engine | Keys · candidate navigation | R |
+| `CurrentCandidate` | `space`, `KP_Space` | no | pinyin engine | Keys · candidate navigation | R |
+| `CommitRawInput` | `Return`, `KP_Enter`, `Control+Return`, `Control+KP_Enter`, `Shift+Return`, `Shift+KP_Enter`, `Control+Shift+Return`, `Control+Shift+KP_Enter` | no | pinyin engine | Keys · commit | R for the unmodified entries; **C** for the modified and `KP_Enter` entries (§2.6) |
+| `SecondCandidate` | **empty list** | **no** | pinyin engine | Keys · candidate selection | R |
+| `ThirdCandidate` | **empty list** | **no** | pinyin engine | Keys · candidate selection | R |
+| `UseKeypadAsSelection` | bool · `false` | — | pinyin engine | Keys · candidate selection | R |
+| `ChooseCharFromPhrase` | `[` | **yes** — the N-th binding selects the N-th character of the current candidate (upstream tooltip) | pinyin engine | Keys · phrase selection | R; order is semantic, never sorted or de-duplicated |
+| `ChooseLastCharFromPhrase` | `]` | no (single `Key`, not a list) | pinyin engine | Keys · phrase selection | R |
+| `BackSpaceToUnselect` | bool · `true` | — | pinyin engine | Keys · phrase selection | R |
+| `FilterByStroke` | `grave` | no | pinyin engine | Keys · more | R |
+| `QuickPhraseKey` | `;` | no (single `Key`) | quickphrase addon | Keys · quick phrase | R |
+| `VAsQuickphrase` | bool · **`true`** | — | quickphrase addon | Keys · quick phrase | R |
+
+`SecondCandidate`/`ThirdCandidate` are **not** "N-th key selects N-th candidate" mappings; they are the key lists for the
+2nd and 3rd candidate actions and are empty by default. Only `ChooseCharFromPhrase` is positional.
+
+### 2.4 Advanced values
+
+| Path | Type · default · constraints | New location | Disposition |
+|---|---|---|---|
+| `Number of sentence` | int · `2` · 1–3 | Candidates and input · More | R — the stored key is literally `Number of sentence`; `nbest` is only the C++ member name |
+| `WordCandidateLimit` | int · `15` · ≥0 (`0` = all) | Candidates and input · More | R |
+| `LongWordLengthLimit` | int · `4` · 0–10 | Candidates and input · More | R |
+| `QuickPhraseTriggerRegex` | `std::vector<std::string>` of regular expressions · defaults `.(/\|@)$`, `^(www\|bbs\|forum\|mail)\.`, `^(http\|https\|ftp\|telnet\|mailto):` · no constraint beyond `RegexConstrain` per entry | Keys · quick phrase · trigger patterns (one expression per line) | R — a list of patterns, not a key list; each entry is validated as a regular expression and order is preserved |
+| `FirstRun` | hidden bool · `true` | — | H |
+
+### 2.5 External and sub-configuration links (exact URIs)
+
+| Path | Kind | URI | Runtime availability | Disposition |
+|---|---|---|---|---|
+| `DictManager` | `ExternalOption` | `fcitx://config/addon/pinyin/dictmanager` | addon `pinyin` packaged | X — link only; the dictionary tool is not implemented on Windows |
+| `CustomPhrase` | `ExternalOption` | `fcitx://config/addon/pinyin/customphrase` | addon `pinyin` packaged | X — link only; tool not implemented |
+| `QuickPhrase` | `ExternalOption` | `fcitx://config/addon/quickphrase/editor` | addon `quickphrase` packaged | X — link only; editor not implemented |
+| `Punctuation` | `SubConfigOption` | `fcitx://config/addon/punctuation/punctuationmap/zh_CN` | addon `punctuation` packaged | X — link only; the punctuation map is a separate schema page |
+| `Chttrans` | `SubConfigOption` | `fcitx://config/addon/chttrans` | **not packaged** (`data/fcitx5/addon` has no `chttrans.conf`) | X with a stated reason: shown as unavailable in this runtime, not silently dropped |
+
+A link is not an option value: opening one leaves the current draft and opens another configuration surface.
+
+### 2.6 Measured Windows caveat (carried over, not changed here)
+
+From the earlier key-path measurement (`windows-architecture.md` §22, R36):
+
+- `KP_Enter`-named entries never match, because the TSF path delivers the main `Return` keysym.
+- `Control+…` / `Alt+…` entries are not delivered: `routes_key` refuses modified keys, so those bindings are stored but
+  cannot fire on this path.
+- An idle `Return` is left to the application (R36), so `CommitRawInput`'s plain `Return` only acts while composing.
+
+The editor shows the lists exactly as the engine stores them and must not claim the affected entries take effect.
 
 ## 3. Global configuration — `fcitx://config/global`
 
-| Option | Type / default | New location | Status |
-|---|---|---|---|
-| `TriggerKeys` | key list, default Control+space, Zenkaku_Hankaku, Hangul | Keys · Toggle input method | S |
-| `EnumerateWithTriggerKeys` | bool, *(schema default)* | Keys · More | S |
-| `ActivateKeys` | key list, default Hangul_Hanja | Keys · Activate / deactivate | NA — no Windows behaviour |
-| `DeactivateKeys` | key list, default Hangul_Romaja | Keys · Activate / deactivate | NA |
-| `ConsumeRedundantActivateKeys` | bool, *(schema default)* | Keys · More | NA |
-| `AltTriggerKeys` | key list, default Shift_L | Keys · Temporary toggle | NA — bare Shift is not routed (unresolved product boundary) |
-| `EnumerateForwardKeys` / `EnumerateBackwardKeys` | key lists, *(schema default)* | Keys · Group switching | NA |
-| `EnumerateSkipFirst` | bool | Keys · Group switching | NA |
-| `EnumerateGroupForwardKeys` / `EnumerateGroupBackwardKeys` | key lists | Keys · Group switching | NA |
-| `PrevPage` / `NextPage` (global fallback) | key lists | Keys · Paging fallback | S — separate variables, **not** an inheritance layer for the Pinyin paging keys |
-| `PrevCandidate` / `NextCandidate` (global fallback) | key lists, default Shift+Tab / Tab | Keys · Candidate fallback | S |
-| `TogglePreedit` | key list, default Control+Alt+P | Keys · More | NA |
-| `ModifierOnlyKeyTimeout` | int −1…5000 | Keys · More | NA |
-| `ActiveByDefault` | bool | Input methods · Behaviour | NA — Windows TSF decides |
-| `resetStateWhenFocusIn` | enum | Input methods · Behaviour | NA |
-| `ShareInputState` | enum | Input methods · Behaviour | NA |
-| `PreeditEnabledByDefault` | bool, true | Candidates and input · Preedit | NA |
-| `ShowInputMethodInformation` | bool, true | Candidates and input · Info panel | NA |
-| `showInputMethodInformationWhenFocusIn` | bool, false | Candidates and input · Info panel | NA |
-| `CompactInputMethodInformation` | bool | Candidates and input · Info panel | NA |
-| `ShowFirstInputMethodInformation` | bool | Candidates and input · Info panel | NA |
-| `DefaultPageSize` | int 3–10 | Candidates and input · Fallback page size | S |
-| `AllowInputMethodForPassword` | bool | Candidates and input · Password fields | NA — hard policy in the TIP |
-| `ShowPreeditForPassword` | bool | Candidates and input · Password fields | NA |
-| `CustomXkbOption` | string | — | NA — no keyboard layouts in this runtime |
-| `EnabledAddons` / `DisabledAddons` | hidden string lists | — | not surfaced (upstream hides them; changing them is not a user setting) |
-| `PreloadInputMethod` | hidden bool | — | not surfaced |
-| `AutoSavePeriod` | int | Candidates and input · More | NA |
-| `Hotkey` / `Behavior` (nested) | sub-configs | — | DEF — no Windows hotkey or behaviour surface exists; shown read-only with an explanation |
+The schema is two **containers**, not a flat list: `Hotkey` and `Behavior`. Each child below is one option; the containers
+are not counted as settings.
 
-## 4. Cross-cutting semantics the client must honour
+### 3.1 `Hotkey` (17 children)
 
-1. **One draft per underlying option.** Pinyin and Shuangpin link to the same `pinyin` schema; a second view must not
-   hold a stale copy (a save from the stale view would revert the other). One canonical draft/baseline keyed by
-   `(URI, option path)`.
-2. **Positional lists stay positional.** Candidate-selection key lists are indexed; no sorting, no de-duplication.
-3. **Empty ≠ default.** `PrevPage`/`NextPage` are genuinely empty by default. Reset writes the schema default; clearing
-   writes an empty list. The UI must distinguish "cleared" from "reset".
-4. **Schema-known unsubmitted options survive.** Only options the client actually changed are submitted; the Host
-   merges into the full `save()` tree, and keys the schema does not know are dropped by Fcitx itself (measured in
-   Stage A). The client must not claim arbitrary unknown keys survive.
-5. **Comma/period presets edit the same official list.** A preset is a shortcut that replaces the list's content after
-   an explicit confirmation; it is not a separate boolean and it does not merge silently.
-6. **Alternatives are not chords.** One action = N independent bindings; one binding = one complete chord. Recording
-   Escape cancels; an unrecognized recording leaves the previous value.
-7. **Duplicate/overlapping bindings** are reported as warnings computed from the values shown; the UI must not invent
-   priority rules or silently rewrite a list.
-8. **No atomic claim across URIs.** Saving `global` and `pinyin` can partially succeed; report per-URI results and keep
-   the remaining edits.
-9. **No-change save writes nothing** (no setter call), so no configuration or learning file is touched.
-
-## 5. Coverage summary
-
-| Group | Options in schema | Reachable in the design | Deferred | Not applicable on Windows |
+| Path | Default · constraints | Consumer | Delivery on this path | Disposition |
 |---|---|---|---|---|
-| Input-method list | 4 concepts | 4 | 0 | 0 |
-| Pinyin/Shuangpin engine + fuzzy | 22 + 20 | 41 | 1 (CloudPinyin sub-page) | 0 |
-| Pinyin key bindings | 17 | 15 | 2 (QuickPhrase, DictManager/CustomPhrase external tools) | 0 |
-| Global configuration | 31 | 12 | 2 (Hotkey/Behavior sub-configs) | 17 |
+| `TriggerKeys` | `Control+space`, `Zenkaku_Hankaku`, `Hangul` | `instance.cpp:805` key handler | modified keys are not delivered to the engine | C |
+| `EnumerateWithTriggerKeys` | bool · `true` | `instance.cpp` trigger path | same | C |
+| `ActivateKeys` | `Hangul_Hanja` | `instance.cpp:813` | same | C |
+| `DeactivateKeys` | `Hangul_Romaja` | `instance.cpp:816` | same | C |
+| `ConsumeRedundantActivateKeys` | bool · `true` | `instance.cpp` activate path | same | C |
+| `AltTriggerKeys` | `Shift_L` | `instance.cpp:810` | modifier-only keys are not delivered | C |
+| `EnumerateForwardKeys` | empty | `instance.cpp:819` | modified keys | C |
+| `EnumerateBackwardKeys` | empty | `instance.cpp:822` | same | C |
+| `EnumerateSkipFirst` | bool · `false` | `instance.cpp` enumerate | same | C |
+| `EnumerateGroupForwardKeys` | `Super+space` | `instance.cpp:825` | Windows consumes Super+Space | C |
+| `EnumerateGroupBackwardKeys` | `Super+Shift+space` | `instance.cpp:828` | same | C |
+| `PrevPage` (fallback) | `Up` | `clipboardtempmode.cpp:71`, `imselectortempmode.cpp:116` | unmodified key; only in those temporary modes | R, **separate from the Pinyin `PrevPage`** — not an inheritance layer |
+| `NextPage` (fallback) | `Down` | `clipboardtempmode.cpp:86`, `imselectortempmode.cpp:124` | same | R |
+| `PrevCandidate` (fallback) | `Shift+Tab` | core temporary-mode consumers | same | R |
+| `NextCandidate` (fallback) | `Tab` | core temporary-mode consumers | same | R |
+| `TogglePreedit` | `Control+Alt+P` | `instance.cpp` key handler | modified keys | C |
+| `ModifierOnlyKeyTimeout` | int · −1–5000 (schema default) | modifier-only hotkey path | no modifier-only delivery | C |
 
-The 17 "not applicable" global options are still **shown** with a one-line explanation: hiding them would make the
-surface disagree with the official schema and would look like a missing feature.
+### 3.2 `Behavior` (17 children)
 
-## 6. What this inventory does not establish
+| Path | Default · constraints | Consumer | Disposition |
+|---|---|---|---|
+| `ActiveByDefault` | bool · `false` | `instance.cpp` activation policy | NV — the TIP's compartment state also decides; interaction not measured |
+| `resetStateWhenFocusIn` | enum · `No` | `instance.cpp` focus-in policy | NV |
+| `ShareInputState` | enum · `No` on desktop | `instance.cpp` property propagation | NV |
+| `PreeditEnabledByDefault` | bool · `true` | `instance.cpp` / input context | NV |
+| `ShowInputMethodInformation` | bool · `true` | notifications module | C — `notifications` is not in the packaged addon set |
+| `showInputMethodInformationWhenFocusIn` | bool · `false` | notifications module | C — same |
+| `CompactInputMethodInformation` | bool · `true` | notifications module | C — same |
+| `ShowFirstInputMethodInformation` | bool · `true` | notifications module | C — same |
+| `DefaultPageSize` | int · **`5`** · **1–10** | core default page size (input context / temporary modes) | NV — the Pinyin page has its own `PageSize`; the two are different options |
+| `OverrideXkbOption` | bool · `false` | XKB path | H — `ConditionalHidden<!hasKeyboard>`; this runtime has no keyboard layouts |
+| `CustomXkbOption` | string · empty | XKB path | H — same |
+| `EnabledAddons` / `DisabledAddons` | hidden string lists | addon manager | H — upstream hides them |
+| `PreloadInputMethod` | hidden bool · `true` | instance | H |
+| `AllowInputMethodForPassword` | bool · `false` | `instance.cpp` password detection | NV — the product's password gate is the TIP hard policy; the two were not measured together |
+| `ShowPreeditForPassword` | bool · `false` | same | NV |
+| `AutoSavePeriod` | int · **`30`** · 0–1440 | `instance.cpp:1336`, `:2134` (instance timer + reload) | R — an actual timer consumer exists; **not** "ineffective because global". Not measured in the product (NV) |
 
-- Any Windows effect of a value: the mapping is schema-level only. "A displayed value is not proof the engine acted on
-  it" (the same rule the Stage A record used).
-- Any key translation: the `KP_Enter` / Ctrl+Alt caveats above come from the earlier measured key path, not from this
-  inventory.
-- Editor behaviour of the new client: it is not compiled (see `blocker.md`).
+`AutoSavePeriod`, `ActivateKeys`/`DeactivateKeys`/enumeration and the fallback paging options are the corrections to the
+earlier blanket claim: each has a real consumer, and only the *event delivery* is limited where stated.
+
+## 4. Cross-cutting rules the client must honour
+
+1. **One draft per underlying option**, keyed by `(URI, path)`. Pinyin and Shuangpin share one schema; a stale second copy
+   would revert the other view's save.
+2. **Lists are ordered.** Only `ChooseCharFromPhrase` is positional; the others are ordered alternatives. No sorting or
+   de-duplication anywhere.
+3. **Empty ≠ default.** `SecondCandidate`/`ThirdCandidate`/`EnumerateForwardKeys` are empty by default; reset restores the
+   schema default, clearing writes an empty list.
+4. **Only changed options are submitted**; the Host merges into the full `save()` tree. Unknown keys are dropped by Fcitx
+   itself (measured in Stage A) — the client must not claim otherwise.
+5. **Comma/period presets** edit the official list after explicit confirmation; they are not a boolean and do not merge.
+6. **Warnings are computed from the values shown**; no invented priority rules, no silent rewriting.
+7. **Per-URI partial success** is reported honestly; no atomic claim across `global` and `pinyin`.
+8. **No-change save writes nothing**, so no configuration or learning file is touched.
+9. **Links (X) leave the draft**; they never fabricate a value in the parent schema.
+
+## 5. Coverage (recomputed)
+
+| Group | Fields | Containers | Links (X) | Hidden (H) | Conditional (C) | Reachable (R) | NV-only |
+|---|---|---|---|---|---|---|---|
+| Input-method operations | 5 | 0 | 0 | 0 | 0 | 5 | 0 |
+| Pinyin engine/candidates/preedit | 21 | 1 (`Fuzzy`) | 0 | 0 | 4 (cloud pinyin) | 17 | 0 |
+| Fuzzy children | 21 | 0 | 0 | 0 | 0 | 21 | 0 |
+| Pinyin key bindings | 16 | 0 | 0 | 0 | 1 (`CommitRawInput`, partly) | 15 (+1 partial) | 0 |
+| Advanced values | 4 | 0 | 0 | 1 (`FirstRun`) | 0 | 4 | 0 |
+| External / sub-config links | 5 | 0 | 5 | 0 | 0 | 0 | 0 |
+| Global `Hotkey` | 17 | 1 container | 0 | 0 | 13 | 4 | 0 |
+| Global `Behavior` | 17 | 1 container | 0 | 4 | 4 (notifications) | 1 (`AutoSavePeriod`) | 8 |
+
+Totals: **107 schema fields/operations** = 5 input-method operations + 21 pinyin engine/candidate/preedit + 21 fuzzy
+children + 16 pinyin key options + 5 advanced values (1 of them hidden) + 5 external/sub-config links + 17 `Hotkey` children
++ 17 `Behavior` children. The three containers (`Fuzzy`, `Hotkey`, `Behavior`) are not counted as fields. Of the 107: 5 are
+links to other surfaces, 5 are hidden by upstream, 18 carry a stated conditional limitation, and 8 are reachable-in-design
+but explicitly **not validated**.
+The earlier "17 global settings have no effect" claim is withdrawn: it conflated a missing event with a missing consumer.
+
+## 6. What this inventory still does not establish
+
+- Whether any value takes effect in the product: no runtime test was executed for this client (NV rows).
+- Whether the conditional rows can be made to work: that needs either a different delivery path (a TSF routing change,
+  out of scope) or the missing addons.
+- Editor behaviour: the client is not compiled (`blocker.md`).

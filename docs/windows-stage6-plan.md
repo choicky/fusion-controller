@@ -191,10 +191,13 @@ owner installation/acceptance are separate states; no installation is claimed he
 Fusion-owned **C# + WinUI 3** client with task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
 while official Fcitx configuration semantics, storage, defaults and the settings-before-installer order stay as they are. D086's scoped
 licence remains attached to the retained upstream-derived executable and does not extend to the new client. The Qt client recorded below is
-still the **shipped** settings surface — nothing has replaced it — and the WinUI 3 client is **not implemented**: this machine has no .NET SDK
-and the NuGet/SDK hosts are unreachable, so it could not be compiled, packaged or validated
-(`evidence/settings-winui3-2026-10-21/blocker.md`). The option-coverage design is in
-`evidence/settings-winui3-2026-10-21/migration-inventory.md`; it is a design record, not implemented behaviour. The three-round feasibility
+still the **shipped** settings surface — nothing has replaced it. The WinUI 3 client is **designed but not implemented**: the development
+environment has no .NET SDK and its package/SDK acquisition requests currently fail, so the client is not compiled, packaged or validated
+(`evidence/settings-winui3-2026-10-21/blocker.md` — an environment prerequisite, not a design limitation and not a proven network policy).
+Option coverage is complete as a **design** record in `evidence/settings-winui3-2026-10-21/migration-inventory.md`; it is not implemented
+behaviour. Separately, the **tray entry point** is implemented and tested in fusion-windows PR #30 (left click opens or activates the
+settings window, right-click menu unchanged, duplicate windows avoided); it launches the current `FusionSettings.exe` and does not depend on
+the replacement client. The three-round feasibility
 investigation stays historical evidence in `docs/windows-settings-ui-feasibility.md`, and the per-correction detail lives in
 `evidence/stage-a-global-settings-2026-10-20/` (`change-contract.md`, `correction-inventory.md`, `capability-mapping.md`, `handoff.md`).
 Implementation, compilation, isolated validation, packaging, owner installation and owner acceptance are separate states; the first four
