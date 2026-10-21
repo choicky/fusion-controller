@@ -17,7 +17,7 @@ application was **not run**.
 
 | Repo | Role | Branch | Base commit | Head commit | Draft PR |
 |---|---|---|---|---|---|
-| `choicky/fusion-windows` | product | `feature/stage-a-global-settings-im-methods` | `fe23f07611707c2d70aaf16a2ece282057ff8097` (origin/main, PR #28 merged) | `2e28a88d8beb0548070cc8073cbb80b8174d8c66` (feature `0a965e2` + correction `fb62348` + packaging-pin `2e28a88`) | https://github.com/choicky/fusion-windows/pull/29 |
+| `choicky/fusion-windows` | product | `feature/stage-a-global-settings-im-methods` | `fe23f07611707c2d70aaf16a2ece282057ff8097` (origin/main, PR #28 merged) | `fe65d08621fb84f47ef83acfc3e50835217af462` (feature `0a965e2` + correction `fb62348` + packaging-pin `2e28a88` + closure `fe65d08`) | https://github.com/choicky/fusion-windows/pull/29 |
 | `choicky/fcitx5-configtool` (owner fork) | reusable widget-layer contract | `windows/fusion-settings` | `9bd6022c6f5f768d32b6dbe2012358e4cdb1116b` (upstream base) | `abc2c6644b030d761d3d5e7c27c888af019e63f0` (unchanged this batch — no new commit) | https://github.com/choicky/fcitx5-configtool/pull/2 |
 | `choicky/fusion-controller` | docs/authority + this evidence | `feature/stage-a-global-settings` | `96fb28c2bca1cc400361fc2377409e668201054f` (origin/main, PR #51 merged) | PR #52 branch tip (this evidence pack; `d25c39c` = first commit, `8ca1282` = Draft index, this batch on top) | https://github.com/choicky/fusion-controller/pull/52 |
 
@@ -210,16 +210,17 @@ JSON result.
 
 ## 7. Packaging and remaining work
 
-- **Packaged.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
-  `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, built by the committed
-  packaging script from the clean committed source `2e28a88d8beb0548070cc8073cbb80b8174d8c66`
+- **Packaged.** `fusion-0.0.0-settings+fe65d08.zip`, 60,085,623 bytes, SHA-256
+  `5db4ab21c80a9ffd6aa68c880312a1c68c4b1c5f1a6fb71f78869aecb1d95e5d`, built by the committed packaging
+  script from the clean committed source `fe65d08621fb84f47ef83acfc3e50835217af462`
   (`sourceDirty=false`). All 148 manifest entries were re-verified after extraction, along with the
   Qt platform plugin, the executable/DLL identities, the zh_CN catalogs, the non-nested
-  `data\locale` layout and the notice/corresponding-source set. The manifest's settings block now
-  reads its repository, branch and commit from `cmake/settings-ui/versions.cmake` instead of a
-  literal, which is what had left a stale `0234c64` in it.
-  `fusion-0.0.0-settings+5271848.zip` (60,052,053 bytes) is retained for rollback. **Not installed,
-  not registered, not owner-accepted.**
+  `data\locale` layout and the notice/corresponding-source set. The manifest's settings block reads
+  its repository, branch and commit from `cmake/settings-ui/versions.cmake` instead of a literal,
+  which is what had left a stale `0234c64` in it. This batch changed `src/settings/main.cpp`, which
+  ships inside `FusionSettings.exe`, so the package was rebuilt from the new head rather than reused;
+  `fusion-0.0.0-settings+2e28a88.zip` (60,076,754 bytes) and `+5271848` (60,052,053 bytes) are retained
+  for rollback. **Not installed, not registered, not owner-accepted.**
 - **EXE installer** remains a separate later item (D085 / U4). U4 signing + distribution channel,
   U6 real-window confirmation, U7 tray hang-detection follow-up, WP5/WP7/P0-A/P0-B/P0-D are not
   closed by this stage.
@@ -256,7 +257,10 @@ Only the three intended task branches were pushed.
 - `correction-inventory.md` — C1–C9 (the consolidated correction batch), C10/C11 (this closure batch),
   and what was deliberately not changed.
 - `capability-mapping.md` — global/IM option-by-option mapping and the Shift/raw-input account.
-- `diffs/fusion-windows-stage-a.diff` — cumulative product diff `fe23f07..2e28a88` (the real diff, not
+- `isolated-stage-a-result.json` — the JSON `tools/settings/run-isolated-stage-a.ps1` printed for the
+  final run (`fusion-stage-a-20261021u`, profile `profile-stage-a-20`): integration PASS, the four
+  Cancel/Reload assertions, the skip/refusal results, and the before/after fingerprints.
+- `diffs/fusion-windows-stage-a.diff` — cumulative product diff `fe23f07..fe65d08` (the real diff, not
   a summary).
 - `diffs/fusion-windows-commits.txt` — product commit list.
 - `diffs/fcitx5-configtool-stage-a.diff` — the Stage A increment in the fork, `0234c64..abc2c66`

@@ -11,7 +11,8 @@ with reusable configtool adaptations on the owner fork `choicky/fcitx5-configtoo
 input-method list management over the runtime's actual methods; the fork's reusable list-management
 provider model is on `windows/fusion-settings`. Stage A has since been **built in Release on
 Windows 7700, validated against an isolated Host + GUI and packaged** as
-`fusion-0.0.0-settings+2e28a88.zip`; the per-state record (implemented / compiled / validated /
+`fusion-0.0.0-settings+fe65d08.zip` (after the test-isolation closure batch; `+2e28a88` is retained
+for rollback); the per-state record (implemented / compiled / validated /
 packaged / not installed) is the consolidated settings section of the Stage 6 plan and
 `evidence/stage-a-global-settings-2026-10-20/handoff.md`. It is **not installed, not registered and
 not owner-accepted**.

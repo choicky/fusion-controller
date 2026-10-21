@@ -69,7 +69,8 @@ stale at `0234c64`), so they now come from `cmake/settings-ui/versions.cmake`, a
 
 Result: product head `2e28a88` (Release build clean, focused CTest green, isolated Host + GUI
 validation passing, package `fusion-0.0.0-settings+2e28a88.zip`), controller head on PR #52, fork
-unchanged at `abc2c66`. The checks that were unrun at that point are named in `handoff.md` §6 and are
+unchanged at `abc2c66` — then superseded by the closure batch below (product `fe65d08`, package
+`fusion-0.0.0-settings+fe65d08.zip`). The checks that were unrun at that point are named in `handoff.md` §6 and are
 not presented as passing.
 
 ## Closure batch (2026-10-21) — test isolation and evidence accuracy
@@ -82,5 +83,8 @@ stay closed and none was reopened.
 | C10 | `tests/stage4a_ipc.cpp` `test_integration()` called `make_ipc_backend(timeout)` with no endpoint, so it connected to the default pipe — the installed product Host and the user's live profile. CTest set `FUSION_FCITX_SKIP_USER_PATH=1` on the *test* process, which cannot change the environment or profile of a Host that is already running; describing that as isolation was wrong. | The mode now requires `FUSION_STAGE4A_INTEGRATION_PIPE`, prints `SKIP` and connects to nothing without it, refuses this user's production endpoint in both the logical-name and full-path spellings before the first request, and connects with the device path `IpcBackend` actually needs. The CTest entry carries `SKIP_REGULAR_EXPRESSION` so a skip is reported as skipped; the misleading `ENVIRONMENT` property is gone, and `FUSION_STAGE4A_INTEGRATION_PIPE` is a cache variable for a configured run. New `tools/settings/run-isolated-stage-a.ps1` starts the Host on a unique pipe with a disposable profile and passes the endpoint. Assertions unchanged. |
 | C11 | Committed validation statements claimed more than their evidence: "Cancel/reload; unknown + learning-data preservation — EXECUTED and passing" bundled checks that had not run (Cancel/Reload was not exercised; "preservation" rested on file existence); the shared-value scenario was labelled a Global-versus-IM cross-page test; `stage4a_ipc_integration`'s failure was excused as "not a regression" because its source was unchanged; a `PageSize=9` observation was attributed to the owner without evidence. | Cancel/Reload is now a self-test step with its own assertions (edit discarded, baseline refreshed, a value changed on the Host behind the page fetched by Reload, tab switch keeping an edit). Preservation is measured on content: schema-known unsubmitted options survive, a key no schema knows is dropped by Fcitx's own save, learning files are byte-identical. The shared-value scenario is named Pinyin/Shuangpin. The integration test is executed against a controlled profile and passes, which replaces the inference. The `PageSize=9` note is recorded as unattributed. |
 
-Both are test/evidence changes: no shipped runtime code changed, so the `+2e28a88` package is retained
-and still names `2e28a88` as its source.
+Both are test/evidence changes in intent, but C10 also touches `src/settings/main.cpp`, which ships
+inside `FusionSettings.exe`, so the product binary differs and the package was rebuilt from the new
+head: `fusion-0.0.0-settings+fe65d08.zip` (60,085,623 bytes, SHA-256
+`5db4ab21c80a9ffd6aa68c880312a1c68c4b1c5f1a6fb71f78869aecb1d95e5d`, `sourceCommit=fe65d08`,
+`sourceDirty=false`, 148 manifest entries re-verified). `+2e28a88` is retained for rollback.

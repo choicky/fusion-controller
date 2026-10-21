@@ -255,13 +255,14 @@ ends on the reordered list. Preservation was measured on content, not existence:
 were byte-identical (SHA-256) before and after the settings-only session. No production Host/tray/browser/profile was changed. The live
 key-down/key-up test through a TSF-registered application was **not run**, so no keyboard claim rests on it.
 
-**Package.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
-`ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, built by the committed packaging script from the clean committed
-product source `2e28a88d8beb0548070cc8073cbb80b8174d8c66` with `sourceDirty=false`, the fork pinned at
+**Package.** `fusion-0.0.0-settings+fe65d08.zip`, 60,085,623 bytes, SHA-256
+`5db4ab21c80a9ffd6aa68c880312a1c68c4b1c5f1a6fb71f78869aecb1d95e5d`, built by the committed packaging script from the clean
+committed product source `fe65d08621fb84f47ef83acfc3e50835217af462` with `sourceDirty=false`, the fork pinned at
 `abc2c6644b030d761d3d5e7c27c888af019e63f0` (`windows/fusion-settings`, fork PR #2) and the pinned runtime identity. All 148 manifest
 entries were re-verified after extraction, together with the Qt platform plugin, the executable/DLL identities, the zh_CN catalogs,
-the non-nested `data\locale` layout and the notice/corresponding-source set. The package is **not installed and not registered**. The
-earlier `fusion-0.0.0-settings+5271848.zip` (60,052,053 bytes) is retained for rollback, and `+1f4b749` stays superseded.
+the non-nested `data\locale` layout and the notice/corresponding-source set. The package is **not installed and not registered**. It was
+rebuilt rather than reused because this batch changes `src/settings/main.cpp`, which ships inside `FusionSettings.exe`; the previous
+`fusion-0.0.0-settings+2e28a88.zip` (60,076,754 bytes) is retained for rollback, and `+1f4b749` stays superseded.
 
 **Corrections in this batch.** `correction-inventory.md` records C1–C9: the list surface did not compile
 (`QListWidget::addItem(QString)` returns `void`, not a `QListWidgetItem *`); Reload and Cancel skipped the Global page; unsupported

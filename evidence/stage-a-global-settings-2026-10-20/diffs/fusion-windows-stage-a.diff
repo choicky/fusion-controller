@@ -9,10 +9,42 @@ index 0000000..38d99d5
 +# every line and make the patch unapplicable, so they are never EOL-converted.
 +*.patch -text
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0828fd9..c44a2da 100644
+index 0828fd9..7b334ec 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -339,6 +339,19 @@ if(BUILD_TESTING)
+@@ -3,6 +3,11 @@ project(FusionWindowsStage1 LANGUAGES CXX)
+ 
+ option(FUSION_WITH_FCITX5 "Enable the Stage 4A out-of-process Fcitx Host (FusionHost.exe + IPC)" OFF)
+ option(FUSION_WITH_SETTINGS_UI "Build the upstream-derived FusionSettings.exe process" OFF)
++# The real-engine integration test types into the Host it connects to, so it runs
++# only against an endpoint named here. Leave it unset and the test skips: the
++# default endpoint is the installed product Host and the user's live data.
++set(FUSION_STAGE4A_INTEGRATION_PIPE "" CACHE STRING
++    "Isolated FusionHost pipe for stage4a_ipc_integration (empty = skip)")
+ if(FUSION_WITH_SETTINGS_UI AND NOT FUSION_WITH_FCITX5)
+   message(FATAL_ERROR "FusionSettings.exe requires FUSION_WITH_FCITX5=ON")
+ endif()
+@@ -228,10 +233,16 @@ if(BUILD_TESTING)
+       target_compile_definitions(stage4a PRIVATE FUSION_WITH_FCITX5)
+       target_link_libraries(stage4a PRIVATE FusionFcitxHost)
+       add_test(NAME stage4a_ipc_integration COMMAND stage4a integration)
+-      # The spawned product Host must not read or write the real per-user Fcitx
+-      # data (Stage 6 WP3 A2): the Host's own switch keeps it on the skipped path.
++      # Without an explicit isolated endpoint the mode prints SKIP and connects to
++      # nothing, so CTest has to report it as skipped rather than as a successful
++      # integration run. Setting a variable on this process would not isolate the
++      # Host anyway: it is already running, with its own environment and profile.
+       set_tests_properties(stage4a_ipc_integration PROPERTIES
+-        ENVIRONMENT "FUSION_FCITX_SKIP_USER_PATH=1")
++        SKIP_REGULAR_EXPRESSION "SKIP integration")
++      if(FUSION_STAGE4A_INTEGRATION_PIPE)
++        set_tests_properties(stage4a_ipc_integration PROPERTIES
++          ENVIRONMENT "FUSION_STAGE4A_INTEGRATION_PIPE=${FUSION_STAGE4A_INTEGRATION_PIPE}")
++      endif()
+     endif()
+ 
+     # Stage 4B reconnect / semantic-readiness / incarnation-fencing tests. They
+@@ -339,6 +350,19 @@ if(BUILD_TESTING)
      target_compile_options(wp3_input_methods PRIVATE -Wall -Wextra -Wpedantic -Werror)
    endif()
    add_test(NAME wp3_input_methods COMMAND wp3_input_methods)
@@ -846,7 +878,7 @@ index 9024402..219bb34 100644
      registerFcitxQtDBusTypes();
      controller_ = new ControllerProxy(pipeName, this, this);
 diff --git a/src/settings/main.cpp b/src/settings/main.cpp
-index b197134..fabb400 100644
+index b197134..407a3d2 100644
 --- a/src/settings/main.cpp
 +++ b/src/settings/main.cpp
 @@ -12,7 +12,6 @@
@@ -1150,7 +1182,7 @@ index b197134..fabb400 100644
    }
  
    void loadCurrentPage(bool force = false) {
-@@ -231,15 +346,14 @@ private:
+@@ -231,49 +346,79 @@ private:
      if (!page) {
        return;
      }
@@ -1161,15 +1193,24 @@ index b197134..fabb400 100644
      }
    }
  
-   void reloadAll(QLabel *status, const QString &successMessage) {
+-  void reloadAll(QLabel *status, const QString &successMessage) {
 -    reloadSelection([this, status, successMessage] {
 -      loadBothPages([this, status, successMessage](bool ok, const QString &error) {
-+    reloadImList([this, status, successMessage] {
-+      loadAllPages([this, status, successMessage](bool ok, const QString &error) {
++  // onDone is for the unattended self-test, which has to know when the reload
++  // chain finished; the buttons pass nothing and rely on the status label.
++  void reloadAll(QLabel *status, const QString &successMessage,
++                 std::function<void(bool, const QString &)> onDone = {}) {
++    reloadImList([this, status, successMessage, onDone] {
++      loadAllPages([this, status, successMessage, onDone](bool ok, const QString &error) {
          if (ok) {
            status->setText(successMessage);
          } else {
-@@ -249,31 +363,56 @@ private:
+           showError(status, error);
+         }
++        if (onDone) {
++          onDone(ok, error);
++        }
+       });
      });
    }
  
@@ -1246,7 +1287,7 @@ index b197134..fabb400 100644
    }
  
    // Both pages stay loaded so switching tabs keeps unsaved edits. Submitting the
-@@ -346,23 +485,28 @@ private:
+@@ -346,26 +491,103 @@ private:
  
    // Reads authoritative Host state without touching either page's widgets, so the
    // self-test can assert what the Host persisted rather than what the UI shows.
@@ -1283,7 +1324,82 @@ index b197134..fabb400 100644
      });
    }
  
-@@ -496,41 +640,345 @@ private:
++  // Writes through the Host's apply path without adopting the result into a page,
++  // which is what a *second* settings client does: the page keeps the values it
++  // loaded, so a Reload that does not actually fetch cannot pass this check by
++  // replaying its own baseline.
++  void applyHostValues(const QString &uri, const QVariantMap &values,
++                       std::function<void(bool, const QString &)> onDone) {
++    if (!provider_.controller()) {
++      onDone(false, QStringLiteral("无法创建 FusionHost 连接请求。"));
++      return;
++    }
++    auto *call = provider_.controller()->SetConfig(uri, QDBusVariant(values));
++    connect(call, &fcitx::kcm::PendingCall::finished, this, [call, onDone] {
++      const QDBusMessage reply = call->reply();
++      call->deleteLater();
++      if (reply.type() != QDBusMessage::ReplyMessage) {
++        onDone(false, reply.errorMessage());
++        return;
++      }
++      onDone(true, QString());
++    });
++  }
++
++  // The Cancel/Reload buttons start an asynchronous chain with no completion
++  // signal of its own. The self-test waits for the state it expects instead of
++  // assuming a fixed delay, and fails when the state never arrives.
++  void waitFor(std::function<bool()> ready, std::function<void(bool)> settled,
++               int timeoutMs = 15000) {
++    auto elapsed = std::make_shared<int>(0);
++    auto tick = std::make_shared<std::function<void()>>();
++    *tick = [this, ready, settled, elapsed, tick, timeoutMs] {
++      if (ready()) {
++        settled(true);
++        return;
++      }
++      if (*elapsed >= timeoutMs) {
++        settled(false);
++        return;
++      }
++      *elapsed += 50;
++      QTimer::singleShot(50, this, [tick] { (*tick)(); });
++    };
++    QTimer::singleShot(0, this, [tick] { (*tick)(); });
++  }
++
++  int globalPageSize() const {
++    return global_->value()
++        .toMap()
++        .value(QStringLiteral("Behavior"))
++        .toMap()
++        .value(QStringLiteral("DefaultPageSize"))
++        .toInt();
++  }
++
++  void setGlobalPageSize(int size) {
++    QVariantMap values = global_->value().toMap();
++    QVariantMap behavior = values.value(QStringLiteral("Behavior")).toMap();
++    behavior.insert(QStringLiteral("DefaultPageSize"), size);
++    values.insert(QStringLiteral("Behavior"), behavior);
++    global_->setValue(values);
++  }
++
++  // A page size that differs from both arguments, kept inside the schema's range
++  // so the write is a real value rather than a rejected one.
++  static int otherPageSize(int avoid1, int avoid2) {
++    for (int candidate : {8, 9, 10, 6, 5}) {
++      if (candidate != avoid1 && candidate != avoid2) {
++        return candidate;
++      }
++    }
++    return avoid1;
++  }
++
+   void runSelfTest() {
+     if (!selfTestTimer_.isValid()) {
+       selfTestTimer_.start();
+@@ -496,41 +718,529 @@ private:
                            QCoreApplication::exit(21);
                            return;
                          }
@@ -1299,8 +1415,8 @@ index b197134..fabb400 100644
 +
 +  void finishSelfTest() {
 +    status_->setText(QStringLiteral(
-+        "SELF-TEST PASS: cross-page shared value, global configuration and the input-method list "
-+        "round-tripped through the Host."));
++        "SELF-TEST PASS: cross-page shared value, global configuration, Cancel/Reload on the "
++        "Global page and the input-method list round-tripped through the Host."));
 +    if (!screenshot_.isEmpty()) {
 +      windowScreenshot_ = grab().save(screenshot_);
 +    }
@@ -1352,9 +1468,193 @@ index b197134..fabb400 100644
 +          QCoreApplication::exit(25);
 +          return;
 +        }
-+        runImListSelfTest();
++        runGlobalCancelReloadChecks();
 +      });
 +    });
++  }
++
++  // Cancel and Reload must act on the Global page, not only on the pages they used
++  // to walk: leaving it out kept its edits and baseline untouched while the status
++  // line reported success. Each step drives the same button a user clicks, and the
++  // Host is changed behind the page so that a Reload which does not fetch cannot
++  // pass by replaying the page's own baseline.
++  struct GlobalReloadCheck {
++    int host = 0;
++    int dirty = 0;
++    int foreign = 0;
++    int step = 0;
++  };
++
++  void runGlobalCancelReloadChecks() {
++    if (!globalLoaded_) {
++      status_->setText(QStringLiteral("SELF-TEST FAIL: the Global page did not load."));
++      QCoreApplication::exit(33);
++      return;
++    }
++    globalReloadStep(std::make_shared<GlobalReloadCheck>());
++  }
++
++  void failGlobalReload(const QString &message) {
++    showError(status_, QStringLiteral("SELF-TEST FAIL: %1").arg(message));
++    QCoreApplication::exit(33);
++  }
++
++  void globalReloadStep(const std::shared_ptr<GlobalReloadCheck> &check) {
++    switch (check->step++) {
++    case 0: {
++      // Read the authoritative value, make an unsaved edit, then Cancel.
++      readHostValues(globalUri_, [this, check](bool ok, const QVariantMap &values) {
++        if (!ok) {
++          failGlobalReload(QStringLiteral("could not read the global configuration."));
++          return;
++        }
++        check->host = values.value(QStringLiteral("Behavior"))
++                          .toMap()
++                          .value(QStringLiteral("DefaultPageSize"))
++                          .toInt();
++        if (check->host <= 0) {
++          failGlobalReload(QStringLiteral("the Host did not report a DefaultPageSize."));
++          return;
++        }
++        check->dirty = otherPageSize(check->host, -1);
++        check->foreign = otherPageSize(check->host, check->dirty);
++        setGlobalPageSize(check->dirty);
++        if (globalPageSize() != check->dirty) {
++          failGlobalReload(QStringLiteral("the Global page did not take an unsaved edit."));
++          return;
++        }
++        cancel_->click();
++        waitFor([this, check] { return globalPageSize() == check->host; },
++                [this, check](bool settled) {
++                  if (!settled) {
++                    failGlobalReload(QStringLiteral("Cancel did not restore the Host's value."));
++                    return;
++                  }
++                  if (baselinePageSize() != check->host) {
++                    failGlobalReload(QStringLiteral("Cancel did not refresh the Global baseline."));
++                    return;
++                  }
++                  if (!globalLoaded_) {
++                    failGlobalReload(QStringLiteral("Cancel left the Global page unloaded."));
++                    return;
++                  }
++                  std::fprintf(stderr, "[self-test] global cancel restored=%d\n", check->host);
++                  globalReloadStep(check);
++                });
++      });
++      return;
++    }
++    case 1: {
++      // A second client changes the Host through the same official apply path. The
++      // page must still show the value it loaded, then Reload must fetch the new one.
++      QVariantMap values = global_->value().toMap();
++      QVariantMap behavior = values.value(QStringLiteral("Behavior")).toMap();
++      behavior.insert(QStringLiteral("DefaultPageSize"), check->foreign);
++      values.insert(QStringLiteral("Behavior"), behavior);
++      applyHostValues(globalUri_, values, [this, check](bool ok, const QString &error) {
++        if (!ok) {
++          failGlobalReload(
++              QStringLiteral("a second client could not change the global value: %1").arg(error));
++          return;
++        }
++        if (globalPageSize() != check->host) {
++          failGlobalReload(QStringLiteral("the page adopted a change it did not load."));
++          return;
++        }
++        readHostValues(globalUri_, [this, check](bool hostRead, const QVariantMap &hostValues) {
++          if (!hostRead) {
++            failGlobalReload(QStringLiteral("could not read the changed global value."));
++            return;
++          }
++          const int applied = hostValues.value(QStringLiteral("Behavior"))
++                                  .toMap()
++                                  .value(QStringLiteral("DefaultPageSize"))
++                                  .toInt();
++          if (applied != check->foreign) {
++            failGlobalReload(QStringLiteral("the Host did not keep the second client's value."));
++            return;
++          }
++          setGlobalPageSize(check->dirty);
++          reload_->click();
++          waitFor([this, check] { return globalPageSize() == check->foreign; },
++                  [this, check](bool settled) {
++                    if (!settled) {
++                      failGlobalReload(
++                          QStringLiteral("Reload did not fetch the Host's changed value."));
++                      return;
++                    }
++                    if (baselinePageSize() != check->foreign) {
++                      failGlobalReload(QStringLiteral("Reload did not refresh the Global baseline."));
++                      return;
++                    }
++                    std::fprintf(stderr, "[self-test] global reload fetched=%d\n", check->foreign);
++                    globalReloadStep(check);
++                  });
++        });
++      });
++      return;
++    }
++    case 2: {
++      // Switching tabs must keep an ordinary unsaved edit, and the baseline a
++      // reload left behind must still support a normal apply.
++      const int pending = otherPageSize(check->foreign, check->host);
++      setGlobalPageSize(pending);
++      tabs_->setCurrentIndex(0);
++      tabs_->setCurrentIndex(2);
++      if (globalPageSize() != pending) {
++        failGlobalReload(QStringLiteral("switching tabs discarded an unsaved edit."));
++        return;
++      }
++      std::fprintf(stderr, "[self-test] global tab-switch kept=%d\n", pending);
++      cancel_->click();
++      waitFor([this, check] { return globalPageSize() == check->foreign; },
++              [this, check](bool settled) {
++                if (!settled) {
++                  failGlobalReload(QStringLiteral("Cancel did not discard the tab-switch edit."));
++                  return;
++                }
++                // Leave the value the restart check expects.
++                setGlobalPageSize(kGlobalPageSizeProbe);
++                applyCurrentPage([this](bool applied, const QString &error) {
++                  if (!applied) {
++                    failGlobalReload(
++                        QStringLiteral("apply after Reload failed: %1").arg(error));
++                    return;
++                  }
++                  readHostValues(globalUri_, [this](bool ok, const QVariantMap &values) {
++                    if (!ok) {
++                      failGlobalReload(
++                          QStringLiteral("could not read the value after the final apply."));
++                      return;
++                    }
++                    const int applied = values.value(QStringLiteral("Behavior"))
++                                            .toMap()
++                                            .value(QStringLiteral("DefaultPageSize"))
++                                            .toInt();
++                    if (applied != kGlobalPageSizeProbe) {
++                      failGlobalReload(
++                          QStringLiteral("the apply after Reload did not reach the Host."));
++                      return;
++                    }
++                    std::fprintf(stderr, "[self-test] global apply-after-reload=%d\n",
++                                 kGlobalPageSizeProbe);
++                    runImListSelfTest();
++                  });
++                });
++              });
++      return;
++    }
++    default:
++      return;
++    }
++  }
++
++  int baselinePageSize() const {
++    return baseline_.value(global_)
++        .value(QStringLiteral("Behavior"))
++        .toMap()
++        .value(QStringLiteral("DefaultPageSize"))
++        .toInt();
 +  }
 +
 +  // Stage A: the list surface must drive the Host's official setGroup/save and
@@ -1639,7 +1939,7 @@ index b197134..fabb400 100644
                  if (continuation) {
                    continuation();
                  }
-@@ -540,40 +988,115 @@ private:
+@@ -540,40 +1250,115 @@ private:
              });
    }
  
@@ -1677,7 +1977,7 @@ index b197134..fabb400 100644
 +    QStringList order;
 +    for (int i = 0; i < enabledList_->count(); ++i) {
 +      order.append(enabledList_->item(i)->data(Qt::UserRole).toString());
-+    }
+     }
 +    return order;
 +  }
 +
@@ -1685,7 +1985,7 @@ index b197134..fabb400 100644
 +    const int target = row + delta;
 +    if (row < 0 || target < 0 || target >= enabledList_->count()) {
 +      return;
-     }
++    }
 +    auto *item = enabledList_->takeItem(row);
 +    enabledList_->insertItem(target, item);
 +    enabledList_->setCurrentRow(target);
@@ -1767,7 +2067,7 @@ index b197134..fabb400 100644
    bool windowScreenshot_ = false;
    QString screenshot_;
    QElapsedTimer selfTestTimer_;
-@@ -588,11 +1111,22 @@ int main(int argc, char **argv) {
+@@ -588,11 +1373,22 @@ int main(int argc, char **argv) {
    QApplication::setOrganizationName(QStringLiteral("Fcitx5 Fusion"));
    const QString pipeName = endpointName(argc, argv);
    bool selfTest = false;
@@ -1790,7 +2090,7 @@ index b197134..fabb400 100644
      } else if (arg == QLatin1String("--screenshot") && i + 1 < argc) {
        screenshot = QString::fromLocal8Bit(argv[++i]);
      }
-@@ -602,7 +1136,8 @@ int main(int argc, char **argv) {
+@@ -602,7 +1398,8 @@ int main(int argc, char **argv) {
                            QStringLiteral("无法确定当前用户和会话的 FusionHost 管道。"));
      return 2;
    }
@@ -1800,6 +2100,145 @@ index b197134..fabb400 100644
    window.show();
    return application.exec();
  }
+diff --git a/tests/stage4a_ipc.cpp b/tests/stage4a_ipc.cpp
+index 321e886..ce8cdad 100644
+--- a/tests/stage4a_ipc.cpp
++++ b/tests/stage4a_ipc.cpp
+@@ -29,8 +29,11 @@
+ // - hostdiag: the R30 opt-in Host diagnostic log — off by default, file and line
+ //   format when enabled, privacy-marker redaction, the size cap and retention.
+ // - integration: full FusionHost.exe + Fcitx backend over IPC (only in the
+-//   FUSION_WITH_FCITX5 build; requires a running FusionHost.exe and the Fcitx
+-//   runtime). Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip instead of fail.
++//   FUSION_WITH_FCITX5 build). It types into the Host it connects to, so it
++//   requires an explicit isolated endpoint in FUSION_STAGE4A_INTEGRATION_PIPE;
++//   with none set it prints SKIP and connects to nothing, and an endpoint equal to
++//   this user's production pipe is refused before the first request.
++//   Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip explicitly.
+ //
+ // protocol/loopback/hostserver build and run in the Mock-only build too: the
+ // transport, the IpcBackend client and the HostServer do not depend on Fcitx.
+@@ -59,6 +62,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <cwchar>
+ #include <fstream>
+ #include <iostream>
+ #include <memory>
+@@ -96,6 +100,33 @@ std::wstring test_pipe_name(const wchar_t *suffix) {
+   return std::wstring(L"\\\\.\\pipe\\FusionHost-ipc-test-") + suffix;
+ }
+ 
++// The isolated endpoint arrives as an environment variable, so it is UTF-8 text
++// on the way in. An endpoint that is not valid UTF-8 cannot name the pipe the
++// caller meant, so it is rejected rather than converted into a similar name.
++std::wstring wide_from_utf8(const char *text) {
++  if (text == nullptr || *text == '\0')
++    return {};
++  const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
++  if (count <= 0)
++    return {};
++  std::wstring wide(static_cast<std::size_t>(count - 1), L'\0');
++  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide.data(), count) <= 0)
++    return {};
++  return wide;
++}
++
++// True when the endpoint names the pipe the installed product Host listens on for
++// this user and session. Both spellings have to be recognised — the full Win32
++// path and the bare logical name — because both reach the same pipe, and the
++// integration assertions type into whichever Host they connect to.
++bool is_production_endpoint(const std::wstring &endpoint) {
++  const std::wstring logical = logical_pipe_name(endpoint);
++  if (logical.empty())
++    return false;
++  const std::wstring production = logical_pipe_name(compute_pipe_name());
++  return !production.empty() && _wcsicmp(logical.c_str(), production.c_str()) == 0;
++}
++
+ template <typename Predicate>
+ bool wait_until(Predicate predicate, std::chrono::milliseconds limit) {
+   const auto deadline = std::chrono::steady_clock::now() + limit;
+@@ -927,6 +958,29 @@ void test_pipe_endpoint() {
+     require(fusion::ipc::logical_pipe_name(L"\\\\?\\pipe\\fusion").empty(),
+             "an unsupported device path form is rejected");
+   }
++
++  // 4. The integration mode's production-endpoint guard, checked here without a
++  //    Host so the guard itself can never be the thing that reaches the live pipe.
++  //    Both spellings of the live endpoint are recognised; a production-*shaped*
++  //    name that is not this user's endpoint is not mistaken for it.
++  {
++    const std::wstring production = fusion::ipc::compute_pipe_name();
++    const std::wstring logical = fusion::ipc::logical_pipe_name(production);
++    require(!logical.empty(), "the production endpoint has a logical name");
++    require(is_production_endpoint(production),
++            "the full-path production endpoint is recognised");
++    require(is_production_endpoint(logical), "the logical production endpoint is recognised");
++    require(is_production_endpoint(L"\\\\.\\pipe\\" + logical),
++            "the full path of the logical production name is recognised");
++    require(!is_production_endpoint(L"fusion-selftest-8f2c"),
++            "an isolated endpoint is not the production endpoint");
++    require(!is_production_endpoint(L"FusionHost-v1-S-1-5-21-1-1"),
++            "a production-shaped name for another user is not this endpoint");
++    require(!is_production_endpoint(L""), "an empty endpoint is not the production endpoint");
++    require(wide_from_utf8("fusion-selftest-8f2c") == L"fusion-selftest-8f2c",
++            "a UTF-8 endpoint converts to the same logical name");
++    require(wide_from_utf8("\xff\xfe").empty(), "invalid UTF-8 is rejected");
++  }
+ }
+ 
+ void test_loopback() {
+@@ -2398,12 +2452,43 @@ void test_integration() {
+     return;
+   }
+ 
+-  // This test requires FusionHost.exe to be running.
+-  auto backend = make_ipc_backend(std::chrono::milliseconds(2000));
++  // These assertions type into whichever Host owns the endpoint they connect to,
++  // so this mode must never fall back to the default endpoint: that one belongs to
++  // the installed product Host and to the user's live configuration and learning
++  // data. A CTest process cannot isolate a Host it did not start — an environment
++  // variable set here would not reach one — so an explicit isolated endpoint is
++  // required, and its absence skips instead of connecting.
++  const char *configured = std::getenv("FUSION_STAGE4A_INTEGRATION_PIPE");
++  if (configured == nullptr || *configured == '\0') {
++    std::cout << "SKIP integration (FUSION_STAGE4A_INTEGRATION_PIPE not set; the production "
++                 "endpoint is never used)\n";
++    return;
++  }
++  const std::wstring endpoint = wide_from_utf8(configured);
++  const std::wstring isolated = logical_pipe_name(endpoint);
++  if (isolated.empty()) {
++    throw std::runtime_error(
++        "integration: FUSION_STAGE4A_INTEGRATION_PIPE is not a single pipe name");
++  }
++  // Refused before the first request: the caller asked for an isolated run and got
++  // the live endpoint, which is the one case where connecting would corrupt state
++  // outside this test.
++  if (is_production_endpoint(endpoint)) {
++    throw std::runtime_error(
++        "integration: refusing the production endpoint; set FUSION_STAGE4A_INTEGRATION_PIPE "
++        "to the isolated Host's pipe");
++  }
++
++  // IpcBackend hands the name straight to CreateFileW, so it needs the Win32 device
++  // path; only Qt's QLocalSocket completes a logical name by itself.
++  const std::wstring device_path = std::wstring(pipe_device_path_prefix) + isolated;
++  auto backend = make_ipc_backend(device_path, std::chrono::milliseconds(2000));
+   if (!backend) {
+-    std::fprintf(stderr, "FAIL integration: FusionHost not reachable\n");
+-    std::fprintf(stderr, "  Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip.\n");
+-    throw std::runtime_error("integration: FusionHost not reachable");
++    std::fprintf(stderr, "FAIL integration: no FusionHost is listening on the isolated endpoint\n");
++    std::fprintf(stderr, "  Start an isolated Host on %ls, or set "
++                         "FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip.\n",
++                 isolated.c_str());
++    throw std::runtime_error("integration: isolated FusionHost not reachable");
+   }
+   require(backend->healthy(), "integration healthy");
+ 
 diff --git a/tests/stage_a_settings.cpp b/tests/stage_a_settings.cpp
 new file mode 100644
 index 0000000..84acedf
@@ -2102,3 +2541,339 @@ index 5fc20ff..80ef2d8 100644
  if (-not $configtoolRepository.Success) { throw 'Missing owner-fork repository URL pin' }
  $configtool = Get-PinnedCheckout 'fcitx5-configtool' $configtoolRepository.Groups[1].Value `
    (Get-Pin 'FUSION_SETTINGS_CONFIGTOOL_COMMIT')
+diff --git a/tools/settings/run-isolated-stage-a.ps1 b/tools/settings/run-isolated-stage-a.ps1
+new file mode 100644
+index 0000000..8b5f3d0
+--- /dev/null
++++ b/tools/settings/run-isolated-stage-a.ps1
+@@ -0,0 +1,330 @@
++param(
++  [Parameter(Mandatory = $true)][string]$BuildDir,
++  [Parameter(Mandatory = $true)][string]$ProfileRoot,
++  [Parameter(Mandatory = $true)][string]$PipeName,
++  [string]$OutFile = ''
++)
++
++# Stage A closure checks against a real, isolated Host.
++#
++# One disposable profile, one isolated pipe, two consumers:
++#   1. stage4a integration — the real-engine assertions (Pinyin keys, the commit,
++#      the projected candidate). It types, so it runs only here, against a Host
++#      this script started, with the endpoint passed explicitly.
++#   2. FusionSettings --self-test — global apply, Global Cancel/Reload, the
++#      input-method list and the no-change pass.
++#
++# Around and between them the script asserts the two things the evidence pack
++# claimed but had not shown: configuration the apply does not submit survives, and
++# the engine's learning files are not rewritten by a settings-only session. It also
++# proves the safe default: with no endpoint the integration mode skips, and this
++# user's production endpoint is refused in both spellings before any request.
++#
++# Isolation is applied to the Host itself: APPDATA/LOCALAPPDATA/USERPROFILE are
++# redirected in this process, so every child inherits the disposable profile. The
++# production Host is never addressed — only the named stop event of this scope is
++# signalled, and the production pipe name is rejected as a parameter.
++
++$ErrorActionPreference = 'Stop'
++Set-StrictMode -Version 2.0
++
++trap {
++  [Console]::Error.WriteLine("HARNESS ERROR line={0}: {1}" -f `
++    $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message)
++  exit 1
++}
++
++# The real profile, read-only, before anything is redirected: the refusal checks
++# below must not be able to write to it.
++$realPinyinDir = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'fcitx5\pinyin'
++
++$BuildDir = (Resolve-Path -LiteralPath $BuildDir).Path
++$ProfileRoot = [IO.Path]::GetFullPath($ProfileRoot)
++New-Item -ItemType Directory -Force $ProfileRoot | Out-Null
++
++if ($PipeName -match '^FusionHost-v1-') {
++  throw "Refusing '$PipeName': that is the product pipe identity, and a Host started on it would collide with the installed one. Pass an isolated name."
++}
++if ($PipeName -match '[\\/:*?"<>|\x00-\x1f]') {
++  throw "Refusing '$PipeName': not a single pipe name component."
++}
++
++$bin = Join-Path $BuildDir 'bin'
++$hostExe = Join-Path $bin 'FusionHost.exe'
++$settingsExe = Join-Path $bin 'FusionSettings.exe'
++$stage4aExe = Join-Path $bin 'stage4a.exe'
++foreach ($path in @($hostExe, $settingsExe, $stage4aExe, (Join-Path $bin 'FusionFcitxHost.dll'))) {
++  if (-not (Test-Path -LiteralPath $path)) { throw "Missing isolated product binary: $path" }
++}
++
++$env:APPDATA = Join-Path $ProfileRoot 'AppData\Roaming'
++$env:LOCALAPPDATA = Join-Path $ProfileRoot 'AppData\Local'
++$env:USERPROFILE = Join-Path $ProfileRoot 'User'
++New-Item -ItemType Directory -Force $env:APPDATA, $env:LOCALAPPDATA, $env:USERPROFILE | Out-Null
++$env:PATH = "$bin;$env:PATH"
++$env:FUSION_HOST_DIAGNOSTICS = '1'
++
++$pipe = "\\.\pipe\$PipeName"
++$stopScope = "stage-a-$PipeName"
++$stopEventName = "Local\FusionHost-stop-$stopScope"
++
++Add-Type -Namespace StageAClosure -Name Native -MemberDefinition @'
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true, CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
++public static extern System.IntPtr OpenEventW(uint access, bool inherit, string name);
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]
++public static extern bool SetEvent(System.IntPtr handle);
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]
++public static extern bool CloseHandle(System.IntPtr handle);
++'@
++
++# Fcitx resolves its user directory from the profile, not from APPDATA: the files
++# this script seeds and compares live under %USERPROFILE%\AppData\Roaming\Fcitx5.
++$fcitxRoot = Join-Path $env:USERPROFILE 'AppData\Roaming\Fcitx5'
++$configDir = Join-Path $fcitxRoot 'config\fcitx5'
++$globalConfig = Join-Path $configDir 'config'
++$pinyinConfig = Join-Path $configDir 'conf\pinyin.conf'
++$learningDir = Join-Path $fcitxRoot 'pinyin'
++
++function Invoke-Bounded {
++  param(
++    [string]$Exe,
++    [string]$Arguments,
++    [string]$IntegrationEndpoint = '',
++    [int]$TimeoutMs = 60000
++  )
++  # The child inherits this process's environment. An empty value is how this
++  # script says "unset": the integration mode treats an empty
++  # FUSION_STAGE4A_INTEGRATION_PIPE exactly like a missing one, which is the case
++  # the safe-default check needs.
++  $previous = $env:FUSION_STAGE4A_INTEGRATION_PIPE
++  $env:FUSION_STAGE4A_INTEGRATION_PIPE = $IntegrationEndpoint
++  try {
++    $psi = [Diagnostics.ProcessStartInfo]::new()
++    $psi.FileName = $Exe
++    $psi.Arguments = $Arguments
++    $psi.WorkingDirectory = $BuildDir
++    $psi.UseShellExecute = $false
++    $psi.CreateNoWindow = $true
++    $psi.RedirectStandardError = $true
++    $psi.RedirectStandardOutput = $true
++    $sw = [Diagnostics.Stopwatch]::StartNew()
++    $proc = [Diagnostics.Process]::Start($psi)
++    $stderr = $proc.StandardError.ReadToEndAsync()
++    $stdout = $proc.StandardOutput.ReadToEndAsync()
++    $finished = $proc.WaitForExit($TimeoutMs)
++    if (-not $finished) {
++      $proc.Kill()
++      $proc.WaitForExit(5000)
++    }
++    $sw.Stop()
++    return @{
++      ExitCode  = $(if ($finished) { $proc.ExitCode } else { -1 })
++      TimedOut  = (-not $finished)
++      ElapsedMs = $sw.ElapsedMilliseconds
++      Stdout    = $stdout.Result.Trim()
++      Stderr    = $stderr.Result.Trim()
++    }
++  } finally {
++    $env:FUSION_STAGE4A_INTEGRATION_PIPE = $previous
++  }
++}
++
++function Start-IsolatedHost {
++  $psi = [Diagnostics.ProcessStartInfo]::new()
++  $psi.FileName = $hostExe
++  $psi.Arguments = "--console --pipe-name `"$pipe`" --stop-event-scope `"$stopScope`""
++  $psi.WorkingDirectory = $BuildDir
++  $psi.UseShellExecute = $false
++  $psi.CreateNoWindow = $true
++  $proc = [Diagnostics.Process]::Start($psi)
++  # Readiness is taken from the Host's own diagnostic log rather than from a probe
++  # connection: the Host listens on one instance at a time, so a probe would consume
++  # it and leave the consumer that follows with nothing to connect to.
++  $logPath = Join-Path (Join-Path $env:LOCALAPPDATA 'fusion-host') "fusion-host-$($proc.Id).log"
++  $deadline = (Get-Date).AddSeconds(20)
++  while ((Get-Date) -lt $deadline) {
++    if ($proc.HasExited) { throw "FusionHost exited early with code $($proc.ExitCode)" }
++    if (Test-Path -LiteralPath $logPath) {
++      if (Select-String -LiteralPath $logPath -Pattern 'accept_loop' -Quiet -ErrorAction SilentlyContinue) {
++        Start-Sleep -Milliseconds 150
++        return $proc
++      }
++    }
++    Start-Sleep -Milliseconds 50
++  }
++  throw "FusionHost did not reach its accept loop (expected $logPath)"
++}
++
++function Stop-IsolatedHostOrderly {
++  param([Diagnostics.Process]$Process)
++  $handle = [StageAClosure.Native]::OpenEventW(0x0002, $false, $stopEventName)
++  if ($handle -eq [IntPtr]::Zero) { throw "cannot open the isolated stop event $stopEventName" }
++  try {
++    if (-not [StageAClosure.Native]::SetEvent($handle)) { throw 'cannot signal the isolated stop event' }
++  } finally {
++    [void][StageAClosure.Native]::CloseHandle($handle)
++  }
++  if (-not $Process.WaitForExit(30000)) {
++    $Process.Kill()
++    $Process.WaitForExit(5000)
++    return @{ ExitCode = -1; TimedOut = $true }
++  }
++  Start-Sleep -Milliseconds 300
++  return @{ ExitCode = $Process.ExitCode; TimedOut = $false }
++}
++
++function Get-FileFingerprint {
++  param([string]$Path)
++  if (-not (Test-Path -LiteralPath $Path)) { return @{ Exists = $false; Length = 0; Sha256 = '' } }
++  $item = Get-Item -LiteralPath $Path
++  return @{
++    Exists = $true
++    Length = $item.Length
++    Sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
++  }
++}
++
++# INI value reader: the seeded keys are plain `Key=Value` lines in one section.
++function Get-IniValue {
++  param([string]$Path, [string]$Section, [string]$Key)
++  if (-not (Test-Path -LiteralPath $Path)) { return $null }
++  $current = ''
++  foreach ($line in Get-Content -LiteralPath $Path) {
++    if ($line -match '^\[(.+)\]$') { $current = $Matches[1]; continue }
++    if ($current -ne $Section) { continue }
++    if ($line -match "^\s*$([regex]::Escape($Key))\s*=\s*(.*)$") { return $Matches[1].Trim() }
++  }
++  return $null
++}
++
++$result = [ordered]@{}
++$result.pipe = $PipeName
++$result.profileRoot = $ProfileRoot
++
++# ---- seed: configuration the apply must not submit, plus an unknown key --------
++# Both are written before any Host starts, so their survival spans every save this
++# run performs. ShowInputMethodInformation and SpellEnabled are schema-known and
++# non-default; no step in the self-test changes them, which is what "unexposed by
++# this apply" means. FusionStageAUnknownProbe is not in any schema.
++New-Item -ItemType Directory -Force (Split-Path -Parent $pinyinConfig) | Out-Null
++# DefaultPageSize starts away from the value the self-test applies, so that apply is
++# a real write rather than an empty delta. The files are written without a BOM:
++# Fcitx parses the first line as the first section header.
++[IO.File]::WriteAllText($globalConfig, (@(
++  '[Behavior]',
++  'DefaultPageSize=5',
++  'ShowInputMethodInformation=False',
++  'FusionStageAUnknownProbe=keep-me'
++) -join "`r`n") + "`r`n")
++[IO.File]::WriteAllText($pinyinConfig, (@(
++  'PageSize=8',
++  'SpellEnabled=False',
++  'FusionStageAUnknownProbe=keep-me'
++) -join "`r`n") + "`r`n")
++$result.seededGlobalUnknownKey = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'FusionStageAUnknownProbe')
++$result.seededGlobalKnownValue = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'ShowInputMethodInformation')
++$result.seededPinyinKnownValue = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'SpellEnabled')
++
++# ---- safe default and refusal, before any Host is started ---------------------
++# 1. No endpoint: the mode must skip without connecting.
++$result.missingEndpoint = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint '' -TimeoutMs 20000
++$result.missingEndpointSkipped = ($result.missingEndpoint.ExitCode -eq 0 -and
++  $result.missingEndpoint.Stdout -like 'SKIP integration*')
++
++# 2. This user's production endpoint, in both spellings, must be refused before any
++#    request. The owner's learning files are fingerprinted around the attempt: if
++#    the guard ever stopped working, this run would have typed into them.
++$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
++$session = (Get-Process -Id $PID).SessionId
++$productionLogical = "FusionHost-v1-$sid-$session"
++$before = @{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $before[$name] = Get-FileFingerprint -Path (Join-Path $realPinyinDir $name)
++}
++$result.productionRefusalLogical = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint $productionLogical -TimeoutMs 20000
++$result.productionRefusalFullPath = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint "\\.\pipe\$productionLogical" -TimeoutMs 20000
++$result.malformedEndpointRefusal = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint 'bad\name' -TimeoutMs 20000
++$untouched = $true
++foreach ($name in @('user.dict', 'user.history')) {
++  $after = Get-FileFingerprint -Path (Join-Path $realPinyinDir $name)
++  if ($after.Sha256 -ne $before[$name].Sha256 -or $after.Length -ne $before[$name].Length) {
++    $untouched = $false
++  }
++}
++$refused = { param($r) $r.ExitCode -ne 0 -and $r.Stderr -like '*refusing the production endpoint*' }
++$result.productionEndpointRefused = ((& $refused $result.productionRefusalLogical) -and
++  (& $refused $result.productionRefusalFullPath))
++$result.productionLearningUntouched = $untouched
++$result.malformedEndpointRefused = ($result.malformedEndpointRefusal.ExitCode -ne 0 -and
++  $result.malformedEndpointRefusal.Stderr -like '*not a single pipe name*')
++
++# ---- phase 1: real-engine integration against the isolated Host ---------------
++$host1 = $null
++try {
++  $host1 = Start-IsolatedHost
++  $result.integration = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++    -IntegrationEndpoint $PipeName -TimeoutMs 120000
++} finally {
++  if ($host1 -and -not $host1.HasExited) {
++    $stop = Stop-IsolatedHostOrderly -Process $host1
++    $result.integrationHostExit = $stop.ExitCode
++    $result.integrationHostStoppedInTime = (-not $stop.TimedOut)
++  }
++}
++
++# ---- learning fixtures: produced by that run, recorded before the settings pass -
++# The engine wrote these while committing; they are the valid fixtures. A synthetic
++# dictionary is not used, and the owner's files are never read as data.
++$learningBefore = [ordered]@{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $learningBefore[$name] = Get-FileFingerprint -Path (Join-Path $learningDir $name)
++}
++$result.learningBefore = $learningBefore
++
++# ---- phase 2: settings session — global apply, Cancel/Reload, list, no-change --
++$host2 = $null
++try {
++  $host2 = Start-IsolatedHost
++  $result.selfTest = Invoke-Bounded -Exe $settingsExe `
++    -Arguments "--pipe-name `"$pipe`" --self-test" -TimeoutMs 120000
++} finally {
++  if ($host2 -and -not $host2.HasExited) {
++    $stop = Stop-IsolatedHostOrderly -Process $host2
++    $result.selfTestHostExit = $stop.ExitCode
++    $result.selfTestHostStoppedInTime = (-not $stop.TimedOut)
++  }
++}
++
++# ---- after: learning files and configuration, compared at the same point ------
++$learningAfter = [ordered]@{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $learningAfter[$name] = Get-FileFingerprint -Path (Join-Path $learningDir $name)
++}
++$result.learningAfter = $learningAfter
++$result.learningDictByteIdentical =
++  ($learningBefore['user.dict'].Sha256 -eq $learningAfter['user.dict'].Sha256)
++$result.learningHistoryByteIdentical =
++  ($learningBefore['user.history'].Sha256 -eq $learningAfter['user.history'].Sha256)
++$result.learningPresentAfter = ($learningAfter['user.dict'].Exists -and
++  $learningAfter['user.history'].Exists)
++
++$result.globalUnknownKeyAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'FusionStageAUnknownProbe')
++$result.globalKnownValueAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'ShowInputMethodInformation')
++$result.globalPageSizeAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'DefaultPageSize')
++$result.pinyinKnownValueAfter = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'SpellEnabled')
++$result.pinyinUnknownKeyAfter = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'FusionStageAUnknownProbe')
++
++$result.globalUnknownKeyPreserved = ($result.globalUnknownKeyAfter -eq 'keep-me')
++$result.pinyinUnknownKeyPreserved = ($result.pinyinUnknownKeyAfter -eq 'keep-me')
++$result.globalKnownUnsubmittedPreserved = ($result.globalKnownValueAfter -eq 'False')
++$result.pinyinKnownUnsubmittedPreserved = ($result.pinyinKnownValueAfter -eq 'False')
++
++$json = $result | ConvertTo-Json -Depth 6
++if ($OutFile) {
++  [IO.File]::WriteAllText($OutFile, $json)
++}
++$json

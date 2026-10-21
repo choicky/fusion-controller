@@ -124,7 +124,8 @@ kept apart on purpose: implemented ≠ compiled ≠ tested ≠ packaged ≠ inst
 
 - **Implemented.** Product `fusion-windows` `feature/stage-a-global-settings-im-methods` off `fe23f07`:
   feature commit `0a965e2`, one consolidated correction `fb62348` (C1–C9), packaging-pin correction
-  `2e28a88`. Controller `fusion-controller` `feature/stage-a-global-settings` off `96fb28c`.
+  `2e28a88`, and the closure batch `fe65d08` (C10 test isolation, C11 evidence accuracy). Controller
+  `fusion-controller` `feature/stage-a-global-settings` off `96fb28c`.
   **Fork: no new commit** — the build and the package pin `abc2c66`, and inspection showed nothing in
   the fork needed changing (`configlib` links only `launchexternal.cpp`/`logging.cpp`/`font.cpp`;
   `configwidgetslib` calls only `GetConfig`, `SetConfig` and `PendingSignal::finished`; no fork
@@ -149,10 +150,12 @@ kept apart on purpose: implemented ≠ compiled ≠ tested ≠ packaged ≠ inst
   Preservation was measured on content: the schema-known but unsubmitted `ShowInputMethodInformation` and
   pinyin `SpellEnabled` survived, a key no schema knows was dropped by Fcitx's own save, and
   `user.dict`/`user.history` were byte-identical across the settings-only session.
-- **Packaged.** `fusion-0.0.0-settings+2e28a88.zip`, 60,076,754 bytes, SHA-256
-  `ab6101b37111a81da775207d9babd98158a794b5127b9cb17f1a41c134810214`, from clean committed source
-  `2e28a88d8beb0548070cc8073cbb80b8174d8c66` with `sourceDirty=false`. All 148 manifest entries were
-  re-verified after extraction. `fusion-0.0.0-settings+5271848.zip` is retained for rollback.
+- **Packaged.** `fusion-0.0.0-settings+fe65d08.zip`, 60,085,623 bytes, SHA-256
+  `5db4ab21c80a9ffd6aa68c880312a1c68c4b1c5f1a6fb71f78869aecb1d95e5d`, from clean committed source
+  `fe65d08621fb84f47ef83acfc3e50835217af462` with `sourceDirty=false`. All 148 manifest entries were
+  re-verified after extraction. The package was rebuilt rather than reused because C10 changes
+  `src/settings/main.cpp`, which ships in `FusionSettings.exe`;
+  `fusion-0.0.0-settings+2e28a88.zip` and `+5271848` are retained for rollback.
 - **Not installed, not registered, not accepted.** No package was installed, no TIP was registered,
   and the owner's production Host, tray, browser and profile were not modified. The live
   key-down/key-up check through a TSF-registered application was **not run**, so the `Shift`/`Return`
