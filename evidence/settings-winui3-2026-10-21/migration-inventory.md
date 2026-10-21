@@ -1,8 +1,13 @@
 # Migration inventory — Windows settings (C# + WinUI 3)
 
 Status: **design inventory, corrected 2026-10-21.** It records what the schema actually contains and where each item is
-meant to live in the new navigation. **Nothing here is implemented**: the client is not compiled (see `blocker.md`), so
-"disposition" is a design decision, not an observed behaviour.
+meant to live in the new navigation.
+
+**What exists.** The client's **core** is implemented, compiled and tested (fusion-windows
+`src/settings-winui3/FusionSettings.Core`): framing, codecs, endpoint naming, connection and handshake, the shared
+draft/baseline model, key chords and lists, the key-editor state machine, and the input-method draft. The **WinUI views are
+not written**, because `Microsoft.WindowsAppSDK` cannot be restored here (`blocker.md`). So a "disposition" below is a
+design decision plus, where the core implements it, a tested behaviour — never a claim that a settings window shows it.
 
 ## 0. Method
 
@@ -22,8 +27,9 @@ Three facts are kept separate for every row, because they fail independently:
 
 Disposition vocabulary: **R** reachable in the design (schema + consumer + a delivery path that exists) · **C** conditional
 limitation, stated in the row (consumer exists, but the triggering event is not delivered on this path) · **X**
-external/sub-configuration link to another configuration surface · **H** hidden by upstream, not exposed · **NV** not
-validated (no runtime test executed; the default for anything not measured).
+external/sub-configuration link to another configuration surface · **H** hidden by upstream, not exposed · **V** present
+in the value tree but in no schema, so there is no editable location and the client never writes it · **NV** not validated
+(no runtime test executed; the default for anything not measured).
 
 A row marked **R** means "the design exposes it"; it does **not** mean the value was observed to take effect. Nothing in
 this document is a product-validation claim.
@@ -59,6 +65,13 @@ drafts of one value, and saving the stale one would revert the other. Method-spe
 place or hide options differently (e.g. `OptionalHideInDescription` entries live under More), but a field hidden in one view
 is never fabricated there, and the value edited in either view is the same one.
 
+**How the core implements it.** `SettingsDraft` holds the **values** — a confirmed baseline and a set of pending edits —
+and no schema. Each edit takes the requesting view's snapshot, so the editable-field check is explicitly that view's, and
+adopting or refreshing a reply from either view cannot replace the other view's schema. One draft, two schemas: a
+Shuangpin-specific field is editable through the Shuangpin view and refused by the Pinyin view, while both share one
+pending set and one change set. A field that no view describes (the four `CloudPinyin*` values, `FirstRun`) is therefore not
+writable from anywhere.
+
 ### 2.1 Engine, candidates and preedit
 
 | Path | Type · default · constraints | Consumer | New location | Disposition |
@@ -71,10 +84,6 @@ is never fabricated there, and the value edited in either view is the same one.
 | `ChaiziEnabled` | bool · `true` | pinyin engine | Candidates and input · More | R |
 | `ExtBEnabled` | bool · `true` on desktop | pinyin engine | Candidates and input · More | R |
 | `StrokeCandidateEnabled` | bool · `true` | pinyin engine | Candidates and input · stroke candidates | R |
-| `CloudPinyinEnabled` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — the `cloudpinyin` addon is **not** in the packaged set, so the value is stored but the feature cannot act here |
-| `CloudPinyinIndex` | int · `2` · 1–10 | cloudpinyin addon | Candidates and input · More | C — same missing addon |
-| `CloudPinyinAnimation` | bool · `true` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
-| `KeepCloudPinyinPlaceHolder` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
 | `PreeditMode` | enum · `ComposingPinyin` on desktop | pinyin engine | Candidates and input · preedit mode | R |
 | `PreeditCursorPositionAtBeginning` | bool · `true` | pinyin engine | Candidates and input · preedit cursor | R |
 | `PinyinInPreedit` | bool · `false` | pinyin engine | Candidates and input · show full pinyin | R |
@@ -84,6 +93,18 @@ is never fabricated there, and the value edited in either view is the same one.
 | `BackspaceBehaviorOnPrediction` | enum · `BackspaceWhenNotUsingOnScreenKeyboard` | pinyin engine | Candidates and input · prediction · more | R |
 | `SwitchInputMethodBehavior` | enum · `CommitPreedit` | pinyin engine | Keys · action when switching input method | R |
 | `Learning` | bool · `true` | pinyin engine | Candidates and input · learning | R |
+
+**Value-tree-only fields (no editable UI location).** Five keys are present in the configuration's value tree but are
+described by **no** schema in this runtime, so no view can display them and the core refuses to write them. They are
+recorded here so a later schema change is noticed, not to give them a screen:
+
+| Path | Type · default | Why it is not exposed | Disposition |
+|---|---|---|---|
+| `CloudPinyinEnabled` | bool · `false` | `cloudpinyin` addon is not in the packaged set, so the engine still stores the value but exposes no option for it | **V** — value-tree only; never written |
+| `CloudPinyinIndex` | int · `2` · 1–10 | same | **V** |
+| `CloudPinyinAnimation` | bool · `true` | same | **V** |
+| `KeepCloudPinyinPlaceHolder` | bool · `false` | same | **V** |
+| `FirstRun` | bool · `true` | hidden upstream (`HiddenOption`); the first-run flow is not part of this product | **V** |
 
 ### 2.2 Fuzzy pinyin — `Fuzzy` (nested container)
 
@@ -113,7 +134,7 @@ All children: **R**, on Candidates and input · fuzzy pinyin (advanced items und
 |---|---|---|---|---|---|
 | `ForgetWord` | `Control+7` | no | pinyin engine | Keys · learning | R |
 | `PrevPage` | `minus`, `Up`, `KP_Up`, `Page_Up` | no | pinyin engine | Keys · paging | R |
-| `NextPage` | `equal`, `Down`, `KP_Down`, `Page_Down` | no | pinyin engine | Keys · paging | R |
+| `NextPage` | `equal`, `Down`, `KP_Down`, `Next` | no | pinyin engine | Keys · paging | R |
 | `PrevCandidate` | `Shift+Tab` | no | pinyin engine | Keys · candidate navigation | R |
 | `NextCandidate` | `Tab` | no | pinyin engine | Keys · candidate navigation | R |
 | `CurrentCandidate` | `space`, `KP_Space` | no | pinyin engine | Keys · candidate navigation | R |
@@ -121,15 +142,22 @@ All children: **R**, on Candidates and input · fuzzy pinyin (advanced items und
 | `SecondCandidate` | **empty list** | **no** | pinyin engine | Keys · candidate selection | R |
 | `ThirdCandidate` | **empty list** | **no** | pinyin engine | Keys · candidate selection | R |
 | `UseKeypadAsSelection` | bool · `false` | — | pinyin engine | Keys · candidate selection | R |
-| `ChooseCharFromPhrase` | `[` | **yes** — the N-th binding selects the N-th character of the current candidate (upstream tooltip) | pinyin engine | Keys · phrase selection | R; order is semantic, never sorted or de-duplicated |
-| `ChooseLastCharFromPhrase` | `]` | no (single `Key`, not a list) | pinyin engine | Keys · phrase selection | R |
+| `ChooseCharFromPhrase` | `bracketleft` (the source literal is `[`) | **yes** — the N-th binding selects the N-th character of the current candidate (upstream tooltip) | pinyin engine | Keys · phrase selection | R; order is semantic, never sorted or de-duplicated |
+| `ChooseLastCharFromPhrase` | `bracketright` (source literal `]`) | no (single `Key`, not a list) | pinyin engine | Keys · phrase selection | R |
 | `BackSpaceToUnselect` | bool · `true` | — | pinyin engine | Keys · phrase selection | R |
 | `FilterByStroke` | `grave` | no | pinyin engine | Keys · more | R |
-| `QuickPhraseKey` | `;` | no (single `Key`) | quickphrase addon | Keys · quick phrase | R |
+| `QuickPhraseKey` | `semicolon` (source literal `;`) | no (single `Key`) | quickphrase addon | Keys · quick phrase | R |
 | `VAsQuickphrase` | bool · **`true`** | — | quickphrase addon | Keys · quick phrase | R |
 
 `SecondCandidate`/`ThirdCandidate` are **not** "N-th key selects N-th candidate" mappings; they are the key lists for the
 2nd and 3rd candidate actions and are empty by default. Only `ChooseCharFromPhrase` is positional.
+
+**Wire shape (measured, 2026-10-21).** A `List|Key` value is **not** a space-separated string. The Host sends it as an
+indexed map — `PrevPage` arrives as `{"0":"minus","1":"Up","2":"KP_Up","3":"Page_Up"}` — and an empty list arrives as the
+empty **scalar** `""`. Fcitx marshals a vector as numbered keys, so a client must preserve index order and must accept both
+shapes. Key names are X11 keysym names, not source literals: `[` is `bracketleft`, `]` is `bracketright`, `;` is
+`semicolon`, and `Page_Down` is `Next` (the same keysym under its canonical name). A UI that compared the source literal
+with the wire name would show a binding as changed when the user had not touched it.
 
 ### 2.4 Advanced values
 
@@ -139,7 +167,6 @@ All children: **R**, on Candidates and input · fuzzy pinyin (advanced items und
 | `WordCandidateLimit` | int · `15` · ≥0 (`0` = all) | Candidates and input · More | R |
 | `LongWordLengthLimit` | int · `4` · 0–10 | Candidates and input · More | R |
 | `QuickPhraseTriggerRegex` | `std::vector<std::string>` of regular expressions · defaults `.(/\|@)$`, `^(www\|bbs\|forum\|mail)\.`, `^(http\|https\|ftp\|telnet\|mailto):` · no constraint beyond `RegexConstrain` per entry | Keys · quick phrase · trigger patterns (one expression per line) | R — a list of patterns, not a key list; each entry is validated as a regular expression and order is preserved |
-| `FirstRun` | hidden bool · `true` | — | H |
 
 ### 2.5 External and sub-configuration links (exact URIs)
 
@@ -148,7 +175,7 @@ All children: **R**, on Candidates and input · fuzzy pinyin (advanced items und
 | `DictManager` | `ExternalOption` | `fcitx://config/addon/pinyin/dictmanager` | addon `pinyin` packaged | X — link only; the dictionary tool is not implemented on Windows |
 | `CustomPhrase` | `ExternalOption` | `fcitx://config/addon/pinyin/customphrase` | addon `pinyin` packaged | X — link only; tool not implemented |
 | `QuickPhrase` | `ExternalOption` | `fcitx://config/addon/quickphrase/editor` | addon `quickphrase` packaged | X — link only; editor not implemented |
-| `CloudPinyin` | `SubConfigOption` | `fcitx://config/addon/cloudpinyin` | addon `cloudpinyin` **not** in the packaged addon set | X — link only; the sub-page is unreachable in this runtime and is shown as unavailable |
+| `CloudPinyin` | `SubConfigOption` | `fcitx://config/addon/cloudpinyin` | addon `cloudpinyin` **not** in the packaged addon set, so the option is **not in the runtime schema at all** (measured 2026-10-21) | X — recorded, but there is nothing to show: this view does not expose it |
 | `Punctuation` | `SubConfigOption` | `fcitx://config/addon/punctuation/punctuationmap/zh_CN` | addon `punctuation` packaged | X — link only; the punctuation map is a separate schema page |
 | `Chttrans` | `SubConfigOption` | `fcitx://config/addon/chttrans` | **not packaged** (`data/fcitx5/addon` has no `chttrans.conf`) | X with a stated reason: shown as unavailable in this runtime, not silently dropped |
 
@@ -192,7 +219,7 @@ are not counted as settings.
 | `TogglePreedit` | `Control+Alt+P` | `instance.cpp` key handler | modified keys | C |
 | `ModifierOnlyKeyTimeout` | int · −1–5000 (schema default) | modifier-only hotkey path | no modifier-only delivery | C |
 
-### 3.2 `Behavior` (17 children)
+### 3.2 `Behavior` (12 exposed children)
 
 | Path | Default · constraints | Consumer | Disposition |
 |---|---|---|---|
@@ -205,16 +232,17 @@ are not counted as settings.
 | `CompactInputMethodInformation` | bool · `true` | notifications module | C — same |
 | `ShowFirstInputMethodInformation` | bool · `true` | notifications module | C — same |
 | `DefaultPageSize` | int · **`5`** · **1–10** | core default page size (input context / temporary modes) | NV — the Pinyin page has its own `PageSize`; the two are different options |
-| `OverrideXkbOption` | bool · `false` | XKB path | H — `ConditionalHidden<!hasKeyboard>`; this runtime has no keyboard layouts |
-| `CustomXkbOption` | string · empty | XKB path | H — same |
-| `EnabledAddons` / `DisabledAddons` | hidden string lists | addon manager | H — upstream hides them |
-| `PreloadInputMethod` | hidden bool · `true` | instance | H |
 | `AllowInputMethodForPassword` | bool · `false` | `instance.cpp` password detection | NV — the product's password gate is the TIP hard policy; the two were not measured together |
 | `ShowPreeditForPassword` | bool · `false` | same | NV |
 | `AutoSavePeriod` | int · **`30`** · 0–1440 | `instance.cpp:1336`, `:2134` (instance timer + reload) | R — an actual timer consumer exists; **not** "ineffective because global". Not measured in the product (NV) |
 
 `AutoSavePeriod`, `ActivateKeys`/`DeactivateKeys`/enumeration and the fallback paging options are the corrections to the
 earlier blanket claim: each has a real consumer, and only the *event delivery* is limited where stated.
+
+**Five more `Behavior` fields exist in the source but are not in the runtime schema** (measured 2026-10-21):
+`OverrideXkbOption` and `CustomXkbOption` (`ConditionalHidden` — this runtime has no keyboard layouts),
+`EnabledAddons`/`DisabledAddons` and `PreloadInputMethod` (hidden upstream). A client never sees them, so there is nothing
+to show and nothing to write; they are recorded here so a later schema change is noticed rather than guessed at.
 
 ## 4. Cross-cutting rules the client must honour
 
@@ -233,45 +261,77 @@ earlier blanket claim: each has a real consumer, and only the *event delivery* i
 8. **No-change save writes nothing**, so no configuration or learning file is touched.
 9. **Links (X) leave the draft**; they never fabricate a value in the parent schema.
 
-## 5. Coverage (recomputed)
+## 5. Coverage (recomputed from the runtime schema)
 
-`Items` counts every schema field or operation listed above, hidden ones included. The five disposition columns are
-**mutually exclusive** and sum to `Items`: X = link to another surface, H = hidden by upstream, C = conditional limit
-stated in the row, NV = reachable in the design but explicitly unvalidated, R = reachable with no stated limit.
+The earlier totals were counted from the source and did not match what a Host actually returns. These are counted from a
+schema dump of a running Host (2026-10-21, isolated pipe, `FUSION_FCITX_SKIP_USER_PATH=1`).
 
-| Group | Items | X | H | C | NV | R |
-|---|---|---|---|---|---|---|
-| Input-method operations | 5 | 0 | 0 | 0 | 0 | 5 |
-| Pinyin engine / candidates / preedit | 21 | 0 | 0 | 4 | 0 | 17 |
-| Fuzzy children | 21 | 0 | 0 | 0 | 0 | 21 |
-| Pinyin key options | 16 | 0 | 0 | 1 | 0 | 15 |
-| Advanced values | 5 | 0 | 1 | 0 | 0 | 4 |
-| External / sub-config links | 6 | 6 | 0 | 0 | 0 | 0 |
-| Global `Hotkey` children | 17 | 0 | 0 | 13 | 0 | 4 |
-| Global `Behavior` children | 17 | 0 | 5 | 4 | 8 | 0 |
-| **Total** | **108** | **6** | **6** | **22** | **8** | **66** |
+`Items` counts every field or operation a client must give a disposition to. Containers (`Fuzzy`, `Hotkey`, `Behavior`) are
+**not** items: they are navigation, and the rows below already include their children. The four disposition columns are
+mutually exclusive and sum to `Items`: X = link to another surface, C = conditional limit stated in the row, NV = reachable
+but explicitly unvalidated, R = reachable with no stated limit.
+
+| Group | Items | X | C | NV | R |
+|---|---|---|---|---|---|
+| Input-method operations | 5 | 0 | 0 | 0 | 5 |
+| Pinyin/Shuangpin options (union of both views) | 37 | 0 | 1 | 0 | 36 |
+| Fuzzy children | 21 | 0 | 0 | 0 | 21 |
+| External / sub-configuration links | 5 | 5 | 0 | 0 | 0 |
+| Global `Hotkey` children | 17 | 0 | 13 | 0 | 4 |
+| Global `Behavior` children | 12 | 0 | 4 | 8 | 0 |
+| **Total** | **97** | **5** | **18** | **8** | **66** |
 
 Reading the totals:
 
-- **6 links**: `DictManager`, `CustomPhrase`, `QuickPhrase`, `Punctuation`, `Chttrans`, `CloudPinyin`. Of these, `Chttrans`
-  and `CloudPinyin` point at addons that are **not** in the packaged set and are shown as unavailable.
-- **6 hidden**: `FirstRun`; `OverrideXkbOption`, `CustomXkbOption` (conditional on a keyboard layout this runtime lacks);
-  `EnabledAddons`, `DisabledAddons`, `PreloadInputMethod` (hidden upstream).
-- **22 conditional**: 4 CloudPinyin values (missing addon), `CommitRawInput` (partly: modified and `KP_Enter` entries are
-  not delivered), 13 `Hotkey` children (modified keys, Super+Space or modifier-only keys are not delivered), 4
-  notifications-related `Behavior` children (addon not packaged).
+- **The two Pinyin views expose different schemas over one value tree.** The pinyin view describes 41 options, the
+  shuangpin view 43 (it adds `ShuangpinProfile` and `ShowShuangpinMode`), and both return the **same 43-key value tree**.
+  The union is 43, of which 5 are links and 1 is the `Fuzzy` container, leaving 37 fields. This is why a draft is keyed by
+  the addon, not by the URI: two URI-keyed drafts of one value would diverge.
+- **5 links**: `DictManager`, `CustomPhrase`, `QuickPhrase`, `Punctuation`, `Chttrans`. `Chttrans` is described by the
+  schema even though its addon is not packaged, so it is shown as unavailable rather than dropped. `CloudPinyin` is **not**
+  in the runtime schema at all, so it is not one of these five.
+- **1 conditional Pinyin field**: `CommitRawInput` — the modified and `KP_Enter` entries are stored but not delivered on
+  this path (§2.6).
+- **13 conditional `Hotkey` children**: modified keys, `Super+space` and modifier-only keys are not delivered.
+- **4 conditional `Behavior` children**: the `notifications` addon is not packaged.
 - **8 not validated**: `ActiveByDefault`, `resetStateWhenFocusIn`, `ShareInputState`, `PreeditEnabledByDefault`,
-  `DefaultPageSize`, `AllowInputMethodForPassword`, `ShowPreeditForPassword`, and `AutoSavePeriod` — each has a consumer,
-  none was measured in the product.
-- Containers (`Fuzzy`, `Hotkey`, `Behavior`) are **not** counted as items; the input-method group is counted as 5
-  operations, not as configuration fields.
+  `DefaultPageSize`, `AllowInputMethodForPassword`, `ShowPreeditForPassword`, `AutoSavePeriod` — each has a consumer, none
+  was measured in the product.
 
-The headline total is a bookkeeping check, not a product feature: completeness here means every schema item listed above
-has a disposition.
+**Five keys are in the value tree but in no schema** and are therefore **not counted** in the table: the four
+`CloudPinyin*` values and `FirstRun`. They carry disposition **V** and are listed in §2.1 with no editable location. The
+client must never write them — they are not visible in any view, so a write would change a setting the user could not see.
+The draft layer enforces this structurally: an edit is only accepted against the requesting view's schema, so a field no
+view describes is refused by every view.
 
-## 6. What this inventory still does not establish
+The row counts add up as they should: §2.1 has 17 option rows, §2.3 has 16, §2.4 has 4 — 37 in the Pinyin/Shuangpin group.
 
-- Whether any value takes effect in the product: no runtime test was executed for this client (NV rows).
-- Whether the conditional rows can be made to work: that needs either a different delivery path (a TSF routing change,
-  out of scope) or the missing addons.
-- Editor behaviour: the client is not compiled (`blocker.md`).
+The headline total is a bookkeeping check, not a product feature: completeness here means every item above has a
+disposition.
+
+## 6. What this inventory does and does not establish
+
+**Completion level of the client, by layer:**
+
+| Layer | State |
+|---|---|
+| design (this document) | done |
+| core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
+| WinUI views | **not written** — `Microsoft.WindowsAppSDK` cannot be restored (`blocker.md`) |
+| packaged / installed / owner-accepted | no |
+
+- **Implemented and tested**: the transport, framing, codecs, endpoint naming, connection and handshake, the shared
+  draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft. **371 checks pass**
+  — 336 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read → apply →
+  read-back, a key-list round trip, the shared-configuration claim, IM list and selection, incarnation stability, and the
+  Host refusing an unknown URI).
+- **Corrected in the same pass**, because review found the first version got them wrong: the draft no longer stores a
+  schema (one draft per addon, one schema per view); a mutation whose request had started returns `Indeterminate` rather
+  than claiming nothing was written; an unparsable key binding is preserved instead of becoming empty; a newer Host's API
+  version is accepted and an older one refused; and the node budget counts each node once instead of twice.
+- **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client running
+  against the product Host, which is an owner step.
+- **Not established**: whether the conditional rows can be made to work. That needs either a different delivery path (a TSF
+  routing change, out of scope here) or the missing addons.
+- **Not claimed**: that a stable-incarnation check exercises every fencing failure, or that an in-memory reread is restart
+  persistence. Neither was tested.
