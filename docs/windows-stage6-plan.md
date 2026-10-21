@@ -201,9 +201,9 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **546 checks pass** with an isolated Host on a disposable **writable** profile (454 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, and read/apply/read-back with incarnation stability |
+| tested | **580 checks pass** with an isolated Host on a disposable **writable** profile (454 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, **the candidate-presentation configuration saved in both directions with its default, its file location, discard, reload and its persistence across the same orderly restart**, and read/apply/read-back with incarnation stability. Separately, `candidate_window_layout` creates the **real popup** and measures its window rectangle per geometry (724×24 horizontal, 180×198 vertical), and the four layout-precedence cases are asserted through the projection against a real engine list |
 | UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+502d5ec.zip`, 139 010 396 B, SHA-256 `C64A259D…45A5F2`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable launched against an isolated Host (endpoint resolved from `--pipe-name`, window activated, page loaded and refreshed). `fusion-0.0.0-winui3+ae02af0.zip` (139 010 202 B) is retained as the previous package and is superseded |
+| packaged | **yes** — `fusion-0.0.0-winui3+9a1d51a.zip`, 139 014 811 B, SHA-256 `9F6E4946…A737DD`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable launched against an isolated Host (endpoint resolved from `--pipe-name`, window activated, page loaded and refreshed). `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B) is retained as the previous package and is superseded |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -216,6 +216,24 @@ ZIP needs nothing installed on the target and no installer. That is why it is ab
 because it carries its own runtimes, which must not be mixed with the Host's and the Qt client's DLLs in `bin\`. The tray
 and the Start Menu shortcut point there; this build tree has the Qt client switched off, so this package ships one settings
 entry and the rollback path is the previous package rather than a second executable.
+
+**Candidate layout (2026-10-22, fifth round).** The candidate window could only render the engine's own layout hint, so a user
+could not choose between a horizontal and a vertical list. That one choice now exists end to end, and the round's real work was
+the authority question rather than the control. Upstream's only such option — `verticalCandidateList` — belongs to the classicui
+addon, which this runtime neither builds nor loads (`classicui.h:129`; read by that addon's own `reloadConfig()`), and neither
+`GlobalConfig` nor any shipped addon has a layout option; reusing the key would have meant loading the Linux classic UI or storing
+a value with no reader. The owner therefore authorized one narrowly scoped Windows presentation configuration (**D088**), which
+narrows D085/D087's "no additional configuration store" **for presentation only** and leaves every other constraint — official
+formats, per-user paths, no duplicated engine or global value, the user-data policy — unchanged.
+`fcitx://config/candidate-presentation` is a normal Fcitx `FCITX_CONFIGURATION` served over the existing messages, stored by
+Fcitx's own `safeSave` beside `pinyin.conf`, owned and read/written by the Host, and edited only through the Host. Precedence is
+classicui's rule adopted verbatim rather than invented: an engine hint that names a layout wins, the stored preference applies
+only when the hint is `NotSet`, and the default is vertical so an upgrade changes nothing for a user who never opens the setting.
+The resolution lives in `project_candidate_page`, so `CandidatePage::layout` carries the effective layout and a saved value cannot
+be silently ignored; `candidate_layout.hpp` and its hit-testing were already correct and are unchanged. The checks prove the
+configuration path and the popup geometry (a real window measured 724×24 horizontal and 180×198 vertical); they do **not** prove
+that a composition inside a real application reaches that popup, because that path is unchanged by this work and exercising it
+would need an installed TIP, which this round must not touch.
 
 What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path,
 the save/recovery behaviour and that the pages render, navigate and reflow; they do not prove that a paging binding pages

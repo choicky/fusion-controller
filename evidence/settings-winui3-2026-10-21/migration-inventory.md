@@ -195,6 +195,27 @@ From the earlier key-path measurement (`windows-architecture.md` §22, R36):
 
 The editor shows the lists exactly as the engine stores them and must not claim the affected entries take effect.
 
+### 2.7 Windows candidate-presentation configuration — `fcitx://config/candidate-presentation`
+
+**This is the one configuration here that upstream does not ship.** Owner-authorized on 2026-10-22 (D088) because the
+official candidate-layout option (`verticalCandidateList`) belongs to the classicui addon, which this runtime neither
+builds nor loads, and because inventing a second copy of an *input semantic* would be worse. It holds presentation only
+and repeats no Pinyin, Shuangpin or global value.
+
+| Path | Type · default | Consumer | New location | Disposition |
+|---|---|---|---|---|
+| `CandidateLayout` | enum · `Vertical` · `Horizontal`/`Vertical` | **the Host projection** (`project_candidate_page`), not the engine | Candidates and input → 候选窗口 → 候选排列方向 | **R** — the only option; it decides the candidate window's geometry |
+
+**Precedence, and why the value cannot be silently ignored.** The stored value is a *default*: an engine
+`CandidateLayoutHint` that names a layout wins (classicui's own rule, `inputwindow.cpp:598-603` and `938-943`). The default
+is `Vertical`, so a profile that never configured it keeps the presentation this product shipped before the option
+existed; classicui's own default is the opposite, and that difference is deliberate. The Host resolves hint and preference
+into `CandidatePage::layout`, which therefore carries the *effective* layout — so "saves successfully but the renderer
+ignores it" is unreachable, and the renderer and its hit-testing needed no change at all.
+
+**Storage.** `…/Fcitx5/config/fcitx5/conf/candidate-presentation.conf`, written by Fcitx's own `safeSave` beside
+`pinyin.conf` and `punctuation.conf` — measured, not assumed. A save with nothing changed writes no file.
+
 ## 3. Global configuration — `fcitx://config/global`
 
 The schema is two **containers**, not a flat list: `Hotkey` and `Behavior`. Each child below is one option; the containers
@@ -336,6 +357,7 @@ diagnostics, and every item in §1–§3 has a place in it:
 | External links | 5 | Candidates and input → 外部工具, listed with the reason they are unavailable |
 | Global `Hotkey` children | 17 | Keys → 系统快捷键 and 系统回退翻页 |
 | Global `Behavior` children | 12 | Candidates and input → 系统输入行为 |
+| Windows presentation (`fcitx://config/candidate-presentation`, §2.7) | 1 | Candidates and input → 候选窗口 → 候选排列方向 |
 | Value-tree-only (`V`) | 5 | no location, by design — no view describes them and the draft refuses to write them |
 
 - **The engine's paging keys and the system's fallback paging keys are separate sections** with the difference stated in

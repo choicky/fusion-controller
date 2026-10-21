@@ -622,6 +622,48 @@ boundary stays unresolved), no EXE installer implementation, no machine installa
 **Status.** The presentation change is **accepted**; implementation state is tracked in the Stage 6 plan and the product
 PRs, not here. The option-coverage design is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
 
+## D088 — Windows candidate-presentation configuration (narrow supersession of D085/D087's "no additional configuration store", for presentation only)
+
+Accepted by the owner on 2026-10-22 through the bounded instruction for the horizontal/vertical candidate-layout setting.
+
+**The decision.** A **Windows-specific presentation setting may have its own configuration**, while **official input
+semantics must not acquire duplicate stores**. A setting that decides how the Windows candidate window presents itself has
+no official Fcitx configuration to live in in this runtime, and inventing a second copy of an *input semantic* is not an
+acceptable substitute. The owner therefore authorized exactly one narrowly scoped configuration for presentation.
+
+**What it is.** `fcitx://config/candidate-presentation` — one Fcitx `FCITX_CONFIGURATION`
+(`CandidatePresentationConfig`) holding the candidate layout only, served over the existing `GetConfig`/`SetConfig`
+messages with the same `dumpDescription` / `safeSave` / reload semantics as the three official URIs, and stored through
+Fcitx's own standard per-user configuration path (`…/Fcitx5/config/fcitx5/conf/candidate-presentation.conf`, measured on
+this runtime beside `pinyin.conf`). It is **not** an additional configuration *system*: schema, serializer, storage
+location, apply path and per-user policy are all Fcitx's. The Host owns the stored value and is its only reader and
+writer; the WinUI client edits it through the Host; the candidate renderer consumes it.
+
+**Why not the official option.** Upstream's only candidate-layout option is `verticalCandidateList`, a member of
+`ClassicUIConfig` owned by the classicui addon (`classicui.h:129`, stored in `conf/classicui.conf`, read by that addon's own
+`reloadConfig()` at pinned fcitx5 `a7f2528`). This runtime does not build, ship or load classicui, and the Host serves only
+`global`, `inputmethod/pinyin` and `inputmethod/shuangpin`; `GlobalConfig` and the shipped addons have no layout option.
+Reusing that key would mean loading the Linux classic UI (explicitly excluded) or storing a value with no reader. The new
+configuration therefore uses its own namespace and never classicui's.
+
+**Narrow supersession.** Exactly one statement is narrowed, and only for Windows presentation settings: D085's
+"*no Fusion-specific file, switch or registry key* … means no *additional* configuration store" and D087's unchanged
+"prohibition on an additional Fusion configuration store". For presentation, a Fusion-owned Fcitx configuration in Fcitx's
+own storage is permitted. **Everything else stands unchanged**: official Fcitx configuration formats, storage in Fcitx's
+standard per-user paths, no Fusion-specific *data* location, no duplicate store of any engine or global value, the
+user-data policy (upgrade keeps it; uninstall leaves it unless chosen), D087's presentation-technology decision, D086's
+scoped licence, and the settings-before-EXE-installer order. No engine-semantic change, no new key-routing policy, no
+matrix layout, no theme or font work, and no general configuration-framework expansion is authorized.
+
+**Precedence.** The stored preference is a **default**; an engine `CandidateLayoutHint` that names a layout wins. This is
+classicui's own rule (`inputwindow.cpp:598-603`, again at `938-943`) adopted verbatim, so a semantic hint (clipboard,
+unicode, imselector) keeps working and no stored value can silently override one. The default is **vertical**, which
+preserves the presentation shipped before the option existed — deliberately the opposite of classicui's default, because
+preserving existing behaviour outranks copying upstream's default.
+
+**Status.** Accepted. Implementation, compilation, isolated validation and packaging are tracked in the Stage 6 plan and
+the product PRs, not here. The option-coverage record is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
+
 ## Current authority rule
 
 For current post-release product state, use the compact current-state/current-
