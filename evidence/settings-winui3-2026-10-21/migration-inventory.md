@@ -195,6 +195,34 @@ From the earlier key-path measurement (`windows-architecture.md` §22, R36):
 
 The editor shows the lists exactly as the engine stores them and must not claim the affected entries take effect.
 
+### 2.7 Windows candidate-presentation configuration — `fcitx://config/candidate-presentation`
+
+**This is the one configuration here that upstream does not ship.** Owner-authorized on 2026-10-22 (D088) because the
+official candidate-layout option (`verticalCandidateList`) belongs to the classicui addon, which this runtime neither
+builds nor loads, and because inventing a second copy of an *input semantic* would be worse. It holds presentation only
+and repeats no Pinyin, Shuangpin or global value.
+
+| Path | Type · default | Consumer | New location | Disposition |
+|---|---|---|---|---|
+| `CandidateLayout` | enum · `Vertical` · `Horizontal`/`Vertical` | **the Host projection** (`project_candidate_page`), not the engine | Candidates and input → 候选窗口 → 候选排列方向 | **R** — the only option; it decides the candidate window's geometry |
+
+**Precedence, and when a save takes effect.** The stored value is a *default*: an engine `CandidateLayoutHint` that names a
+layout wins (classicui's own rule, `inputwindow.cpp:598-603` and `938-943`). The default is `Vertical`, so a profile that
+never configured it keeps the presentation this product shipped before the option existed; classicui's own default is the
+opposite, and that difference is deliberate. The Host resolves hint and preference into `CandidatePage::layout`, which
+therefore carries the *effective* layout rather than the hint's verbatim value, and the renderer and its hit-testing needed
+no change at all.
+
+**A successful save is what changes the projection.** The Host writes the file first and publishes the configuration and
+the effective layout only afterwards, so a save that succeeds is what the next projected page uses, and a save the
+filesystem refuses returns a failure with the stored value, the reported value and the effective layout all left as they
+were. The refused write is covered by a regression check that induces a real failure (the target held open so the rename
+cannot replace it) rather than fabricating an error return; see the Stage 6 plan for what that check does and does not
+prove.
+
+**Storage.** `…/Fcitx5/config/fcitx5/conf/candidate-presentation.conf`, written by Fcitx's own `safeSave` beside
+`pinyin.conf` and `punctuation.conf` — measured, not assumed. A save with nothing changed writes no file.
+
 ## 3. Global configuration — `fcitx://config/global`
 
 The schema is two **containers**, not a flat list: `Hotkey` and `Behavior`. Each child below is one option; the containers
@@ -284,6 +312,13 @@ but explicitly unvalidated, R = reachable with no stated limit.
 | Global `Behavior` children | 12 | 0 | 4 | 8 | 0 |
 | **Total** | **97** | **5** | **18** | **8** | **66** |
 
+**Scope of that total.** It counts the **official** configurations only — the input-method operations, the Pinyin and
+Shuangpin schemas and `fcitx://config/global` (§1–§3) — because those are what the runtime schema dump contains. The
+Windows candidate-presentation configuration (§2.7) is **not** an official configuration and is not in that dump, so it is
+not one of the 97: it adds **one** item of its own, and the settings surface as a whole is therefore **98** items — 97
+official plus 1 presentation. Keep the two numbers apart: "97" answers "does every official item have a disposition",
+"98" answers "how many items does the window expose".
+
 Reading the totals:
 
 - **The two Pinyin views expose different schemas over one value tree.** The pinyin view describes 41 options, the
@@ -321,7 +356,7 @@ disposition.
 | design (this document) | done |
 | core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
 | WinUI views (`src/settings-winui3/FusionSettings.App`) | **implemented, compiled, launched, driven** — four pages, every item below has a location |
-| packaged | yes — `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B, SHA-256 `C64A259D…45A5F2`, 652 manifest entries re-verified) |
+| packaged | yes — `fusion-0.0.0-winui3+4160e66.zip` (139 015 158 B, SHA-256 `E3E24218…E5A3F9`, 652 manifest entries re-verified); `+9a1d51a` and `+502d5ec` are superseded |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -336,7 +371,11 @@ diagnostics, and every item in §1–§3 has a place in it:
 | External links | 5 | Candidates and input → 外部工具, listed with the reason they are unavailable |
 | Global `Hotkey` children | 17 | Keys → 系统快捷键 and 系统回退翻页 |
 | Global `Behavior` children | 12 | Candidates and input → 系统输入行为 |
+| Windows presentation (`fcitx://config/candidate-presentation`, §2.7) | 1 | Candidates and input → 候选窗口 → 候选排列方向 |
 | Value-tree-only (`V`) | 5 | no location, by design — no view describes them and the draft refuses to write them |
+
+The first six rows are the **97 official items** of §5; the presentation row is the **one additional item** of §2.7, which
+is why this table totals 98 while §5 totals 97.
 
 - **The engine's paging keys and the system's fallback paging keys are separate sections** with the difference stated in
   the UI, because they are two different options with two different consumers.
@@ -346,7 +385,7 @@ diagnostics, and every item in §1–§3 has a place in it:
 - **Editable means editable through the asking view's schema.** A row's setter is bound to the configuration that page
   renders, so a Global control cannot reach the Pinyin draft, and the save splits the shared draft across the URIs whose
   schemas describe its fields.
-- **Checks**: **546** with an isolated Host on a disposable **writable** profile (454 without one). The workspace path is
+- **Checks**: **589** with an isolated Host on a disposable **writable** profile (454 without one). The workspace path is
   driven against a real Host — Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the
   method list, a failed start and its retry — a scripted peer covers an uncertain method-list write (applied / not applied /
   reread failed) and the three reconnect cases for the list (a clean list adopting a changed Host order, a pending one

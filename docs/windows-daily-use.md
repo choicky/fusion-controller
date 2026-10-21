@@ -54,8 +54,13 @@ rather than as done.
   preset edits the same `PrevPage`/`NextPage` lists and asks whether to replace or extend them. **系统快捷键** and
   **系统回退翻页** are separate sections: the first is the system's own shortcuts, the second is the core's fallback paging,
   and neither is the Pinyin engine's paging keys.
-- **候选与输入** — candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and 系统输入行为. The 外部工具 section
-  lists the upstream tools this package does not ship, with the reason.
+- **候选与输入** — the candidate window itself, then candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and
+  系统输入行为. The **候选窗口** section at the top holds **候选排列方向** (horizontal or vertical); it saves with the same
+  **保存** button as everything else — there is no separate apply — and it takes effect from the next candidate page, so the
+  popup already on screen does not move under the pointer. A profile that never touched it keeps the vertical list this
+  product has always drawn, so upgrading changes nothing. When an input method asks for a particular direction for one list
+  (quick phrase, Unicode and the input-method selector do), the input method's choice wins over this setting. The 外部工具
+  section lists the upstream tools this package does not ship, with the reason.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
