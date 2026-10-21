@@ -1,45 +1,49 @@
-# Build prerequisite — the WinUI 3 client cannot be compiled on this machine (2026-10-21)
+# Build prerequisite — what this machine can and cannot build (2026-10-21, updated)
 
-Recorded so that nothing downstream claims a build that did not happen. It is a **development-environment prerequisite**,
-not a product decision and not a statement about the design.
+Originally recorded when no .NET SDK was present. The SDK half is now **resolved**; the Windows App SDK half is still
+blocked. The file is kept as the single prerequisite record rather than being replaced by a second one.
 
-## What was observed
+## Current state
 
-| Requirement | State | Observation |
+| Requirement | State | Evidence |
 |---|---|---|
-| .NET SDK (any version) | absent | `dotnet --info` → `No SDKs were found`; no `C:\Program Files\dotnet\sdk` |
-| .NET runtimes | present (6.0.8, 8.0.15) | runtimes only; runtimes cannot compile |
-| .NET SDK component in Visual Studio 18 Community | absent | `vswhere -requires Microsoft.NetCore.Component.SDK` returns nothing; the VS `dotnet\` folder holds `net8.0/runtime` and `net10.0/runtime` only |
-| NuGet configuration | none | no user `NuGet.Config`; no `~\.nuget\packages` cache at all |
-| Windows App SDK (WinUI 3) package | absent | nothing in the package cache |
-| Restore/download requests | **fail** | `api.nuget.org`, `globalcdn.nuget.org`, `dot.net/v1/dotnet-install.ps1`, `aka.ms/dotnet/8.0/...` all return HTTP 000 with `curl` exit 35 (SSL connect error); the environment sets `http_proxy`/`https_proxy` to a local address |
-| Other hosts | reachable | `github.com` returns 200, `www.nuget.org` returns 200 (the site, not the API) |
+| .NET SDK | **present, task-local** | `10.0.402` extracted to `C:\Users\choicky\worktmp\fusion-windows\settings-winui3-env\dotnet`; `dotnet --info` reports SDK 10.0.402, MSBuild 18.9.15 |
+| SDK provenance | **verified** | `dotnet-sdk-10.0.402-win-x64.zip`, 300 755 826 bytes, SHA-512 `ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd`, matching the official sidecar `.sha512` published beside the artifact |
+| SDK source | `dotnetcli.blob.core.windows.net` | the only .NET download host that completes TLS from here; `builds.dotnet.microsoft.com` and `dot.net` redirect to it and fail |
+| NuGet feed | **unreachable** | `dotnet restore` → `NU1301: 无法加载源 https://api.nuget.org/v3/index.json` → `The SSL connection could not be established` → `Received an unexpected EOF or 0 bytes from the transport stream` |
+| Package cache | empty | no `~\.nuget\packages` |
+| Windows App SDK | **cannot be restored** | `Microsoft.WindowsAppSDK` and `Microsoft.Windows.SDK.BuildTools` both resolve through `api.nuget.org` |
+| Offline build | **works** | a zero-package `net10.0` project builds and runs with no feed configured; the SDK's bundled reference packs are enough |
 
-**What this does and does not establish.** It establishes that *this* environment currently cannot obtain a .NET SDK or
-the Windows App SDK packages, therefore cannot compile a WinUI 3 client. It does **not** establish that the hosts are
-blocked by policy: a failed TLS connection through a local proxy is a failed request, and its cause (proxy rule, TLS
-interception, DNS, certificate store) was not investigated. No proxy setting, certificate validation or firewall rule was
-changed, and no credential was read.
+The environment proxy is `http://127.0.0.1:9516`. The `CONNECT` tunnel to `api.nuget.org:443` is accepted
+(`HTTP/1.1 200 Connection Established`) and the TLS handshake then fails, so the failure is at or after the tunnel, not at
+DNS or at the socket. Its cause was not investigated further: no proxy setting, TLS validation, certificate store or
+firewall rule was changed, and no credential was read.
+
+**What this does and does not establish.** It establishes that a WinUI 3 assembly cannot be produced here, because
+`Microsoft.WindowsAppSDK` is the only distribution of the WinUI 3 references and build tooling. It does **not** establish a
+policy block: an `HTTP 000` and a `curl` exit 35 are a failed request, and several unrelated hosts (`github.com`,
+`www.nuget.org`, `azuresearch-usnc.nuget.org`, `dotnetcli.blob.core.windows.net`) answer normally from the same shell.
 
 ## Consequence for this batch
 
-- The client is **not implemented, compiled, packaged or installed**. No C# was written, because unbuildable source would
-  still not produce the deliverable and would be recorded only as COMPILE UNVERIFIED.
-- The tray entry-point change does **not** depend on it and was implemented and tested separately (fusion-windows PR #30).
+- The **client core is implemented, compiled and tested** (`src/settings-winui3/FusionSettings.Core`, 215 checks). It has
+  no package references, which is why it builds here.
+- The **WinUI 3 presentation is not implemented**: it cannot be compiled, so writing it would produce source recorded only
+  as COMPILE UNVERIFIED and still no deliverable. That is a deliberate boundary, not an omission.
+- No package was produced, because a settings package without a settings executable would misrepresent the product. The
+  installed `0.0.0-wp7+d095a44` package remains the shipped artifact.
 
-## What would unblock it
+## What would unblock the presentation
 
-Either, as an environment change the owner controls:
+One environment change, on the owner's side: make a NuGet feed reachable that serves `Microsoft.WindowsAppSDK` and
+`Microsoft.Windows.SDK.BuildTools` (a restored `api.nuget.org`, a mirror the owner approves, or a warm package cache in a
+task-local directory). The SDK is already in place, so nothing else is missing.
 
-1. Install a .NET SDK (any supported version; 8.0.x is a reasonable default but not a requirement of the design) and
-   restore `Microsoft.WindowsAppSDK` plus `Microsoft.Windows.SDK.BuildTools` from a reachable feed; or
-2. Provide an SDK installer and a warm NuGet cache in the approved task-local location.
-
-Then: client project → compile → unit checks (draft model, key-binding parse/serialise, protocol client) → isolated Host
-round trip → packaging with the chosen deployment model → entry points. The tray's settings launch path already works with
-the current executable, so nothing in the shipped product waits on this.
+Then, in order: the WinUI project → compile → bind the views to the tested core → package with the chosen deployment model
+→ tray and Start Menu entries → owner acceptance.
 
 ## Not done to work around it
 
-No package was fabricated, no binary relabelled, no dependency vendored from an unverified source, and no test recorded as
-passed.
+No package was fabricated, no binary relabelled, no dependency vendored from an unverified source, no mirror introduced,
+and no check recorded as passed that did not run.

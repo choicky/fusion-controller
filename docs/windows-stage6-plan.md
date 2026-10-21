@@ -191,11 +191,28 @@ owner installation/acceptance are separate states; no installation is claimed he
 Fusion-owned **C# + WinUI 3** client with task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
 while official Fcitx configuration semantics, storage, defaults and the settings-before-installer order stay as they are. D086's scoped
 licence remains attached to the retained upstream-derived executable and does not extend to the new client. The Qt client recorded below is
-still the **shipped** settings surface — nothing has replaced it. The WinUI 3 client is **designed but not implemented**: the development
-environment has no .NET SDK and its package/SDK acquisition requests currently fail, so the client is not compiled, packaged or validated
-(`evidence/settings-winui3-2026-10-21/blocker.md` — an environment prerequisite, not a design limitation and not a proven network policy).
-Option coverage is complete as a **design** record in `evidence/settings-winui3-2026-10-21/migration-inventory.md`; it is not implemented
-behaviour. Separately, the **tray entry point** is implemented in fusion-windows PR #30: left click opens the settings window or raises the
+still the **shipped** settings surface — nothing has replaced it.
+
+**WinUI 3 client — state by level (2026-10-21, second round).**
+
+| Level | State |
+|---|---|
+| designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
+| implemented | **core layer only** — `src/settings-winui3/FusionSettings.Core`: framing, codecs, endpoint naming, connection/handshake, draft/baseline model, key-chord and key-list model, key-editor state machine, input-method draft. The WinUI views are **not written**. |
+| compiled | core **yes** (.NET SDK 10.0.402, zero package references); views **no** — `Microsoft.WindowsAppSDK` cannot be restored |
+| tested | **215 checks pass**, of which 35 run against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal) |
+| packaged | no — a settings package without a settings executable would misrepresent the product |
+| installed | no |
+| owner-accepted | no |
+
+The remaining blocker is one dependency, not the design: no reachable feed serves `Microsoft.WindowsAppSDK` and
+`Microsoft.Windows.SDK.BuildTools` (`evidence/settings-winui3-2026-10-21/blocker.md`). The .NET SDK half of that record is
+**resolved** — 10.0.402 is installed in the task-local toolchain with its SHA-512 verified against the official sidecar.
+
+The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
+indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one
+keysym, two names); `[`/`]`/`;` arrive as `bracketleft`/`bracketright`/`semicolon`; `Behavior` exposes 12 children, not 17;
+`CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 items. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
 existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
 older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a
 launch guard stops repeated clicks from stacking windows during startup. Right-click keeps the full menu and the launch path is unchanged.
