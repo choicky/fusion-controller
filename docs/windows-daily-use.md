@@ -47,11 +47,13 @@ rather than as done.
   edited here. The 正在编辑 selector at the bottom chooses *which* method's settings you are editing — it does **not** switch
   the active input method.
 - **按键** — one row per action, each holding the alternative bindings for it. Three tags are shown with **N 个更多** for the
-  rest; **编辑** reveals the remove buttons; **添加按键** records a new binding (press the keys, **Esc** cancels). A binding
-  this build cannot interpret is shown in italics and kept as it is, not replaced. The **，/。** preset edits the same
-  `PrevPage`/`NextPage` lists and asks whether to replace or extend them. **系统快捷键** and **系统回退翻页** are separate
-  sections: the first is the system's own shortcuts, the second is the core's fallback paging, and neither is the Pinyin
-  engine's paging keys.
+  rest; **编辑** reveals the per-tag **替换** and remove buttons; **添加按键** records a new binding (press the keys, **Esc**
+  cancels and changes nothing). **恢复默认** writes the Host's own default for that action into the draft — nothing reaches the
+  Host until Save. A binding this build cannot interpret is shown in italics and kept as it is, not replaced. A repeated or
+  cross-action binding is reported in a warning line and left alone: which one wins is the engine's business. The **，/。**
+  preset edits the same `PrevPage`/`NextPage` lists and asks whether to replace or extend them. **系统快捷键** and
+  **系统回退翻页** are separate sections: the first is the system's own shortcuts, the second is the core's fallback paging,
+  and neither is the Pinyin engine's paging keys.
 - **候选与输入** — candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and 系统输入行为. The 外部工具 section
   lists the upstream tools this package does not ship, with the reason.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
@@ -62,10 +64,19 @@ configuration, and the global configuration has its own. The bar at the bottom a
 not discard the other, and an unapplied edit stays in the draft. **放弃修改** throws the draft away. Closing the window with
 unsaved edits asks first. Changing pages never loses edits.
 
-A save that changes nothing sends no request at all. If the Host is busy composing, the save is refused with a visible
-message: finish the composition and save again. If a write's outcome is uncertain — the reply was lost, the connection
-dropped, or the Host said so — the window says the change **may have applied**, re-reads the configuration and shows what the
-Host actually has. It never silently retries.
+A save that changes nothing sends no request at all. Clearing every binding of an action, or emptying a rule list, is a
+change and saves like any other. If the Host is busy composing, the save is refused with a visible message: finish the
+composition and save again. If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
+so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
+the reread does not confirm stay pending. It never silently retries.
+
+**While a request is running** the pages are read-only and the buttons are disabled, so nothing can change under a request
+that has already been sent. Typing in a field commits when you leave it, and Save moves focus for you, so the value you just
+typed is the value that is saved.
+
+**If the Host is not there.** At startup the window says so and offers **重试连接**. Once connected, **重新加载** re-reads
+everything and asks first if anything is unsaved. A reconnect keeps your pending edits; only an explicit reload discards
+them.
 
 **What the pages do not claim.** A binding stored here is a configuration value; whether that key reaches the engine depends
 on the input path. Combinations with Ctrl/Alt/Win, modifier-only keys and keypad Enter are not delivered on this path, so

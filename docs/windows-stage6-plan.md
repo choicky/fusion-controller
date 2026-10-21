@@ -200,9 +200,9 @@ still the **shipped** settings surface — nothing has replaced it.
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **371 checks pass** — 336 focused (framing, codec through its production entry points, endpoint, identity, shared drafts, keys, editor, input methods, a controlled pipe peer for mutation outcomes and handshake versions) plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read/apply/read-back, key-list round trip, shared-configuration claim, IM list and selection, incarnation stability, unknown-URI refusal) |
+| tested | **422 checks pass** with an isolated Host (347 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, the method list, a failed start and its retry), and read/apply/read-back with incarnation stability. Plus an edit driven through the compiled window: a control toggled, Save pressed, and the Host read back independently |
 | UI verified | **yes, as a running window** — built, launched against an isolated Host, all four pages navigated through UI Automation and captured (`worktmp\fusion-windows\settings-winui3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+67f771b.zip`, 139 001 488 B, 652 files, every manifest hash re-verified after extraction |
+| packaged | **yes** — `fusion-0.0.0-winui3+bcf4375.zip`, 139 006 737 B, SHA-256 `68F737CB…030F5D`, 652 files, every manifest hash re-verified after extraction, and an edit/save driven through the **packaged** executable |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -226,13 +226,24 @@ keysym, two names); `[`/`]`/`;` arrive as `bracketleft`/`bracketright`/`semicolo
 `CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 items, with the five value-tree-only fields
 (the four `CloudPinyin*` values and `FirstRun`) classified separately and given no editable location.
 
-**Correction round (2026-10-21, fusion-windows PR #31).** Review found five defects in the core, all now fixed with
-regression coverage: the draft stored a schema and so let one Pinyin view adopt the other's; a mutation whose request had
-started was reported as "nothing written"; an unparsable key binding was replaced with an empty one; the handshake rejected
-a Host newer than the client instead of accepting it; and the node budget charged each node twice. None of these changes the
-option coverage, the Host protocol or the Host's own protections. **The WinUI views are still not written**, and packaging,
-installation and owner acceptance remain open — they wait on the NuGet prerequisite recorded in `blocker.md`, which is
-separate from these code corrections. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
+**Correction round 1 (2026-10-21, fusion-windows PR #31) — core.** Five defects, all fixed with regression coverage: the
+draft stored a schema and so let one Pinyin view adopt the other's; a mutation whose request had started was reported as
+"nothing written"; an unparsable key binding was replaced with an empty one; the handshake rejected a Host newer than the
+client instead of accepting it; and the node budget charged each node twice. None of these changes the option coverage, the
+Host protocol or the Host's own protections.
+
+**Correction round 2 (2026-10-21, fusion-windows PR #32) — the application path.** The views had been written and captured,
+but the path they drive had never been exercised, and review found nine defects in it. A Global control was applied to the
+Pinyin draft and silently refused. The shared draft was always saved through the Pinyin URI, so a Shuangpin-only field made
+the request fail. Method-list edits raised nothing, so the save bar never enabled. A cleared list was written as an empty
+scalar, which the Host rejects on write. A successful write could not be adopted when its stored form differed from the
+submitted one. Nothing stopped overlapping operations, and an uncertain outcome was reported as a successful reconcile. There
+was no retry or reload. Pages ignored the presentation table's page and duplicated rows. The key editor had no replace entry
+point, no reset and no warnings.
+
+All nine are fixed, and running the corrected build found a tenth: `FocusManager.TryMoveFocus` without a search root throws
+in a WinUI Desktop app and closed the window on the first Save. `SettingsWorkspace` moved into the core so the edit/save/
+recovery path could be tested against a real Host. Packaging, installation and owner acceptance remain open. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
 existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
 older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a
 launch guard stops repeated clicks from stacking windows during startup. Right-click keeps the full menu and the launch path is unchanged.

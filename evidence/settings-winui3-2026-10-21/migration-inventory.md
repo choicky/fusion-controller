@@ -328,7 +328,7 @@ diagnostics, and every item in §1–§3 has a place in it:
 | Group | Items | Where it is now |
 |---|---|---|
 | Input-method operations | 5 | Input methods: the enabled list with ↑/↓/remove, the available list with add, `Items/0` marked 当前 |
-| Pinyin/Shuangpin options | 37 | Keys (bindings) and Candidates and input (candidates, preedit, learning, Shuangpin profile) |
+| Pinyin/Shuangpin options | 37 | Keys: 翻页 · 候选导航 · 候选选择 · 上屏 · 短语选字 · 快捷短语 · 学习（忘记词语）· 更多设置. Candidates and input: 候选 · 预编辑 · 学习 · 双拼 · 更多设置 |
 | Fuzzy children | 21 | Candidates and input → 模糊音, one section for the nested container |
 | External links | 5 | Candidates and input → 外部工具, listed with the reason they are unavailable |
 | Global `Hotkey` children | 17 | Keys → 系统快捷键 and 系统回退翻页 |
@@ -337,12 +337,18 @@ diagnostics, and every item in §1–§3 has a place in it:
 
 - **The engine's paging keys and the system's fallback paging keys are separate sections** with the difference stated in
   the UI, because they are two different options with two different consumers.
-- **Options the schema describes but this table does not place** still render, under 更多设置 of their configuration, so a
-  Host that adds a field never becomes invisible.
-- **Checks**: 336 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1`
-  (read → apply → read-back, a key-list round trip, the shared-configuration claim, IM list and selection, incarnation
-  stability, and the Host refusing an unknown URI). The UI itself was built, launched and captured against an isolated
-  Host; the screenshots show the compiled application.
+- **The table is enforced, not advisory.** Each page renders only the rows whose placement names it; an option the table
+  does not place falls back to 更多设置 of its own configuration, so a Host that adds a field never becomes invisible and is
+  never duplicated. Before the correction round the page was not consulted at all, so every page rendered every root option.
+- **Editable means editable through the asking view's schema.** A row's setter is bound to the configuration that page
+  renders, so a Global control cannot reach the Pinyin draft, and the save splits the shared draft across the URIs whose
+  schemas describe its fields.
+- **Checks**: **422** with an isolated Host (347 without one). The workspace path is driven against a real Host — Global
+  routing, a Shuangpin-only save, clearing the last binding, the method list, a failed start and its retry — and one edit was
+  driven through the compiled window: a control toggled, Save pressed, and the Host read back independently.
+- **A successful global save is NOT RUN on this Host.** The isolated Host runs without a user config path, and the Host's
+  global apply ends in `safeSave()`, which needs one; it answers "Fcitx could not save the global configuration; reload
+  before retrying." What is checked instead is that the client reports that failure and keeps the edit.
 - **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client used
   against the product Host, which is an owner step.
 - **Not established**: whether the conditional rows can be made to work. That needs either a different delivery path (a TSF
