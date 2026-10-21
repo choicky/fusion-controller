@@ -187,7 +187,10 @@ On the first installed package (`0.0.0-wp7+0094269`, 2026-10-20) the owner confi
 `Fusion: Host running (pid 41396)`. That is the whole of the installed confirmation so far: the commands below, the
 balloon and the session-end behaviour were **not** exercised.
 
-**What it does.** Right-click the icon:
+**What it does.** In the tray update under review (fusion-windows PR #30, **not yet in an installed package**) a **left click**
+opens the settings window, or raises the one that is already open instead of starting a second copy; if Windows refuses to bring
+it forward the taskbar button flashes. Until that update is installed, use **right-click → Settings**. Right-click keeps every
+command below, and the menu stays keyboard reachable:
 
 | command | effect |
 |---|---|

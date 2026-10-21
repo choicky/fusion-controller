@@ -552,7 +552,9 @@ must not be assumed by the implementation.
 semantics over writing a Fusion-specific configuration surface. Whether that is feasible on Windows is **not
 established**: the upstream UI's Windows dependencies and the way it would communicate with this product's Host must be
 inspected before an implementation approach is chosen. A Fusion-written UI is a fallback, not the default, and it is not
-authorized here.
+   authorized here. *(Partially superseded 2026-10-21 by D087: the presentation layer is now a Fusion-owned C# + WinUI 3 client.
+   Everything else in this decision — official configuration formats and storage, no additional configuration store, the user-data policy,
+   the settings-before-EXE-installer order, the EXE deliverable form and U4 remaining open — remains effective.)*
 
 **Partial supersession.** Exactly two accepted statements are narrowed:
 
@@ -587,6 +589,38 @@ Accepted by the owner on 2026-10-20 through the bounded implementation instructi
 **Upstream maintenance.** The owner-maintained `choicky/fcitx5-configtool` fork is the source home for reusable configtool UI adaptations, on a dedicated branch based on the pinned upstream 5.1.16 commit. The Windows product repository owns FusionHost transport, tray, packaging and source-pin/build integration. The single `fcitx5-qt` MSVC path-portability fix remains a separate, reviewable patch; no fork was authorized or created for fcitx5-qt by this decision.
 
 Implementation/package/validation state is tracked in the Stage 6 plan and product PRs, not in this Accepted Decision. U4, U6, WP7 and P0-A/P0-B/P0-D remain unchanged.
+
+## D087 — Windows settings UI: Fusion-owned C# + WinUI 3 presentation (supersedes D085's presentation clause only)
+
+Decided by the owner on 2026-10-21.
+
+**Presentation technology.** The Windows settings surface is a **Fusion-owned C# + WinUI 3** application. This
+supersedes exactly one clause of D085 — "The settings UI reuses upstream first … A Fusion-written UI is a fallback, not
+the default, and it is not authorized here." That clause is replaced: the **presentation layer is Fusion-written**, while
+upstream Fcitx remains the authority for **configuration semantics** (schema, defaults, storage, apply path), not for the
+widget technology.
+
+**Accepted with it.** The task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
+lower-frequency settings under "More settings" sections rather than one advanced dump, and the interaction rules the
+owner stated for the key editor, shared Pinyin/Shuangpin state and saving.
+
+**Unchanged.** D085's **work order** (settings UI, then the EXE installer), its **EXE** deliverable form, official Fcitx
+configuration formats, storage in Fcitx's standard per-user paths, the prohibition on an additional Fusion configuration
+store, the user-data policy (upgrade keeps data; uninstall leaves it unless chosen), and every other U1 constraint. U4
+(signing/channel) stays open; the installer framework stays undecided; no merge, installation, registration or publication
+is authorized by this record.
+
+**D086 is not changed.** Its scoped GPL-2.0-or-later authorization remains attached to the retained upstream-derived
+`FusionSettings.exe` and the `fcitx5-configtool`-derived sources. The new client is Fusion-owned code and does **not**
+inherit that authorization, and this decision selects **no repository-wide licence**. While the upstream-derived
+executable continues to ship, its notices, corresponding source and build instructions remain required; whether it is
+retained or retired is a packaging decision taken with its own evidence.
+
+**Out of scope.** No engine-semantic change, no new configuration store, no TSF key-routing policy (the bare-Shift
+boundary stays unresolved), no EXE installer implementation, no machine installation.
+
+**Status.** The presentation change is **accepted**; implementation state is tracked in the Stage 6 plan and the product
+PRs, not here. The option-coverage design is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
 
 ## Current authority rule
 
