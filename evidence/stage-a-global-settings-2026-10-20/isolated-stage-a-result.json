@@ -1,0 +1,93 @@
+{
+    "pipe":  "fusion-stage-a-20261021u",
+    "profileRoot":  "C:\\Users\\choicky\\worktmp\\fusion-windows\\official-settings-ui\\profile-stage-a-20",
+    "seededGlobalUnknownKey":  "keep-me",
+    "seededGlobalKnownValue":  "False",
+    "seededPinyinKnownValue":  "False",
+    "missingEndpoint":  {
+                            "Stdout":  "SKIP integration (FUSION_STAGE4A_INTEGRATION_PIPE not set; the production endpoint is never used)",
+                            "ExitCode":  0,
+                            "Stderr":  "",
+                            "ElapsedMs":  161,
+                            "TimedOut":  false
+                        },
+    "missingEndpointSkipped":  true,
+    "productionRefusalLogical":  {
+                                     "Stdout":  "",
+                                     "ExitCode":  1,
+                                     "Stderr":  "FAIL integration: integration: refusing the production endpoint; set FUSION_STAGE4A_INTEGRATION_PIPE to the isolated Host\u0027s pipe",
+                                     "ElapsedMs":  163,
+                                     "TimedOut":  false
+                                 },
+    "productionRefusalFullPath":  {
+                                      "Stdout":  "",
+                                      "ExitCode":  1,
+                                      "Stderr":  "FAIL integration: integration: refusing the production endpoint; set FUSION_STAGE4A_INTEGRATION_PIPE to the isolated Host\u0027s pipe",
+                                      "ElapsedMs":  128,
+                                      "TimedOut":  false
+                                  },
+    "malformedEndpointRefusal":  {
+                                     "Stdout":  "",
+                                     "ExitCode":  1,
+                                     "Stderr":  "FAIL integration: integration: FUSION_STAGE4A_INTEGRATION_PIPE is not a single pipe name",
+                                     "ElapsedMs":  131,
+                                     "TimedOut":  false
+                                 },
+    "productionEndpointRefused":  true,
+    "productionLearningUntouched":  true,
+    "malformedEndpointRefused":  true,
+    "integration":  {
+                        "Stdout":  "PASS integration candidate select committed the projected candidate\r\nPASS integration with real Fcitx over IPC",
+                        "ExitCode":  0,
+                        "Stderr":  "",
+                        "ElapsedMs":  385,
+                        "TimedOut":  false
+                    },
+    "integrationHostExit":  0,
+    "integrationHostStoppedInTime":  true,
+    "learningBefore":  {
+                           "user.dict":  {
+                                             "Length":  339,
+                                             "Sha256":  "99150A9BE7DA6761095E4BA0FEE2C8D34883B9FB6CC9E5C0CC1044B09E0529CF",
+                                             "Exists":  true
+                                         },
+                           "user.history":  {
+                                                "Length":  61,
+                                                "Sha256":  "1826611FA1EB8587EEB328C3BCF7FAD566B6EA7C0BAB25B4A9BE81B95A1622D7",
+                                                "Exists":  true
+                                            }
+                       },
+    "selfTest":  {
+                     "Stdout":  "",
+                     "ExitCode":  0,
+                     "Stderr":  "[self-test] global cancel restored=7\r\n[self-test] global reload fetched=9\r\n[self-test] global tab-switch kept=8\r\n[self-test] global apply-after-reload=7\r\n[self-test] im-list reject ok empty=The input-method list must contain at least one method this Host defines, and every entry must be available. unknown=The input-method list must contain at least one method this Host defines, and every entry must be available.\r\n[self-test] im-list initial=pinyin,shuangpin reordered=shuangpin,pinyin observed=shuangpin,pinyin",
+                     "ElapsedMs":  4242,
+                     "TimedOut":  false
+                 },
+    "selfTestHostExit":  0,
+    "selfTestHostStoppedInTime":  true,
+    "learningAfter":  {
+                          "user.dict":  {
+                                            "Length":  339,
+                                            "Sha256":  "99150A9BE7DA6761095E4BA0FEE2C8D34883B9FB6CC9E5C0CC1044B09E0529CF",
+                                            "Exists":  true
+                                        },
+                          "user.history":  {
+                                               "Length":  61,
+                                               "Sha256":  "1826611FA1EB8587EEB328C3BCF7FAD566B6EA7C0BAB25B4A9BE81B95A1622D7",
+                                               "Exists":  true
+                                           }
+                      },
+    "learningDictByteIdentical":  true,
+    "learningHistoryByteIdentical":  true,
+    "learningPresentAfter":  true,
+    "globalUnknownKeyAfter":  null,
+    "globalKnownValueAfter":  "False",
+    "globalPageSizeAfter":  "7",
+    "pinyinKnownValueAfter":  "False",
+    "pinyinUnknownKeyAfter":  null,
+    "globalUnknownKeyPreserved":  false,
+    "pinyinUnknownKeyPreserved":  false,
+    "globalKnownUnsubmittedPreserved":  true,
+    "pinyinKnownUnsubmittedPreserved":  true
+}

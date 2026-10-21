@@ -1,0 +1,2879 @@
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..38d99d5
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1,4 @@
++# Patch files are applied with `git apply`, which compares context lines
++# byte-for-byte. A CRLF checkout (core.autocrlf=true on Windows) would rewrite
++# every line and make the patch unapplicable, so they are never EOL-converted.
++*.patch -text
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0828fd9..7b334ec 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,6 +3,11 @@ project(FusionWindowsStage1 LANGUAGES CXX)
+ 
+ option(FUSION_WITH_FCITX5 "Enable the Stage 4A out-of-process Fcitx Host (FusionHost.exe + IPC)" OFF)
+ option(FUSION_WITH_SETTINGS_UI "Build the upstream-derived FusionSettings.exe process" OFF)
++# The real-engine integration test types into the Host it connects to, so it runs
++# only against an endpoint named here. Leave it unset and the test skips: the
++# default endpoint is the installed product Host and the user's live data.
++set(FUSION_STAGE4A_INTEGRATION_PIPE "" CACHE STRING
++    "Isolated FusionHost pipe for stage4a_ipc_integration (empty = skip)")
+ if(FUSION_WITH_SETTINGS_UI AND NOT FUSION_WITH_FCITX5)
+   message(FATAL_ERROR "FusionSettings.exe requires FUSION_WITH_FCITX5=ON")
+ endif()
+@@ -228,10 +233,16 @@ if(BUILD_TESTING)
+       target_compile_definitions(stage4a PRIVATE FUSION_WITH_FCITX5)
+       target_link_libraries(stage4a PRIVATE FusionFcitxHost)
+       add_test(NAME stage4a_ipc_integration COMMAND stage4a integration)
+-      # The spawned product Host must not read or write the real per-user Fcitx
+-      # data (Stage 6 WP3 A2): the Host's own switch keeps it on the skipped path.
++      # Without an explicit isolated endpoint the mode prints SKIP and connects to
++      # nothing, so CTest has to report it as skipped rather than as a successful
++      # integration run. Setting a variable on this process would not isolate the
++      # Host anyway: it is already running, with its own environment and profile.
+       set_tests_properties(stage4a_ipc_integration PROPERTIES
+-        ENVIRONMENT "FUSION_FCITX_SKIP_USER_PATH=1")
++        SKIP_REGULAR_EXPRESSION "SKIP integration")
++      if(FUSION_STAGE4A_INTEGRATION_PIPE)
++        set_tests_properties(stage4a_ipc_integration PROPERTIES
++          ENVIRONMENT "FUSION_STAGE4A_INTEGRATION_PIPE=${FUSION_STAGE4A_INTEGRATION_PIPE}")
++      endif()
+     endif()
+ 
+     # Stage 4B reconnect / semantic-readiness / incarnation-fencing tests. They
+@@ -339,6 +350,19 @@ if(BUILD_TESTING)
+     target_compile_options(wp3_input_methods PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   endif()
+   add_test(NAME wp3_input_methods COMMAND wp3_input_methods)
++  # Stage A settings/list protocol and the product-side list validation are pure
++  # header logic (no Fcitx instance), so they build and run on every platform.
++  add_executable(stage_a_settings tests/stage_a_settings.cpp)
++  target_include_directories(stage_a_settings PRIVATE src include)
++  target_compile_features(stage_a_settings PRIVATE cxx_std_20)
++  if(MSVC)
++    target_compile_options(stage_a_settings PRIVATE /W4 /WX /utf-8)
++  else()
++    target_compile_options(stage_a_settings PRIVATE -Wall -Wextra -Wpedantic -Werror)
++  endif()
++  foreach(test protocol bounds validator)
++    add_test(NAME stage_a_settings_${test} COMMAND stage_a_settings ${test})
++  endforeach()
+   # Stage 5 candidate projection/action decisions are platform-free controller
+   # logic (the Win32 surface is smoke-tested on the real product path), so they
+   # build with the same portable sources as tsf_lifecycle.
+diff --git a/cmake/settings-ui/versions.cmake b/cmake/settings-ui/versions.cmake
+index 9a394a7..1afbc01 100644
+--- a/cmake/settings-ui/versions.cmake
++++ b/cmake/settings-ui/versions.cmake
+@@ -1,7 +1,8 @@
+ # Upstream/runtime compatibility pins used by the owner-test settings executable.
+ set(FUSION_SETTINGS_CONFIGTOOL_REPOSITORY "https://github.com/choicky/fcitx5-configtool.git")
++set(FUSION_SETTINGS_CONFIGTOOL_BRANCH "windows/fusion-settings")
+ set(FUSION_SETTINGS_CONFIGTOOL_BASE_COMMIT "9bd6022c6f5f768d32b6dbe2012358e4cdb1116b")
+-set(FUSION_SETTINGS_CONFIGTOOL_COMMIT "0234c64e93f1d61badc1fd3eaad2ba786ca63850")
++set(FUSION_SETTINGS_CONFIGTOOL_COMMIT "abc2c6644b030d761d3d5e7c27c888af019e63f0")
+ set(FUSION_SETTINGS_FCITXQT_COMMIT "0285a5d18367d8f3af80dab7e4819d5555982340")
+ set(FUSION_SETTINGS_FCITX5_COMMIT "a7f2528773ebfec98a20c49b6eea2333110b1c88")
+ set(FUSION_SETTINGS_CHINESE_ADDONS_COMMIT "61474bd3aa9fca26d1c31df93343035697e9f265")
+diff --git a/include/fusion/backend.hpp b/include/fusion/backend.hpp
+index c318a49..af8ac7e 100644
+--- a/include/fusion/backend.hpp
++++ b/include/fusion/backend.hpp
+@@ -211,6 +211,21 @@ public:
+     return SettingsStatus::Unsupported;
+   }
+ 
++  // Stage A input-method list management. Get reads the current group's ordered
++  // enabled list plus the full available set; Set writes an ordered enabled list
++  // back through the manager's official setGroup/save. These are separate from the
++  // single-select path above: selection changes which method a context follows,
++  // list management changes which methods belong to the group and their order.
++  virtual SettingsStatus settings_get_im_list(ImList &, std::string &error) {
++    error = "input-method list management is not supported by this backend";
++    return SettingsStatus::Unsupported;
++  }
++  virtual SettingsStatus settings_set_im_list(const std::vector<std::string> &, ImList &,
++                                              std::string &error) {
++    error = "input-method list management is not supported by this backend";
++    return SettingsStatus::Unsupported;
++  }
++
+   // Link lifecycle. Defaults describe a backend with no transport, so every
+   // existing implementation (Mock, in-process Fcitx, test fakes) stays valid and
+   // keeps exactly the Stage 4A lifecycle: established, no incarnation, one bind.
+diff --git a/include/fusion/ipc_protocol.hpp b/include/fusion/ipc_protocol.hpp
+index 57cc9c6..490ba1e 100644
+--- a/include/fusion/ipc_protocol.hpp
++++ b/include/fusion/ipc_protocol.hpp
+@@ -85,10 +85,19 @@ enum class MessageType : std::uint8_t {
+   SettingsGetSelectionResponse = 0x12,
+   SettingsSelectInputMethodRequest = 0x13,
+   SettingsSelectInputMethodResponse = 0x14,
++  // Stage A input-method list management (settings_api_version 2). GetImList
++  // returns the ordered enabled list plus the full available set; SetImList
++  // writes an ordered enabled list back through the manager's setGroup/save.
++  // Additive on v4, one request per connection, so existing v4 TIP and v1
++  // settings clients are unaffected.
++  SettingsGetImListRequest = 0x15,
++  SettingsGetImListResponse = 0x16,
++  SettingsSetImListRequest = 0x17,
++  SettingsSetImListResponse = 0x18,
+ };
+ 
+ inline constexpr std::uint8_t max_message_type =
+-    static_cast<std::uint8_t>(MessageType::SettingsSelectInputMethodResponse);
++    static_cast<std::uint8_t>(MessageType::SettingsSetImListResponse);
+ 
+ struct WireFrame {
+   MessageType type{};
+diff --git a/include/fusion/settings.hpp b/include/fusion/settings.hpp
+index 6a463bd..04318ac 100644
+--- a/include/fusion/settings.hpp
++++ b/include/fusion/settings.hpp
+@@ -54,6 +54,23 @@ struct SettingsSelection {
+   std::vector<std::string> available;
+ };
+ 
++// Stage A input-method list management (settings_api_version 2). This models one
++// Fcitx input-method group's membership using official semantics, not a Fusion
++// concept. `active` is the group's Items/0 (the method a bound context follows);
++// `fallback` is Fcitx's DefaultIM (NOT the active method). `enabled` is the
++// ordered Items list (Items/0..N, so enabled.front() == active when non-empty);
++// `available` is every input method the packaged runtime actually defines. An
++// add/remove/reorder writes `enabled` + `active` back through the manager's
++// setGroup/save; it never deletes a method definition file or learning data.
++struct ImList {
++  std::string active;
++  std::string fallback;
++  std::vector<std::string> enabled;
++  std::vector<std::string> available;
++
++  bool operator==(const ImList &) const = default;
++};
++
+ enum class SettingsStatus : std::uint8_t {
+   Ok = 0,
+   Error = 1,
+diff --git a/include/fusion/settings_protocol.hpp b/include/fusion/settings_protocol.hpp
+index a221227..fae949c 100644
+--- a/include/fusion/settings_protocol.hpp
++++ b/include/fusion/settings_protocol.hpp
+@@ -11,7 +11,13 @@
+ 
+ namespace fusion::ipc {
+ 
+-inline constexpr std::uint32_t settings_api_version = 1;
++// Every settings message is additive: a later version keeps the shape of the
++// messages that already existed and only adds types. A Host therefore serves any
++// client in [min, current] — a v1 client simply never sends the newer types — and
++// a client requires a Host at least as new as itself, while a newer Host stays
++// usable because it must keep the older messages intact.
++inline constexpr std::uint32_t settings_api_version = 2;
++inline constexpr std::uint32_t settings_api_min_version = 1;
+ inline constexpr std::size_t max_settings_payload = 60 * 1024;
+ inline constexpr std::size_t max_settings_nodes = 4096;
+ inline constexpr std::size_t max_settings_map_entries = 512;
+@@ -209,6 +215,58 @@ inline bool read_selection(detail::Reader &reader, SettingsSelection &selection)
+   return true;
+ }
+ 
++inline bool write_string_list(std::vector<std::uint8_t> &out,
++                              const std::vector<std::string> &items) {
++  if (items.size() > max_vector_length) {
++    return false;
++  }
++  detail::write_u32(out, static_cast<std::uint32_t>(items.size()));
++  for (const auto &item : items) {
++    if (!write_string(out, item)) {
++      return false;
++    }
++  }
++  return true;
++}
++
++inline bool read_string_list(detail::Reader &reader, std::vector<std::string> &items) {
++  auto count = reader.read_u32();
++  if (!count || *count > max_vector_length) {
++    return false;
++  }
++  items.clear();
++  items.reserve(*count);
++  for (std::uint32_t i = 0; i < *count; ++i) {
++    auto item = reader.read_string();
++    if (!item) {
++      return false;
++    }
++    items.push_back(std::move(*item));
++  }
++  return true;
++}
++
++// ImList: active, fallback, ordered enabled list, available list. Every string is
++// capped by max_string_length and every list by max_vector_length, so a bound
++// peer cannot drive unbounded allocation; readers fail closed on a short buffer
++// or trailing bytes.
++inline bool write_im_list(std::vector<std::uint8_t> &out, const ImList &list) {
++  return write_string(out, list.active) && write_string(out, list.fallback) &&
++         write_string_list(out, list.enabled) && write_string_list(out, list.available) &&
++         out.size() <= max_settings_payload;
++}
++
++inline bool read_im_list(detail::Reader &reader, ImList &list) {
++  auto active = reader.read_string();
++  auto fallback = reader.read_string();
++  if (!active || !fallback) {
++    return false;
++  }
++  list.active = std::move(*active);
++  list.fallback = std::move(*fallback);
++  return read_string_list(reader, list.enabled) && read_string_list(reader, list.available);
++}
++
+ } // namespace settings_detail
+ 
+ inline std::vector<std::uint8_t> serialize_settings_hello(std::uint32_t protocol,
+@@ -282,6 +340,31 @@ inline bool deserialize_settings_set_request(const std::uint8_t *data, std::size
+   return true;
+ }
+ 
++// Stage A: the input-method list-set request carries the desired ordered enabled
++// list (Items/0..N). The active method is enabled.front(); the fallback and each
++// entry's keyboard layout are preserved server-side, so they are not sent here.
++inline std::vector<std::uint8_t> serialize_settings_set_im_list_request(
++    const std::vector<std::string> &enabled) {
++  std::vector<std::uint8_t> payload;
++  if (!settings_detail::write_string_list(payload, enabled) ||
++      payload.size() > max_settings_payload) {
++    payload.clear();
++  }
++  return payload;
++}
++
++inline bool deserialize_settings_set_im_list_request(const std::uint8_t *data, std::size_t size,
++                                                     std::vector<std::string> &enabled) {
++  if (size > max_settings_payload) {
++    return false;
++  }
++  detail::Reader reader{data, size};
++  if (!settings_detail::read_string_list(reader, enabled) || !reader.at_end()) {
++    return false;
++  }
++  return true;
++}
++
+ inline std::vector<std::uint8_t> serialize_settings_status(SettingsStatus status,
+                                                            const std::string &error) {
+   std::vector<std::uint8_t> payload;
+diff --git a/src/fcitx/backend.cpp b/src/fcitx/backend.cpp
+index ec6cc21..e22a01a 100644
+--- a/src/fcitx/backend.cpp
++++ b/src/fcitx/backend.cpp
+@@ -4,6 +4,7 @@
+ #include <fcitx-config/configuration.h>
+ #include <fcitx-config/rawconfig.h>
+ #include "startup_group.hpp"
++#include "im_list.hpp"
+ #include <atomic>
+ #include <chrono>
+ #include <cstdio>
+@@ -20,6 +21,7 @@
+ #include <fcitx/inputmethodgroup.h>
+ #include <fcitx/inputmethodmanager.h>
+ #include <fcitx/inputpanel.h>
++#include <fcitx/globalconfig.h>
+ #include <fcitx/instance.h>
+ #include <future>
+ #include <iterator>
+@@ -59,6 +61,11 @@ constexpr std::size_t preedit_segment_bound = 16;
+ // Engineering bounds for this PoC only; D072 numerical policy remains OPEN.
+ constexpr auto request_wait = std::chrono::seconds(2);
+ constexpr char input_method_config_prefix[] = "fcitx://config/inputmethod/";
++// The official Fcitx global-configuration URI (fcitx5 modules/dbus/dbusmodule.cpp
++// globalConfigPath). It is served here with the same GetConfig/SetConfig messages
++// and the same dumpDescription/save/load+safeSave+reloadConfig semantics as the
++// D-Bus controller uses; no Fusion-specific schema is introduced.
++constexpr char global_config_uri[] = "fcitx://config/global";
+ 
+ bool parse_supported_input_method_uri(const std::string &uri, std::string &name) {
+   const std::string prefix = input_method_config_prefix;
+@@ -69,6 +76,8 @@ bool parse_supported_input_method_uri(const std::string &uri, std::string &name)
+   return name == "pinyin" || name == "shuangpin";
+ }
+ 
++bool is_global_config_uri(const std::string &uri) { return uri == global_config_uri; }
++
+ // Convert the public RawConfig tree to the same string/map shape used by Fcitx's
+ // Controller1.GetConfig. An empty map key carries a node's own scalar value.
+ SettingsValue raw_config_to_settings_value(const fcitx::RawConfig &config) {
+@@ -522,9 +531,22 @@ public:
+ 
+   SettingsStatus settings_get_config(const std::string &uri, SettingsSnapshot &snapshot,
+                                      std::string &error) override {
++    if (is_global_config_uri(uri)) {
++      auto result = std::make_shared<SettingsSnapshot>();
++      const auto status =
++          invoke_settings([this, result](std::string &taskError) {
++                          return read_global_settings_on_loop(*result, taskError);
++                        },
++                        error, SettingsStatus::Timeout);
++      if (status == SettingsStatus::Ok) {
++        snapshot = std::move(*result);
++      }
++      return status;
++    }
+     std::string method;
+     if (!parse_supported_input_method_uri(uri, method)) {
+-      error = "Only the Pinyin and Shuangpin input-method settings are available.";
++      error = "Only the Global configuration and the Pinyin and Shuangpin input-method settings "
++              "are available.";
+       return SettingsStatus::Invalid;
+     }
+     auto result = std::make_shared<SettingsSnapshot>();
+@@ -541,8 +563,24 @@ public:
+ 
+   SettingsStatus settings_set_config(const std::string &uri, const SettingsValue &submitted,
+                                      SettingsSnapshot &snapshot, std::string &error) override {
++    if (!submitted.is_map) {
++      error = "The settings request is invalid.";
++      return SettingsStatus::Invalid;
++    }
++    if (is_global_config_uri(uri)) {
++      auto result = std::make_shared<SettingsSnapshot>();
++      const auto status =
++          invoke_settings([this, submitted, result](std::string &taskError) {
++                            return apply_global_settings_on_loop(submitted, *result, taskError);
++                          },
++                          error, SettingsStatus::Indeterminate);
++      if (status == SettingsStatus::Ok) {
++        snapshot = std::move(*result);
++      }
++      return status;
++    }
+     std::string method;
+-    if (!parse_supported_input_method_uri(uri, method) || !submitted.is_map) {
++    if (!parse_supported_input_method_uri(uri, method)) {
+       error = "The settings request is invalid.";
+       return SettingsStatus::Invalid;
+     }
+@@ -626,6 +664,31 @@ public:
+     return status;
+   }
+ 
++  SettingsStatus settings_get_im_list(ImList &list, std::string &error) override {
++    auto result = std::make_shared<ImList>();
++    const auto status = invoke_settings(
++        [this, result](std::string &taskError) { return im_list_on_loop(*result, taskError); },
++        error, SettingsStatus::Timeout);
++    if (status == SettingsStatus::Ok) {
++      list = std::move(*result);
++    }
++    return status;
++  }
++
++  SettingsStatus settings_set_im_list(const std::vector<std::string> &enabled, ImList &list,
++                                      std::string &error) override {
++    auto result = std::make_shared<ImList>();
++    const auto status = invoke_settings(
++        [this, enabled, result](std::string &taskError) {
++          return apply_im_list_on_loop(enabled, *result, taskError);
++        },
++        error, SettingsStatus::Indeterminate);
++    if (status == SettingsStatus::Ok) {
++      list = std::move(*result);
++    }
++    return status;
++  }
++
+ private:
+   enum class SettingsTaskPhase : int { Queued, Running, Cancelled, Done };
+   struct SettingsTaskState {
+@@ -714,6 +777,60 @@ private:
+     return false;
+   }
+ 
++  SettingsStatus read_global_settings_on_loop(SettingsSnapshot &snapshot, std::string &error) {
++    const auto &global = instance_->globalConfig();
++    fcitx::RawConfig values;
++    global.save(values);
++    snapshot.values = raw_config_to_settings_value(values);
++    snapshot.types = dump_settings_description(global.config());
++    (void)error;
++    return SettingsStatus::Ok;
++  }
++
++  // The official D-Bus controller apply sequence for fcitx://config/global
++  // (dbusmodule.cpp:425-432): partial load onto the live GlobalConfig, safeSave, and
++  // reloadConfig only if the save succeeded. The submitted tree is merged onto the
++  // current values first (same delta/no-change path as an input-method page), so a
++  // partial load never resets an unexposed option to its default, and a no-change
++  // Apply calls neither load nor safeSave nor reloadConfig and touches no file.
++  SettingsStatus apply_global_settings_on_loop(const SettingsValue &submitted,
++                                               SettingsSnapshot &snapshot, std::string &error) {
++    SettingsSnapshot current;
++    if (const auto status = read_global_settings_on_loop(current, error);
++        status != SettingsStatus::Ok) {
++      return status;
++    }
++    if (current.types.empty()) {
++      error = "Fcitx returned no schema for the global configuration.";
++      return SettingsStatus::Error;
++    }
++    SettingsValue merged = current.values;
++    if (!merge_schema_values(current.types, current.types.front().name, submitted, merged,
++                             error)) {
++      return SettingsStatus::Invalid;
++    }
++    if (merged == current.values) {
++      snapshot = std::move(current);
++      return SettingsStatus::Ok;
++    }
++    if (has_active_composition_on_loop()) {
++      error = "Finish the current composition, then retry applying the global settings.";
++      return SettingsStatus::Busy;
++    }
++    fcitx::RawConfig raw;
++    if (!settings_value_fill_raw_config(merged, raw)) {
++      error = "The global settings value tree is malformed.";
++      return SettingsStatus::Invalid;
++    }
++    instance_->globalConfig().load(raw, /*partial=*/true);
++    if (!instance_->globalConfig().safeSave()) {
++      error = "Fcitx could not save the global configuration; reload before retrying.";
++      return SettingsStatus::Error;
++    }
++    instance_->reloadConfig();
++    return read_global_settings_on_loop(snapshot, error);
++  }
++
+   SettingsStatus read_settings_on_loop(const std::string &method, SettingsSnapshot &snapshot,
+                                        std::string &error) {
+     const auto *entry = instance_->inputMethodManager().entry(method);
+@@ -795,6 +912,105 @@ private:
+     return SettingsStatus::Ok;
+   }
+ 
++  // The input methods this packaged runtime defines. The Host registers only the
++  // Pinyin and Shuangpin engines, so the manageable set is those names where an
++  // entry actually exists; a name outside it is not exposed and is refused on
++  // write (see im_list.hpp), rather than silently dropped by setGroup.
++  std::vector<std::string> available_method_names_on_loop() const {
++    auto &manager = instance_->inputMethodManager();
++    std::vector<std::string> names;
++    for (const char *name : {"pinyin", "shuangpin"}) {
++      if (manager.entry(name)) {
++        names.emplace_back(name);
++      }
++    }
++    return names;
++  }
++
++  // Reads the current group's ordered membership using official semantics:
++  // enabled = the group's defined Items, active = Items/0, fallback = DefaultIM,
++  // available = the methods this runtime defines.
++  SettingsStatus im_list_on_loop(ImList &list, std::string &error) {
++    const auto &group = instance_->inputMethodManager().currentGroup();
++    list = {};
++    list.available = available_method_names_on_loop();
++    if (list.available.empty()) {
++      error = "This Host has no Pinyin or Shuangpin input method available.";
++      return SettingsStatus::Unsupported;
++    }
++    for (const auto &item : group.inputMethodList()) {
++      const auto &name = item.name();
++      if (std::find(list.available.begin(), list.available.end(), name) !=
++          list.available.end()) {
++        list.enabled.push_back(name);
++      }
++    }
++    if (!list.enabled.empty()) {
++      list.active = list.enabled.front();
++    }
++    list.fallback = group.defaultInputMethod();
++    return SettingsStatus::Ok;
++  }
++
++  // Writes an ordered enabled list back through the official setGroup/save path.
++  // The pure validator refuses an empty list and any unavailable name; a no-change
++  // Apply neither touches the composition guard nor calls save (no file writes);
++  // each retained entry keeps its keyboard layout and the group's existing
++  // DefaultIM is carried to setDefaultInputMethod so Fcitx preserves the fallback.
++  SettingsStatus apply_im_list_on_loop(const std::vector<std::string> &requested, ImList &out,
++                                       std::string &error) {
++    auto &manager = instance_->inputMethodManager();
++    const auto available = available_method_names_on_loop();
++    if (available.empty()) {
++      error = "This Host has no Pinyin or Shuangpin input method available.";
++      return SettingsStatus::Unsupported;
++    }
++    const auto &current_group = manager.currentGroup();
++    const auto plan =
++        selection::plan_im_list_update(requested, available, current_group.defaultInputMethod());
++    if (!plan) {
++      error = "The input-method list must contain at least one method this Host defines, and every "
++              "entry must be available.";
++      return SettingsStatus::Invalid;
++    }
++    // No-change short-circuit: same defined membership and order and the same
++    // requested fallback leaves the group identical, so persist nothing.
++    const auto current_enabled = [&] {
++      std::vector<std::string> names;
++      for (const auto &item : current_group.inputMethodList()) {
++        const auto &name = item.name();
++        if (std::find(available.begin(), available.end(), name) != available.end()) {
++          names.push_back(name);
++        }
++      }
++      return names;
++    }();
++    if (current_enabled == plan->methods &&
++        current_group.defaultInputMethod() == plan->requested_fallback) {
++      return im_list_on_loop(out, error);
++    }
++    if (has_active_composition_on_loop()) {
++      error = "Finish the current composition, then retry the input-method list change.";
++      return SettingsStatus::Busy;
++    }
++    auto group = current_group;
++    std::vector<fcitx::InputMethodGroupItem> rebuilt;
++    rebuilt.reserve(plan->methods.size());
++    for (const auto &name : plan->methods) {
++      fcitx::InputMethodGroupItem item(name);
++      const auto &layout = current_group.layoutFor(name);
++      if (!layout.empty()) {
++        item.setLayout(layout);
++      }
++      rebuilt.push_back(std::move(item));
++    }
++    group.inputMethodList() = std::move(rebuilt);
++    group.setDefaultInputMethod(plan->requested_fallback);
++    manager.setGroup(std::move(group));
++    manager.save();
++    return im_list_on_loop(out, error);
++  }
++
+   static std::vector<std::string> method_names(const fcitx::InputMethodGroup &group) {
+     std::vector<std::string> names;
+     names.reserve(group.inputMethodList().size());
+diff --git a/src/fcitx/im_list.hpp b/src/fcitx/im_list.hpp
+new file mode 100644
+index 0000000..f8eead5
+--- /dev/null
++++ b/src/fcitx/im_list.hpp
+@@ -0,0 +1,67 @@
++#pragma once
++
++// Stage A input-method list management: the product-side validation the Fcitx
++// core does not perform, kept pure so it can be unit-tested without constructing
++// a Fcitx instance (which a test must never do on the real user path).
++//
++// Fcitx's InputMethodManager owns persistence and its own invariants: setGroup
++// silently drops names this runtime does not define, save() rewrites only the
++// current group's profile, and setDefaultInputMethod keeps DefaultIM distinct
++// from Items/0 by itself. This file adds the two guards the core leaves open —
++// an empty enabled list and an unavailable selection are refused here instead of
++// being silently persisted or dropped — and decides the enabled order. It does
++// NOT reimplement the DefaultIM rewrite: the previous fallback is passed straight
++// to setDefaultInputMethod so Fcitx remains the single source of truth for it.
++
++#include <algorithm>
++#include <optional>
++#include <string>
++#include <vector>
++
++namespace fusion::selection {
++
++struct ImListPlan {
++  // The ordered Items to write (Items/0..N); the active method is methods.front().
++  std::vector<std::string> methods;
++  // Passed verbatim to InputMethodGroup::setDefaultInputMethod. Fcitx rewrites a
++  // default equal to Items/0 (or a no-longer-enabled default) by its own rule.
++  std::string requested_fallback;
++};
++
++// Normalizes and validates a requested enabled list against the methods the
++// packaged runtime actually defines.
++//
++// `available` is every input method this Host build provides; a request may only
++// enable names from it. `requested` is the desired order produced by the UI's
++// add / remove / reorder; duplicates collapse to their first occurrence and the
++// remaining order is preserved. `previous_fallback` is the group's current
++// DefaultIM, carried through so the user's fallback survives an unrelated edit.
++//
++// Returns nullopt — refuse — when the request would leave the group with no
++// input method (the core would persist that and contexts would have nothing to
++// select) or names a method this runtime does not define (the core would silently
++// drop it, so a partial success would look like a saved list).
++inline std::optional<ImListPlan>
++plan_im_list_update(const std::vector<std::string> &requested,
++                    const std::vector<std::string> &available,
++                    const std::string &previous_fallback) {
++  const auto defined = [&](const std::string &name) {
++    return std::find(available.begin(), available.end(), name) != available.end();
++  };
++  ImListPlan plan;
++  for (const auto &name : requested) {
++    if (!defined(name)) {
++      return std::nullopt;
++    }
++    if (std::find(plan.methods.begin(), plan.methods.end(), name) == plan.methods.end()) {
++      plan.methods.push_back(name);
++    }
++  }
++  if (plan.methods.empty()) {
++    return std::nullopt;
++  }
++  plan.requested_fallback = previous_fallback;
++  return plan;
++}
++
++} // namespace fusion::selection
+diff --git a/src/host/host_server.cpp b/src/host/host_server.cpp
+index f056732..ca099b9 100644
+--- a/src/host/host_server.cpp
++++ b/src/host/host_server.cpp
+@@ -454,6 +454,20 @@ void HostServer::Connection::run() {
+         pipe->disconnect_client();
+       }
+       break;
++    case MessageType::SettingsGetImListRequest:
++      if (settings_capable) {
++        handle_settings_get_im_list(frame->payload);
++      } else {
++        pipe->disconnect_client();
++      }
++      break;
++    case MessageType::SettingsSetImListRequest:
++      if (settings_capable) {
++        handle_settings_set_im_list(frame->payload);
++      } else {
++        pipe->disconnect_client();
++      }
++      break;
+     default: {
+       const unsigned type = static_cast<unsigned>(static_cast<std::uint8_t>(frame->type));
+       std::fprintf(stderr, "[FusionHost] unknown message type 0x%02x, disconnecting\n", type);
+@@ -531,7 +545,10 @@ void HostServer::Connection::handle_settings_hello(const std::vector<std::uint8_
+     return;
+   }
+   const bool protocol_matches = hello->protocol == protocol_version;
+-  const bool api_matches = hello->api == settings_api_version;
++  // Additive API: an older client is served (it never sends the newer types) and a
++  // newer client is refused, because this Host cannot know what it would need.
++  const bool api_matches = hello->api >= settings_api_min_version &&
++                           hello->api <= settings_api_version;
+   std::uint64_t session = 0;
+   if (protocol_matches) {
+     std::lock_guard lock(backend_mutex);
+@@ -650,6 +667,49 @@ void HostServer::Connection::handle_settings_select_input_method(
+   close_after_settings_request = true;
+ }
+ 
++void HostServer::Connection::handle_settings_get_im_list(
++    const std::vector<std::uint8_t> &payload) {
++  if (!payload.empty()) {
++    pipe->disconnect_client();
++    return;
++  }
++  ImList list;
++  std::string error;
++  const auto status = backend.settings_get_im_list(list, error);
++  std::vector<std::uint8_t> response_payload = serialize_settings_status(status, error);
++  if (status == SettingsStatus::Ok && !settings_detail::write_im_list(response_payload, list)) {
++    response_payload = serialize_settings_status(
++        SettingsStatus::Error, "The input-method list exceeds the supported response bound.");
++  }
++  send_response(MessageType::SettingsGetImListResponse, response_payload);
++  close_after_settings_request = true;
++}
++
++void HostServer::Connection::handle_settings_set_im_list(
++    const std::vector<std::uint8_t> &payload) {
++  if (payload.size() > max_settings_payload) {
++    pipe->disconnect_client();
++    return;
++  }
++  std::vector<std::string> enabled;
++  if (!deserialize_settings_set_im_list_request(payload.data(), payload.size(), enabled)) {
++    pipe->disconnect_client();
++    return;
++  }
++  ImList list;
++  std::string error;
++  const auto status = backend.settings_set_im_list(enabled, list, error);
++  std::vector<std::uint8_t> response_payload = serialize_settings_status(status, error);
++  if (status == SettingsStatus::Ok && !settings_detail::write_im_list(response_payload, list)) {
++    response_payload = serialize_settings_status(
++        SettingsStatus::Indeterminate,
++        "The input-method list may have changed, but the Host could not confirm the result. Reload "
++        "before retrying.");
++  }
++  send_response(MessageType::SettingsSetImListResponse, response_payload);
++  close_after_settings_request = true;
++}
++
+ void HostServer::Connection::handle_bind(const std::vector<std::uint8_t> &payload) {
+   auto client_binding = deserialize_binding(payload.data(), payload.size());
+   if (!client_binding) {
+diff --git a/src/host/host_server.hpp b/src/host/host_server.hpp
+index ddbd260..c404665 100644
+--- a/src/host/host_server.hpp
++++ b/src/host/host_server.hpp
+@@ -246,6 +246,8 @@ private:
+     void handle_settings_set_config(const std::vector<std::uint8_t> &payload);
+     void handle_settings_get_selection(const std::vector<std::uint8_t> &payload);
+     void handle_settings_select_input_method(const std::vector<std::uint8_t> &payload);
++    void handle_settings_get_im_list(const std::vector<std::uint8_t> &payload);
++    void handle_settings_set_im_list(const std::vector<std::uint8_t> &payload);
+     void handle_bind(const std::vector<std::uint8_t> &payload);
+     void handle_reset(const std::vector<std::uint8_t> &payload);
+     void handle_unbind(const std::vector<std::uint8_t> &payload);
+diff --git a/src/settings/dbusprovider.cpp b/src/settings/dbusprovider.cpp
+index 9024402..219bb34 100644
+--- a/src/settings/dbusprovider.cpp
++++ b/src/settings/dbusprovider.cpp
+@@ -100,6 +100,35 @@ bool readString(const QByteArray &bytes, qsizetype &offset, QString &value) {
+     return true;
+ }
+ 
++bool appendStringList(QByteArray &bytes, const QStringList &items) {
++    if (static_cast<quint32>(items.size()) > fusion::ipc::max_vector_length) {
++        return false;
++    }
++    appendU32(bytes, static_cast<quint32>(items.size()));
++    for (const auto &item : items) {
++        if (!appendString(bytes, item)) {
++            return false;
++        }
++    }
++    return true;
++}
++
++bool readStringList(const QByteArray &bytes, qsizetype &offset, QStringList &items) {
++    quint32 count = 0;
++    if (!readU32(bytes, offset, count) || count > fusion::ipc::max_vector_length) {
++        return false;
++    }
++    items.clear();
++    for (quint32 i = 0; i < count; ++i) {
++        QString item;
++        if (!readString(bytes, offset, item)) {
++            return false;
++        }
++        items.append(item);
++    }
++    return true;
++}
++
+ bool readValue(const QByteArray &bytes, qsizetype &offset, fusion::SettingsValue &value,
+                std::size_t depth, std::size_t &nodes) {
+     if (depth > fusion::ipc::max_settings_depth || ++nodes > fusion::ipc::max_settings_nodes) {
+@@ -263,13 +292,15 @@ QByteArray makeFrame(fusion::ipc::MessageType type, const QByteArray &payload) {
+ 
+ } // namespace
+ 
+-void PendingCall::complete(const QDBusMessage &reply, SettingsSelection selection) {
++void PendingCall::complete(const QDBusMessage &reply, SettingsSelection selection,
++                           SettingsImList imList) {
+     if (finished_) {
+         return;
+     }
+     finished_ = true;
+     reply_ = reply;
+     selection_ = std::move(selection);
++    imList_ = std::move(imList);
+     if (!completionQueued_) {
+         completionQueued_ = true;
+         QTimer::singleShot(0, this, [this] { Q_EMIT finished(); });
+@@ -373,6 +404,13 @@ private:
+                 return {};
+             }
+             break;
++        case ControllerProxy::Operation::GetImList:
++            break;
++        case ControllerProxy::Operation::SetImList:
++            if (!appendStringList(payload, value_.toStringList())) {
++                return {};
++            }
++            break;
+         }
+         return payload;
+     }
+@@ -387,6 +425,10 @@ private:
+             return fusion::ipc::MessageType::SettingsGetSelectionRequest;
+         case ControllerProxy::Operation::SelectInputMethod:
+             return fusion::ipc::MessageType::SettingsSelectInputMethodRequest;
++        case ControllerProxy::Operation::GetImList:
++            return fusion::ipc::MessageType::SettingsGetImListRequest;
++        case ControllerProxy::Operation::SetImList:
++            return fusion::ipc::MessageType::SettingsSetImListRequest;
+         }
+         return fusion::ipc::MessageType::SettingsGetConfigRequest;
+     }
+@@ -401,6 +443,10 @@ private:
+             return fusion::ipc::MessageType::SettingsGetSelectionResponse;
+         case ControllerProxy::Operation::SelectInputMethod:
+             return fusion::ipc::MessageType::SettingsSelectInputMethodResponse;
++        case ControllerProxy::Operation::GetImList:
++            return fusion::ipc::MessageType::SettingsGetImListResponse;
++        case ControllerProxy::Operation::SetImList:
++            return fusion::ipc::MessageType::SettingsSetImListResponse;
+         }
+         return fusion::ipc::MessageType::SettingsGetConfigResponse;
+     }
+@@ -472,7 +518,12 @@ private:
+             return;
+         }
+         (void)session;
+-        if (protocol != fusion::ipc::protocol_version || api != fusion::ipc::settings_api_version ||
++        // The wire surface is additive, so this client needs a Host that speaks at
++        // least its own API version; a newer Host keeps the older messages and is
++        // accepted. An older Host is refused here rather than failing later on a
++        // message it does not know.
++        if (protocol != fusion::ipc::protocol_version ||
++            api < fusion::ipc::settings_api_version ||
+             status != static_cast<quint8>(fusion::SettingsStatus::Ok)) {
+             controller_->provider_->setAvailable(false);
+             fail(error.isEmpty()
+@@ -520,6 +571,20 @@ private:
+                 return;
+             }
+             call_->complete(configReply(values, types));
++        } else if (operation_ == ControllerProxy::Operation::GetImList ||
++                   operation_ == ControllerProxy::Operation::SetImList) {
++            SettingsImList list;
++            QStringList enabled, available;
++            if (!readString(payload, offset, list.active) ||
++                !readString(payload, offset, list.fallback) ||
++                !readStringList(payload, offset, enabled) ||
++                !readStringList(payload, offset, available) || offset != payload.size()) {
++                fail(QStringLiteral("FusionHost returned a malformed input-method list."));
++                return;
++            }
++            list.enabled = enabled;
++            list.available = available;
++            call_->complete(emptyReply(), SettingsSelection{}, std::move(list));
+         } else {
+             QString selected;
+             quint32 count = 0;
+@@ -618,6 +683,18 @@ PendingCall *ControllerProxy::SelectInputMethod(const QString &method) {
+     return call;
+ }
+ 
++PendingCall *ControllerProxy::GetImList() {
++    auto *call = new PendingCall(this);
++    startRequest(Operation::GetImList, {}, {}, call);
++    return call;
++}
++
++PendingCall *ControllerProxy::SetImList(const QStringList &enabled) {
++    auto *call = new PendingCall(this);
++    startRequest(Operation::SetImList, {}, QVariant(enabled), call);
++    return call;
++}
++
+ DBusProvider::DBusProvider(QObject *parent, const QString &pipeName) : QObject(parent) {
+     registerFcitxQtDBusTypes();
+     controller_ = new ControllerProxy(pipeName, this, this);
+diff --git a/src/settings/main.cpp b/src/settings/main.cpp
+index b197134..407a3d2 100644
+--- a/src/settings/main.cpp
++++ b/src/settings/main.cpp
+@@ -12,7 +12,6 @@
+ #include "ipc/pipe_security.hpp"
+ 
+ #include <QApplication>
+-#include <QComboBox>
+ #include <QCoreApplication>
+ #include <QDBusMessage>
+ #include <QDBusVariant>
+@@ -20,11 +19,12 @@
+ #include <QHBoxLayout>
+ #include <QHash>
+ #include <QLabel>
++#include <QListWidget>
++#include <QListWidgetItem>
+ #include <QMainWindow>
+ #include <QMessageBox>
+ #include <QPushButton>
+ #include <QScrollArea>
+-#include <QStandardItemModel>
+ #include <QTabWidget>
+ #include <QTimer>
+ #include <QVBoxLayout>
+@@ -32,6 +32,7 @@
+ #include <QWidget>
+ 
+ #include <clocale>
++#include <cstdio>
+ #include <functional>
+ #include <memory>
+ #include <string>
+@@ -61,15 +62,26 @@ QString endpointName(int argc, char **argv) {
+   return QString::fromStdWString(fusion::ipc::logical_pipe_name(fusion::ipc::compute_pipe_name()));
+ }
+ 
++// The Global-page probe value used by the self-test/verify pair. It is written to
++// the disposable test profile only; a real user's global configuration is never
++// touched by the harness.
++constexpr int kGlobalPageSizeProbe = 7;
++
+ QString inputMethodName(const QString &name) {
+-  return name == QLatin1String("shuangpin") ? QStringLiteral("双拼")
+-                                             : QStringLiteral("拼音");
++  if (name == QLatin1String("shuangpin")) {
++    return QStringLiteral("双拼");
++  }
++  if (name == QLatin1String("pinyin")) {
++    return QStringLiteral("拼音");
++  }
++  return name;
+ }
+ 
+ class SettingsWindow final : public QMainWindow {
+ public:
+-  explicit SettingsWindow(QString pipeName, bool selfTest = false, QString screenshot = {})
+-      : provider_(this, pipeName), selfTest_(selfTest),
++  explicit SettingsWindow(QString pipeName, bool selfTest = false, bool verifyOnly = false,
++                          QString screenshot = {})
++      : provider_(this, pipeName), selfTest_(selfTest), verifyOnly_(verifyOnly),
+         screenshot_(std::move(screenshot)) {
+     setWindowTitle(QStringLiteral("Fusion 输入法设置"));
+     resize(920, 760);
+@@ -81,21 +93,55 @@ public:
+     status->setWordWrap(true);
+     outer->addWidget(status);
+ 
+-    auto *selectionRow = new QHBoxLayout;
+-    selectionRow->addWidget(new QLabel(QStringLiteral("当前输入方式："), central));
+-    selection_ = new QComboBox(central);
+-    selection_->addItem(QStringLiteral("拼音"), QStringLiteral("pinyin"));
+-    selection_->addItem(QStringLiteral("双拼"), QStringLiteral("shuangpin"));
+-    selectionRow->addWidget(selection_, 1);
+-    auto *applySelection = new QPushButton(QStringLiteral("应用输入方式"), central);
+-    selectionRow->addWidget(applySelection);
+-    outer->addLayout(selectionRow);
++    // Stage A input-method management: the packaged runtime's defined methods,
++    // the ordered enabled list (top to bottom, first row = the active method a
++    // bound context follows), and add / remove / reorder controls. Writing the
++    // list goes through the Host's official setGroup/save; it never deletes a
++    // method's definition or learning data. This replaces the old two-method
++    // dropdown, which could only switch the active method, not manage membership.
++    auto *manageRow = new QHBoxLayout;
++    auto *leftCol = new QVBoxLayout;
++    leftCol->addWidget(new QLabel(QStringLiteral("可用输入方式："), central));
++    availableList_ = new QListWidget(central);
++    leftCol->addWidget(availableList_);
++    auto *moveCol = new QVBoxLayout;
++    auto *addButton = new QPushButton(QStringLiteral("添加 >"), central);
++    auto *removeButton = new QPushButton(QStringLiteral("< 移除"), central);
++    moveCol->addStretch(1);
++    moveCol->addWidget(addButton);
++    moveCol->addWidget(removeButton);
++    moveCol->addStretch(1);
++    auto *rightCol = new QVBoxLayout;
++    rightCol->addWidget(
++        new QLabel(QStringLiteral("已启用（从上到下；第一项为当前输入方式）："), central));
++    enabledList_ = new QListWidget(central);
++    rightCol->addWidget(enabledList_);
++    auto *orderCol = new QVBoxLayout;
++    auto *upButton = new QPushButton(QStringLiteral("上移"), central);
++    auto *downButton = new QPushButton(QStringLiteral("下移"), central);
++    imApply_ = new QPushButton(QStringLiteral("应用输入方式列表"), central);
++    orderCol->addStretch(1);
++    orderCol->addWidget(upButton);
++    orderCol->addWidget(downButton);
++    orderCol->addWidget(imApply_);
++    orderCol->addStretch(1);
++    manageRow->addLayout(leftCol, 1);
++    manageRow->addLayout(moveCol);
++    manageRow->addLayout(rightCol, 1);
++    manageRow->addLayout(orderCol);
++    outer->addLayout(manageRow);
+ 
+     tabs_ = new QTabWidget(central);
+     pinyinUri_ = QStringLiteral("fcitx://config/inputmethod/pinyin");
+     shuangpinUri_ = QStringLiteral("fcitx://config/inputmethod/shuangpin");
++    globalUri_ = QStringLiteral("fcitx://config/global");
+     tabs_->addTab(makePage(pinyinUri_, pinyin_), QStringLiteral("拼音设置"));
+     tabs_->addTab(makePage(shuangpinUri_, shuangpin_), QStringLiteral("双拼设置"));
++    // The Global page renders the official fcitx://config/global schema, which
++    // contains options this Windows path cannot honour. They stay visible — the
++    // schema is Fcitx's — so the page says which categories do not apply instead
++    // of implying that every option shown here changes input behaviour.
++    tabs_->addTab(makePage(globalUri_, global_, globalPageNote()), QStringLiteral("全局设置"));
+     outer->addWidget(tabs_, 1);
+ 
+     auto *buttons = new QHBoxLayout;
+@@ -124,33 +170,38 @@ public:
+       status->setText(QStringLiteral("正在从 FusionHost 重新加载…"));
+       reloadAll(status, QStringLiteral("已从 FusionHost 重新加载。"));
+     });
+-    connect(applySelection, &QPushButton::clicked, this, [this, status, applySelection] {
+-      if (!provider_.controller()) {
+-        showError(status, QStringLiteral("无法创建 FusionHost 重连请求。"));
++    connect(addButton, &QPushButton::clicked, this, [this] {
++      auto *item = availableList_->currentItem();
++      if (!item) {
+         return;
+       }
+-      applySelection->setEnabled(false);
+-      status->setText(QStringLiteral("正在切换输入方式…"));
+-      auto *call = provider_.controller()->SelectInputMethod(selection_->currentData().toString());
+-      connect(call, &fcitx::kcm::PendingCall::finished, this,
+-              [this, call, applySelection, status] {
+-                const auto reply = call->reply();
+-                const auto selection = call->selection();
+-                call->deleteLater();
+-                applySelection->setEnabled(true);
+-                if (reply.type() != QDBusMessage::ReplyMessage) {
+-                  const QString error = reply.errorMessage();
+-                  showError(status, error.isEmpty()
+-                                        ? QStringLiteral("FusionHost 未确认输入方式切换；请重新加载状态。")
+-                                        : error);
+-                  reloadSelection();
+-                  return;
+-                }
+-                setSelection(selection);
+-                loadCurrentPage();
+-                status->setText(QStringLiteral("输入方式已由 FusionHost 确认：%1。")
+-                                    .arg(inputMethodName(selection.selected)));
+-              });
++      const QString name = item->data(Qt::UserRole).toString();
++      availableList_->takeItem(availableList_->row(item));
++      auto *moved = new QListWidgetItem(inputMethodName(name), enabledList_);
++      moved->setData(Qt::UserRole, name);
++      status_->setText(QStringLiteral("输入方式列表有未应用的更改。"));
++    });
++    connect(removeButton, &QPushButton::clicked, this, [this] {
++      auto *item = enabledList_->currentItem();
++      if (!item) {
++        return;
++      }
++      if (enabledList_->count() <= 1) {
++        status_->setText(QStringLiteral("至少需保留一种已启用的输入方式。"));
++        return;
++      }
++      const QString name = item->data(Qt::UserRole).toString();
++      enabledList_->takeItem(enabledList_->row(item));
++      auto *moved = new QListWidgetItem(inputMethodName(name), availableList_);
++      moved->setData(Qt::UserRole, name);
++      status_->setText(QStringLiteral("输入方式列表有未应用的更改。"));
++    });
++    connect(upButton, &QPushButton::clicked, this,
++            [this] { moveEnabledRow(enabledList_->currentRow(), -1); });
++    connect(downButton, &QPushButton::clicked, this,
++            [this] { moveEnabledRow(enabledList_->currentRow(), 1); });
++    connect(imApply_, &QPushButton::clicked, this, [this, status] {
++      applyImList(enabledOrder(), status);
+     });
+     connect(&provider_, &fcitx::kcm::DBusProvider::availabilityChanged, this,
+             [status](bool available) {
+@@ -187,18 +238,38 @@ public:
+     connect(shuangpin_, &fcitx::kcm::ConfigWidget::changed, this, [this, status] {
+       status->setText(QStringLiteral("双拼设置有未应用的更改。"));
+     });
++    connect(global_, &fcitx::kcm::ConfigWidget::configurationLoaded, this,
++            [this, status](bool ok, const QString &error) {
++              globalLoaded_ = ok;
++              if (ok) {
++                baseline_[global_] = global_->value().toMap();
++                status->setText(QStringLiteral("已从 FusionHost 加载全局设置。"));
++              } else {
++                showError(status, error);
++              }
++            });
++    connect(global_, &fcitx::kcm::ConfigWidget::changed, this, [this, status] {
++      status->setText(QStringLiteral("全局设置有未应用的更改。"));
++    });
+ 
+-    // Probe the selection first, then load the page(s). The Host admits one
+-    // settings request at a time; serializing startup avoids a false Busy result.
+-    reloadSelection([this] {
+-      if (selfTest_) {
+-        loadBothPages([this](bool ok, const QString &error) {
++    // Probe the input-method list first, then load the page(s). The Host admits
++    // one settings request at a time; serializing startup avoids a false Busy
++    // result.
++    reloadImList([this] {
++      if (selfTest_ || verifyOnly_) {
++        loadAllPages([this](bool ok, const QString &error) {
+           if (!ok) {
+             showError(status_, error);
+             QCoreApplication::exit(13);
+             return;
+           }
+-          QTimer::singleShot(0, this, [this] { runSelfTest(); });
++          QTimer::singleShot(0, this, [this] {
++            if (verifyOnly_) {
++              runVerify();
++            } else {
++              runSelfTest();
++            }
++          });
+         });
+         return;
+       }
+@@ -206,11 +277,33 @@ public:
+     });
+   }
+ 
++  // Only used by --self-test-verify: the order the harness read from the persisted
++  // profile before the restart.
++  void setExpectedImList(const QStringList &list) { expectedImList_ = list; }
++
+ private:
+-  QWidget *makePage(const QString &uri, fcitx::kcm::ConfigWidget *&page) {
++  // One precise sentence per unsupported category. The official schema is reused
++  // as-is, so these options are neither hidden nor disabled; the note states what
++  // does not reach the engine on this Windows path.
++  static QString globalPageNote() {
++    return QStringLiteral(
++        "说明：本页由 Fcitx 官方全局配置架构生成。以下类别在 Windows 上不生效或不完全生效——"
++        "全局快捷键（触发/激活/停用/翻页/候选移动/ModifierOnlyKeyTimeout）：Fusion 不把单独的修饰键或 "
++        "Ctrl/Alt/Win 组合键交给引擎，Ctrl+Space 由 Windows 输入法切换负责；"
++        "输入法状态提示与面板相关选项：本产品不提供 Fcitx 面板，候选窗是产品自己的投影；"
++        "密码框相关选项：Windows 输入范围策略先于引擎生效，这里的设置不会覆盖它。"
++        "ActiveByDefault 与 resetStateWhenFocusIn 仅部分生效。其余选项按 Fcitx 语义生效。");
++  }
++
++  QWidget *makePage(const QString &uri, fcitx::kcm::ConfigWidget *&page, const QString &note = {}) {
+     auto *wrapper = new QWidget(tabs_);
+     auto *layout = new QVBoxLayout(wrapper);
+     layout->setContentsMargins(0, 0, 0, 0);
++    if (!note.isEmpty()) {
++      auto *noteLabel = new QLabel(note, wrapper);
++      noteLabel->setWordWrap(true);
++      layout->addWidget(noteLabel);
++    }
+     auto *scroll = new QScrollArea(wrapper);
+     scroll->setWidgetResizable(true);
+     page = new fcitx::kcm::ConfigWidget(uri, &provider_);
+@@ -220,7 +313,29 @@ private:
+   }
+ 
+   fcitx::kcm::ConfigWidget *currentPage() const {
+-    return tabs_->currentIndex() == 0 ? pinyin_ : shuangpin_;
++    switch (tabs_->currentIndex()) {
++    case 0:
++      return pinyin_;
++    case 1:
++      return shuangpin_;
++    case 2:
++      return global_;
++    default:
++      return nullptr;
++    }
++  }
++
++  bool loadedFor(const fcitx::kcm::ConfigWidget *page) const {
++    if (page == pinyin_) {
++      return pinyinLoaded_;
++    }
++    if (page == shuangpin_) {
++      return shuangpinLoaded_;
++    }
++    if (page == global_) {
++      return globalLoaded_;
++    }
++    return false;
+   }
+ 
+   void loadCurrentPage(bool force = false) {
+@@ -231,49 +346,79 @@ private:
+     if (!page) {
+       return;
+     }
+-    const bool loaded = page == pinyin_ ? pinyinLoaded_ : shuangpinLoaded_;
+-    if (force || !loaded) {
++    if (force || !loadedFor(page)) {
+       page->load();
+     }
+   }
+ 
+-  void reloadAll(QLabel *status, const QString &successMessage) {
+-    reloadSelection([this, status, successMessage] {
+-      loadBothPages([this, status, successMessage](bool ok, const QString &error) {
++  // onDone is for the unattended self-test, which has to know when the reload
++  // chain finished; the buttons pass nothing and rely on the status label.
++  void reloadAll(QLabel *status, const QString &successMessage,
++                 std::function<void(bool, const QString &)> onDone = {}) {
++    reloadImList([this, status, successMessage, onDone] {
++      loadAllPages([this, status, successMessage, onDone](bool ok, const QString &error) {
+         if (ok) {
+           status->setText(successMessage);
+         } else {
+           showError(status, error);
+         }
++        if (onDone) {
++          onDone(ok, error);
++        }
+       });
+     });
+   }
+ 
+-  // The Host admits one settings request per connection, so the two pages are
+-  // loaded sequentially: Pinyin first, then Shuangpin.
+-  void loadBothPages(std::function<void(bool, const QString &)> onDone) {
++  // The Host admits one settings request per connection, so a full reload walks
++  // the pages sequentially: the next request starts only after the previous reply.
++  // Every page the Cancel/Reload buttons claim to reload is included — leaving the
++  // Global page out left its edits and baseline untouched while reporting success.
++  struct ReloadChain {
++    std::vector<fcitx::kcm::ConfigWidget *> pages;
++    std::function<void(bool, const QString &)> onDone;
++    std::size_t index = 0;
++  };
++
++  void stepReload(const std::shared_ptr<ReloadChain> &chain) {
++    if (chain->index >= chain->pages.size()) {
++      chain->onDone(true, QString());
++      return;
++    }
++    auto *page = chain->pages[chain->index];
++    connect(page, &fcitx::kcm::ConfigWidget::configurationLoaded, this,
++            [this, chain](bool ok, const QString &error) {
++              if (!ok) {
++                chain->onDone(false, error);
++                return;
++              }
++              chain->index++;
++              stepReload(chain);
++            },
++            Qt::SingleShotConnection);
++    page->load();
++  }
++
++  void loadAllPages(std::function<void(bool, const QString &)> onDone) {
+     pinyinLoaded_ = false;
+     shuangpinLoaded_ = false;
+-    auto secondPage = std::make_shared<std::function<void()>>();
+-    *secondPage = [this, onDone] {
+-      connect(shuangpin_, &fcitx::kcm::ConfigWidget::configurationLoaded, this,
+-              [onDone](bool ok, const QString &error) { onDone(ok, error); },
+-              Qt::SingleShotConnection);
+-      shuangpin_->load();
+-    };
+-    connect(pinyin_, &fcitx::kcm::ConfigWidget::configurationLoaded, this,
+-            [secondPage, onDone](bool ok, const QString &error) {
+-              if (ok) {
+-                (*secondPage)();
+-              } else {
+-                onDone(false, error);
+-              }
+-            }, Qt::SingleShotConnection);
+-    pinyin_->load();
++    globalLoaded_ = false;
++    auto chain = std::make_shared<ReloadChain>();
++    chain->pages = {pinyin_, shuangpin_, global_};
++    chain->onDone = std::move(onDone);
++    stepReload(chain);
+   }
+ 
+   QString uriFor(const fcitx::kcm::ConfigWidget *page) const {
+-    return page == pinyin_ ? pinyinUri_ : shuangpinUri_;
++    if (page == pinyin_) {
++      return pinyinUri_;
++    }
++    if (page == shuangpin_) {
++      return shuangpinUri_;
++    }
++    if (page == global_) {
++      return globalUri_;
++    }
++    return {};
+   }
+ 
+   // Both pages stay loaded so switching tabs keeps unsaved edits. Submitting the
+@@ -346,26 +491,103 @@ private:
+ 
+   // Reads authoritative Host state without touching either page's widgets, so the
+   // self-test can assert what the Host persisted rather than what the UI shows.
+-  void readHostValue(const QString &uri, const QString &key,
+-                     std::function<void(bool, const QString &)> onDone) {
++  void readHostValues(const QString &uri,
++                      std::function<void(bool, const QVariantMap &)> onDone) {
+     if (!provider_.controller()) {
+-      onDone(false, QString());
++      onDone(false, {});
+       return;
+     }
+     auto *call = provider_.controller()->GetConfig(uri);
+-    connect(call, &fcitx::kcm::PendingCall::finished, this, [call, key, onDone] {
++    connect(call, &fcitx::kcm::PendingCall::finished, this, [call, onDone] {
+       const QDBusMessage reply = call->reply();
+       call->deleteLater();
+       if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().size() < 2) {
+-        onDone(false, QString());
++        onDone(false, {});
+         return;
+       }
+-      const QVariantMap values =
+-          reply.arguments().at(0).value<QDBusVariant>().variant().toMap();
+-      onDone(true, values.value(key).toString());
++      onDone(true, reply.arguments().at(0).value<QDBusVariant>().variant().toMap());
++    });
++  }
++
++  void readHostValue(const QString &uri, const QString &key,
++                     std::function<void(bool, const QString &)> onDone) {
++    readHostValues(uri, [key, onDone = std::move(onDone)](bool ok, const QVariantMap &values) {
++      onDone(ok, ok ? values.value(key).toString() : QString());
+     });
+   }
+ 
++  // Writes through the Host's apply path without adopting the result into a page,
++  // which is what a *second* settings client does: the page keeps the values it
++  // loaded, so a Reload that does not actually fetch cannot pass this check by
++  // replaying its own baseline.
++  void applyHostValues(const QString &uri, const QVariantMap &values,
++                       std::function<void(bool, const QString &)> onDone) {
++    if (!provider_.controller()) {
++      onDone(false, QStringLiteral("无法创建 FusionHost 连接请求。"));
++      return;
++    }
++    auto *call = provider_.controller()->SetConfig(uri, QDBusVariant(values));
++    connect(call, &fcitx::kcm::PendingCall::finished, this, [call, onDone] {
++      const QDBusMessage reply = call->reply();
++      call->deleteLater();
++      if (reply.type() != QDBusMessage::ReplyMessage) {
++        onDone(false, reply.errorMessage());
++        return;
++      }
++      onDone(true, QString());
++    });
++  }
++
++  // The Cancel/Reload buttons start an asynchronous chain with no completion
++  // signal of its own. The self-test waits for the state it expects instead of
++  // assuming a fixed delay, and fails when the state never arrives.
++  void waitFor(std::function<bool()> ready, std::function<void(bool)> settled,
++               int timeoutMs = 15000) {
++    auto elapsed = std::make_shared<int>(0);
++    auto tick = std::make_shared<std::function<void()>>();
++    *tick = [this, ready, settled, elapsed, tick, timeoutMs] {
++      if (ready()) {
++        settled(true);
++        return;
++      }
++      if (*elapsed >= timeoutMs) {
++        settled(false);
++        return;
++      }
++      *elapsed += 50;
++      QTimer::singleShot(50, this, [tick] { (*tick)(); });
++    };
++    QTimer::singleShot(0, this, [tick] { (*tick)(); });
++  }
++
++  int globalPageSize() const {
++    return global_->value()
++        .toMap()
++        .value(QStringLiteral("Behavior"))
++        .toMap()
++        .value(QStringLiteral("DefaultPageSize"))
++        .toInt();
++  }
++
++  void setGlobalPageSize(int size) {
++    QVariantMap values = global_->value().toMap();
++    QVariantMap behavior = values.value(QStringLiteral("Behavior")).toMap();
++    behavior.insert(QStringLiteral("DefaultPageSize"), size);
++    values.insert(QStringLiteral("Behavior"), behavior);
++    global_->setValue(values);
++  }
++
++  // A page size that differs from both arguments, kept inside the schema's range
++  // so the write is a real value rather than a rejected one.
++  static int otherPageSize(int avoid1, int avoid2) {
++    for (int candidate : {8, 9, 10, 6, 5}) {
++      if (candidate != avoid1 && candidate != avoid2) {
++        return candidate;
++      }
++    }
++    return avoid1;
++  }
++
+   void runSelfTest() {
+     if (!selfTestTimer_.isValid()) {
+       selfTestTimer_.start();
+@@ -496,41 +718,529 @@ private:
+                           QCoreApplication::exit(21);
+                           return;
+                         }
+-                        status_->setText(QStringLiteral(
+-                            "SELF-TEST PASS: a shared value survived an unrelated apply on the other page in both directions."));
+-                        if (!screenshot_.isEmpty()) {
+-                          windowScreenshot_ = grab().save(screenshot_);
++                        runGlobalSelfTest();
++                      });
++      });
++    });
++  }
++
++  void finishSelfTest() {
++    status_->setText(QStringLiteral(
++        "SELF-TEST PASS: cross-page shared value, global configuration, Cancel/Reload on the "
++        "Global page and the input-method list round-tripped through the Host."));
++    if (!screenshot_.isEmpty()) {
++      windowScreenshot_ = grab().save(screenshot_);
++    }
++    QCoreApplication::exit(windowScreenshot_ || screenshot_.isEmpty() ? 0 : 16);
++  }
++
++  // Stage A: the Global page must render the official schema, accept a supported
++  // change through the real Host apply path, and read back the value the Host
++  // persisted. The option chosen here is read by engines that have no page size of
++  // their own, so the write is a real configuration change, not a no-op.
++  void runGlobalSelfTest() {
++    if (!globalLoaded_) {
++      status_->setText(QStringLiteral("SELF-TEST FAIL: the Global page did not load."));
++      QCoreApplication::exit(23);
++      return;
++    }
++    QVariantMap values = global_->value().toMap();
++    QVariantMap behavior = values.value(QStringLiteral("Behavior")).toMap();
++    if (behavior.isEmpty() || !behavior.contains(QStringLiteral("DefaultPageSize"))) {
++      status_->setText(
++          QStringLiteral("SELF-TEST FAIL: the global schema did not expose Behavior/DefaultPageSize."));
++      QCoreApplication::exit(23);
++      return;
++    }
++    behavior.insert(QStringLiteral("DefaultPageSize"), kGlobalPageSizeProbe);
++    values.insert(QStringLiteral("Behavior"), behavior);
++    global_->setValue(values);
++    tabs_->setCurrentIndex(2);
++    applyCurrentPage([this](bool applied, const QString &error) {
++      if (!applied) {
++        showError(status_, error);
++        QCoreApplication::exit(24);
++        return;
++      }
++      readHostValues(globalUri_, [this](bool read, const QVariantMap &hostValues) {
++        if (!read) {
++          status_->setText(
++              QStringLiteral("SELF-TEST FAIL: could not read the applied global settings."));
++          QCoreApplication::exit(25);
++          return;
++        }
++        const QString applied = hostValues.value(QStringLiteral("Behavior"))
++                                    .toMap()
++                                    .value(QStringLiteral("DefaultPageSize"))
++                                    .toString();
++        if (applied != QString::number(kGlobalPageSizeProbe)) {
++          showError(status_, QStringLiteral("SELF-TEST FAIL: the Host kept DefaultPageSize=%1.")
++                                 .arg(applied));
++          QCoreApplication::exit(25);
++          return;
++        }
++        runGlobalCancelReloadChecks();
++      });
++    });
++  }
++
++  // Cancel and Reload must act on the Global page, not only on the pages they used
++  // to walk: leaving it out kept its edits and baseline untouched while the status
++  // line reported success. Each step drives the same button a user clicks, and the
++  // Host is changed behind the page so that a Reload which does not fetch cannot
++  // pass by replaying the page's own baseline.
++  struct GlobalReloadCheck {
++    int host = 0;
++    int dirty = 0;
++    int foreign = 0;
++    int step = 0;
++  };
++
++  void runGlobalCancelReloadChecks() {
++    if (!globalLoaded_) {
++      status_->setText(QStringLiteral("SELF-TEST FAIL: the Global page did not load."));
++      QCoreApplication::exit(33);
++      return;
++    }
++    globalReloadStep(std::make_shared<GlobalReloadCheck>());
++  }
++
++  void failGlobalReload(const QString &message) {
++    showError(status_, QStringLiteral("SELF-TEST FAIL: %1").arg(message));
++    QCoreApplication::exit(33);
++  }
++
++  void globalReloadStep(const std::shared_ptr<GlobalReloadCheck> &check) {
++    switch (check->step++) {
++    case 0: {
++      // Read the authoritative value, make an unsaved edit, then Cancel.
++      readHostValues(globalUri_, [this, check](bool ok, const QVariantMap &values) {
++        if (!ok) {
++          failGlobalReload(QStringLiteral("could not read the global configuration."));
++          return;
++        }
++        check->host = values.value(QStringLiteral("Behavior"))
++                          .toMap()
++                          .value(QStringLiteral("DefaultPageSize"))
++                          .toInt();
++        if (check->host <= 0) {
++          failGlobalReload(QStringLiteral("the Host did not report a DefaultPageSize."));
++          return;
++        }
++        check->dirty = otherPageSize(check->host, -1);
++        check->foreign = otherPageSize(check->host, check->dirty);
++        setGlobalPageSize(check->dirty);
++        if (globalPageSize() != check->dirty) {
++          failGlobalReload(QStringLiteral("the Global page did not take an unsaved edit."));
++          return;
++        }
++        cancel_->click();
++        waitFor([this, check] { return globalPageSize() == check->host; },
++                [this, check](bool settled) {
++                  if (!settled) {
++                    failGlobalReload(QStringLiteral("Cancel did not restore the Host's value."));
++                    return;
++                  }
++                  if (baselinePageSize() != check->host) {
++                    failGlobalReload(QStringLiteral("Cancel did not refresh the Global baseline."));
++                    return;
++                  }
++                  if (!globalLoaded_) {
++                    failGlobalReload(QStringLiteral("Cancel left the Global page unloaded."));
++                    return;
++                  }
++                  std::fprintf(stderr, "[self-test] global cancel restored=%d\n", check->host);
++                  globalReloadStep(check);
++                });
++      });
++      return;
++    }
++    case 1: {
++      // A second client changes the Host through the same official apply path. The
++      // page must still show the value it loaded, then Reload must fetch the new one.
++      QVariantMap values = global_->value().toMap();
++      QVariantMap behavior = values.value(QStringLiteral("Behavior")).toMap();
++      behavior.insert(QStringLiteral("DefaultPageSize"), check->foreign);
++      values.insert(QStringLiteral("Behavior"), behavior);
++      applyHostValues(globalUri_, values, [this, check](bool ok, const QString &error) {
++        if (!ok) {
++          failGlobalReload(
++              QStringLiteral("a second client could not change the global value: %1").arg(error));
++          return;
++        }
++        if (globalPageSize() != check->host) {
++          failGlobalReload(QStringLiteral("the page adopted a change it did not load."));
++          return;
++        }
++        readHostValues(globalUri_, [this, check](bool hostRead, const QVariantMap &hostValues) {
++          if (!hostRead) {
++            failGlobalReload(QStringLiteral("could not read the changed global value."));
++            return;
++          }
++          const int applied = hostValues.value(QStringLiteral("Behavior"))
++                                  .toMap()
++                                  .value(QStringLiteral("DefaultPageSize"))
++                                  .toInt();
++          if (applied != check->foreign) {
++            failGlobalReload(QStringLiteral("the Host did not keep the second client's value."));
++            return;
++          }
++          setGlobalPageSize(check->dirty);
++          reload_->click();
++          waitFor([this, check] { return globalPageSize() == check->foreign; },
++                  [this, check](bool settled) {
++                    if (!settled) {
++                      failGlobalReload(
++                          QStringLiteral("Reload did not fetch the Host's changed value."));
++                      return;
++                    }
++                    if (baselinePageSize() != check->foreign) {
++                      failGlobalReload(QStringLiteral("Reload did not refresh the Global baseline."));
++                      return;
++                    }
++                    std::fprintf(stderr, "[self-test] global reload fetched=%d\n", check->foreign);
++                    globalReloadStep(check);
++                  });
++        });
++      });
++      return;
++    }
++    case 2: {
++      // Switching tabs must keep an ordinary unsaved edit, and the baseline a
++      // reload left behind must still support a normal apply.
++      const int pending = otherPageSize(check->foreign, check->host);
++      setGlobalPageSize(pending);
++      tabs_->setCurrentIndex(0);
++      tabs_->setCurrentIndex(2);
++      if (globalPageSize() != pending) {
++        failGlobalReload(QStringLiteral("switching tabs discarded an unsaved edit."));
++        return;
++      }
++      std::fprintf(stderr, "[self-test] global tab-switch kept=%d\n", pending);
++      cancel_->click();
++      waitFor([this, check] { return globalPageSize() == check->foreign; },
++              [this, check](bool settled) {
++                if (!settled) {
++                  failGlobalReload(QStringLiteral("Cancel did not discard the tab-switch edit."));
++                  return;
++                }
++                // Leave the value the restart check expects.
++                setGlobalPageSize(kGlobalPageSizeProbe);
++                applyCurrentPage([this](bool applied, const QString &error) {
++                  if (!applied) {
++                    failGlobalReload(
++                        QStringLiteral("apply after Reload failed: %1").arg(error));
++                    return;
++                  }
++                  readHostValues(globalUri_, [this](bool ok, const QVariantMap &values) {
++                    if (!ok) {
++                      failGlobalReload(
++                          QStringLiteral("could not read the value after the final apply."));
++                      return;
++                    }
++                    const int applied = values.value(QStringLiteral("Behavior"))
++                                            .toMap()
++                                            .value(QStringLiteral("DefaultPageSize"))
++                                            .toInt();
++                    if (applied != kGlobalPageSizeProbe) {
++                      failGlobalReload(
++                          QStringLiteral("the apply after Reload did not reach the Host."));
++                      return;
++                    }
++                    std::fprintf(stderr, "[self-test] global apply-after-reload=%d\n",
++                                 kGlobalPageSizeProbe);
++                    runImListSelfTest();
++                  });
++                });
++              });
++      return;
++    }
++    default:
++      return;
++    }
++  }
++
++  int baselinePageSize() const {
++    return baseline_.value(global_)
++        .value(QStringLiteral("Behavior"))
++        .toMap()
++        .value(QStringLiteral("DefaultPageSize"))
++        .toInt();
++  }
++
++  // Stage A: the list surface must drive the Host's official setGroup/save and
++  // adopt its authoritative result. The steps run in the disposable test profile
++  // only: reorder, then remove the first entry, then add it back. Removing an entry
++  // is a group-membership edit and never deletes a method's definition or learning
++  // data — that is asserted at file level by the validation script, not here.
++  // Two requests the Host must refuse before touching the group: an empty list and a
++  // name this runtime does not define. They go through the same controller call the
++  // panes use, but not through the panes, so a refusal cannot disturb the list the
++  // following steps assert.
++  void runImListRejectProbe(std::function<void()> onDone) {
++    if (!provider_.controller()) {
++      QCoreApplication::exit(31);
++      return;
++    }
++    auto *emptyCall = provider_.controller()->SetImList({});
++    connect(emptyCall, &fcitx::kcm::PendingCall::finished, this,
++            [this, emptyCall, onDone] {
++              const auto emptyReply = emptyCall->reply();
++              emptyCall->deleteLater();
++              if (emptyReply.type() == QDBusMessage::ReplyMessage) {
++                showError(status_, QStringLiteral("SELF-TEST FAIL: the Host accepted an empty "
++                                                  "input-method list."));
++                QCoreApplication::exit(31);
++                return;
++              }
++              auto *unknownCall = provider_.controller()->SetImList(
++                  {QStringLiteral("fusion-unavailable-probe")});
++              connect(unknownCall, &fcitx::kcm::PendingCall::finished, this,
++                      [this, unknownCall, onDone, emptyReply] {
++                        const auto unknownReply = unknownCall->reply();
++                        unknownCall->deleteLater();
++                        if (unknownReply.type() == QDBusMessage::ReplyMessage) {
++                          showError(status_,
++                                    QStringLiteral("SELF-TEST FAIL: the Host accepted an input "
++                                                   "method this runtime does not define."));
++                          QCoreApplication::exit(31);
++                          return;
++                        }
++                        std::fprintf(stderr,
++                                     "[self-test] im-list reject ok empty=%s unknown=%s\n",
++                                     qPrintable(emptyReply.errorMessage()),
++                                     qPrintable(unknownReply.errorMessage()));
++                        onDone();
++                      });
++            });
++  }
++
++  void runImListSelfTest() {
++    runImListRejectProbe([this] { runImListSteps(); });
++  }
++
++  void runImListSteps() {
++    const QStringList initial = enabledOrder();
++    if (initial.size() < 2) {
++      status_->setText(
++          QStringLiteral("SELF-TEST FAIL: the disposable profile did not enable two methods."));
++      QCoreApplication::exit(26);
++      return;
++    }
++    QStringList reordered = initial;
++    reordered.move(0, 1);
++    // Each step asserts the panes show the Host's authoritative reply, not the
++    // request: populateImList() rebuilds both panes from what setGroup/save
++    // confirmed. The unattended run prints the three lists so a failure is
++    // diagnosable from the harness output instead of only from an exit code.
++    applyImList(reordered, status_, [this, initial, reordered](bool applied, const QString &error) {
++      if (!applied) {
++        showError(status_, error);
++        QCoreApplication::exit(26);
++        return;
++      }
++      const QStringList observed = enabledOrder();
++      std::fprintf(stderr, "[self-test] im-list initial=%s reordered=%s observed=%s\n",
++                   qPrintable(initial.join(QLatin1Char(','))),
++                   qPrintable(reordered.join(QLatin1Char(','))),
++                   qPrintable(observed.join(QLatin1Char(','))));
++      if (observed != reordered) {
++        showError(status_,
++                  QStringLiteral("SELF-TEST FAIL: the Host did not confirm the reordered list."));
++        QCoreApplication::exit(27);
++        return;
++      }
++      QStringList withoutFirst = reordered;
++      const QString first = withoutFirst.takeFirst();
++      applyImList(withoutFirst, status_, [this, reordered, withoutFirst,
++                                          first](bool removed, const QString &removeError) {        if (!removed) {
++          showError(status_, removeError);
++          QCoreApplication::exit(26);
++          return;
++        }
++        if (enabledOrder() != withoutFirst) {
++          std::fprintf(stderr, "[self-test] im-list remove expected=%s observed=%s\n",
++                       qPrintable(withoutFirst.join(QLatin1Char(','))),
++                       qPrintable(enabledOrder().join(QLatin1Char(','))));
++          showError(status_, QStringLiteral("SELF-TEST FAIL: removing a method did not reach the "
++                                            "Host's list."));
++          QCoreApplication::exit(27);
++          return;
++        }
++        QStringList restored = withoutFirst;
++        restored.append(first);
++        applyImList(restored, status_,
++                    [this, restored, reordered](bool added, const QString &addError) {
++                      if (!added) {
++                        showError(status_, addError);
++                        QCoreApplication::exit(26);
++                        return;
++                      }
++                      if (enabledOrder() != restored) {
++                        std::fprintf(stderr, "[self-test] im-list add-back expected=%s observed=%s\n",
++                                     qPrintable(restored.join(QLatin1Char(','))),
++                                     qPrintable(enabledOrder().join(QLatin1Char(','))));
++                        showError(status_, QStringLiteral("SELF-TEST FAIL: adding a method back did "
++                                                          "not reach the Host's list."));
++                        QCoreApplication::exit(27);
++                        return;
++                      }
++                      // End on the reordered list, not the original: the restart check
++                      // then proves a *changed* membership order was written to the
++                      // profile and reloaded, rather than that nothing moved.
++                      applyImList(reordered, status_, [this](bool finalOk,
++                                                             const QString &finalError) {
++                        if (!finalOk) {
++                          showError(status_, finalError);
++                          QCoreApplication::exit(26);
++                          return;
+                         }
+-                        QCoreApplication::exit(windowScreenshot_ || screenshot_.isEmpty() ? 0
+-                                                                                         : 16);
++                        finishSelfTest();
+                       });
++                    });
+       });
+     });
+   }
+ 
++  // Read-only restart check. It asserts exactly the state the apply scenario
++  // leaves, so the two invocations together form one restart test: the first
++  // applies, the Host is stopped in an orderly way, and this one proves the values
++  // came back from the profile rather than from a live process.
++  void runVerify() {
++    if (!pinyinLoaded_ || !shuangpinLoaded_ || !globalLoaded_) {
++      status_->setText(
++          QStringLiteral("VERIFY FAIL: not every settings page loaded after the restart."));
++      QCoreApplication::exit(23);
++      return;
++    }
++    // The enabled order is asserted against what the profile held before the
++    // restart, passed in by the harness from the persisted file. That proves the
++    // Host reloaded exactly the membership and order that were saved, without
++    // hard-coding this profile's contents.
++    const QStringList liveList = enabledOrder();
++    if (liveList.isEmpty() || (!expectedImList_.isEmpty() && liveList != expectedImList_)) {
++      std::fprintf(stderr, "[verify] im-list expected=%s observed=%s\n",
++                   qPrintable(expectedImList_.join(QLatin1Char(','))),
++                   qPrintable(liveList.join(QLatin1Char(','))));
++      showError(status_, QStringLiteral("VERIFY FAIL: the input-method list after the restart does "
++                                        "not match the one that was saved."));
++      QCoreApplication::exit(30);
++      return;
++    }
++    readHostValue(pinyinUri_, QStringLiteral("PageSize"),
++                  [this](bool read, const QString &pageSize) {
++                    if (!read) {
++                      status_->setText(
++                          QStringLiteral("VERIFY FAIL: could not read PageSize after the restart."));
++                      QCoreApplication::exit(28);
++                      return;
++                    }
++                    if (pageSize != QLatin1String("8")) {
++                      showError(status_,
++                                QStringLiteral("VERIFY FAIL: PageSize=%1 after the restart, "
++                                               "expected the applied 8.")
++                                    .arg(pageSize));
++                      QCoreApplication::exit(28);
++                      return;
++                    }
++                    readHostValues(globalUri_, [this](bool globalRead,
++                                                      const QVariantMap &hostValues) {
++                      if (!globalRead) {
++                        status_->setText(QStringLiteral(
++                            "VERIFY FAIL: could not read the global configuration after the restart."));
++                        QCoreApplication::exit(29);
++                        return;
++                      }
++                      const QString applied = hostValues.value(QStringLiteral("Behavior"))
++                                                  .toMap()
++                                                  .value(QStringLiteral("DefaultPageSize"))
++                                                  .toString();
++                      if (applied != QString::number(kGlobalPageSizeProbe)) {
++                        showError(status_,
++                                  QStringLiteral("VERIFY FAIL: DefaultPageSize=%1 after the "
++                                                 "restart, expected the applied %2.")
++                                      .arg(applied)
++                                      .arg(kGlobalPageSizeProbe));
++                        QCoreApplication::exit(29);
++                        return;
++                      }
++                      status_->setText(QStringLiteral(
++                          "VERIFY PASS: the applied per-input-method and global values survived an "
++                          "orderly Host restart."));
++                      runNoChangeChecks();
++                    });
++                  });
++  }
++
++  // A no-change Apply must not reach the Host at all: the page computes an empty
++  // delta and returns without a request, so no setter runs and no file is written.
++  // The list apply is sent, but the Host recognises an unchanged list and returns
++  // the current group without calling save(). The harness hashes the profile tree
++  // around this pass, so "no file written" is asserted, not assumed.
++  void runNoChangeChecks() { noChangeStep(0, tabs_->currentIndex()); }
++
++  void noChangeStep(int tab, int originalTab) {
++    if (tab >= 3) {
++      const QStringList current = enabledOrder();
++      applyImList(current, status_, [this, originalTab](bool ok, const QString &error) {
++        if (!ok) {
++          showError(status_, error);
++          QCoreApplication::exit(32);
++          return;
++        }
++        tabs_->setCurrentIndex(originalTab);
++        status_->setText(QStringLiteral(
++            "VERIFY PASS: no-change Apply issued no settings write and the unchanged list was not "
++            "re-saved."));
++        QCoreApplication::exit(0);
++      });
++      return;
++    }
++    tabs_->setCurrentIndex(tab);
++    applyCurrentPage([this, tab, originalTab](bool ok, const QString &error) {
++      if (!ok) {
++        showError(status_, error);
++        QCoreApplication::exit(32);
++        return;
++      }
++      if (!status_->text().contains(QStringLiteral("没有需要应用的更改"))) {
++        showError(status_, QStringLiteral("VERIFY FAIL: a no-change Apply sent a settings request "
++                                          "instead of short-circuiting."));
++        QCoreApplication::exit(32);
++        return;
++      }
++      noChangeStep(tab + 1, originalTab);
++    });
++  }
++
+   void showError(QLabel *status, const QString &error) {
+     const QString message = error.isEmpty()
+                                 ? QStringLiteral("FusionHost 未确认操作结果。请重新加载；不要重复提交不确定的更改。")
+                                 : error;
+     status->setText(QStringLiteral("操作未完成：%1").arg(message));
++    // An unattended self-test/verify run has nobody to dismiss a modal dialog, so it
++    // reports through the status line and the exit code instead of blocking here.
++    if (selfTest_ || verifyOnly_) {
++      return;
++    }
+     QMessageBox::warning(this, QStringLiteral("Fusion 输入法设置"), message);
+   }
+ 
+-  void reloadSelection(std::function<void()> continuation = {}) {
++  void reloadImList(std::function<void()> continuation = {}) {
+     if (!provider_.controller()) {
+       if (continuation) {
+         continuation();
+       }
+       return;
+     }
+-    auto *call = provider_.controller()->GetSelection();
++    auto *call = provider_.controller()->GetImList();
+     connect(call, &fcitx::kcm::PendingCall::finished, this,
+             [this, call, continuation = std::move(continuation)]() mutable {
+               const auto reply = call->reply();
+-              const auto selection = call->selection();
++              const auto list = call->imList();
+               call->deleteLater();
+               if (reply.type() == QDBusMessage::ReplyMessage) {
+-                setSelection(selection);
++                populateImList(list);
+                 if (continuation) {
+                   continuation();
+                 }
+@@ -540,40 +1250,115 @@ private:
+             });
+   }
+ 
+-  void setSelection(const fcitx::kcm::SettingsSelection &selection) {
+-    const int index = selection_->findData(selection.selected);
+-    if (index >= 0) {
+-      selection_->setCurrentIndex(index);
+-      const bool wasBlocked = tabs_->blockSignals(true);
+-      tabs_->setCurrentIndex(index);
+-      tabs_->blockSignals(wasBlocked);
++  // Splits the Host's authoritative list into the two panes: the enabled methods
++  // keep their order (top row = Items/0 = the active method), and every defined
++  // method not in the enabled list appears as available to add.
++  void populateImList(const fcitx::kcm::SettingsImList &list) {
++    availableList_->clear();
++    enabledList_->clear();
++    for (const auto &name : list.enabled) {
++      auto *item = new QListWidgetItem(inputMethodName(name), enabledList_);
++      item->setData(Qt::UserRole, name);
+     }
+-    auto *model = qobject_cast<QStandardItemModel *>(selection_->model());
+-    for (int i = 0; model && i < selection_->count(); ++i) {
+-      if (auto *item = model->item(i)) {
+-        item->setEnabled(selection.available.contains(selection_->itemData(i).toString()));
++    for (const auto &name : list.available) {
++      if (list.enabled.contains(name)) {
++        continue;
+       }
++      auto *item = new QListWidgetItem(inputMethodName(name), availableList_);
++      item->setData(Qt::UserRole, name);
++    }
++  }
++
++  QStringList enabledOrder() const {
++    QStringList order;
++    for (int i = 0; i < enabledList_->count(); ++i) {
++      order.append(enabledList_->item(i)->data(Qt::UserRole).toString());
+     }
++    return order;
++  }
++
++  void moveEnabledRow(int row, int delta) {
++    const int target = row + delta;
++    if (row < 0 || target < 0 || target >= enabledList_->count()) {
++      return;
++    }
++    auto *item = enabledList_->takeItem(row);
++    enabledList_->insertItem(target, item);
++    enabledList_->setCurrentRow(target);
++    status_->setText(QStringLiteral("输入方式列表有未应用的更改。"));
++  }
++
++  // Writes the enabled order through the Host's official setGroup/save. The Host
++  // refuses an empty list and any method it does not define; a failure reloads the
++  // authoritative list so the panes never drift from what the Host persisted.
++  void applyImList(const QStringList &enabled, QLabel *status,
++                   std::function<void(bool, const QString &)> onDone = {}) {
++    if (enabled.isEmpty()) {
++      const QString message = QStringLiteral("至少需保留一种已启用的输入方式。");
++      status->setText(message);
++      if (onDone) {
++        onDone(false, message);
++      }
++      return;
++    }
++    if (!provider_.controller()) {
++      const QString message = QStringLiteral("无法创建 FusionHost 重连请求。");
++      showError(status, message);
++      if (onDone) {
++        onDone(false, message);
++      }
++      return;
++    }
++    imApply_->setEnabled(false);
++    status->setText(QStringLiteral("正在更新输入方式列表…"));
++    auto *call = provider_.controller()->SetImList(enabled);
++    connect(call, &fcitx::kcm::PendingCall::finished, this,
++            [this, call, status, onDone] {
++              const auto reply = call->reply();
++              const auto list = call->imList();
++              call->deleteLater();
++              imApply_->setEnabled(true);
++              if (reply.type() != QDBusMessage::ReplyMessage) {
++                showError(status, reply.errorMessage());
++                reloadImList();
++                if (onDone) {
++                  onDone(false, reply.errorMessage());
++                }
++                return;
++              }
++              populateImList(list);
++              status->setText(QStringLiteral("FusionHost 已确认输入方式列表。"));
++              if (onDone) {
++                onDone(true, QString());
++              }
++            });
+   }
+ 
+   fcitx::kcm::DBusProvider provider_;
+   QLabel *status_ = nullptr;
+   QTabWidget *tabs_ = nullptr;
+-  QComboBox *selection_ = nullptr;
++  QListWidget *availableList_ = nullptr;
++  QListWidget *enabledList_ = nullptr;
++  QPushButton *imApply_ = nullptr;
+   QPushButton *apply_ = nullptr;
+   QPushButton *cancel_ = nullptr;
+   QPushButton *reload_ = nullptr;
+   fcitx::kcm::ConfigWidget *pinyin_ = nullptr;
+   fcitx::kcm::ConfigWidget *shuangpin_ = nullptr;
++  fcitx::kcm::ConfigWidget *global_ = nullptr;
+   QString pinyinUri_;
+   QString shuangpinUri_;
++  QString globalUri_;
+   // Last authoritative values per page, used to submit only what this page changed.
+   QHash<fcitx::kcm::ConfigWidget *, QVariantMap> baseline_;
+   int pinyinLoads_ = 0;
+   int shuangpinLoads_ = 0;
+   bool pinyinLoaded_ = false;
+   bool shuangpinLoaded_ = false;
++  bool globalLoaded_ = false;
+   bool selfTest_ = false;
++  bool verifyOnly_ = false;
++  QStringList expectedImList_;
+   bool windowScreenshot_ = false;
+   QString screenshot_;
+   QElapsedTimer selfTestTimer_;
+@@ -588,11 +1373,22 @@ int main(int argc, char **argv) {
+   QApplication::setOrganizationName(QStringLiteral("Fcitx5 Fusion"));
+   const QString pipeName = endpointName(argc, argv);
+   bool selfTest = false;
++  bool verifyOnly = false;
++  QStringList expectedImList;
+   QString screenshot;
+   for (int i = 1; i < argc; ++i) {
+     const QString arg = QString::fromLocal8Bit(argv[i]);
+     if (arg == QLatin1String("--self-test")) {
+       selfTest = true;
++    } else if (arg == QLatin1String("--self-test-verify")) {
++      // Read-only: asserts the state the apply scenario leaves, so the pair proves
++      // the values came back from the profile after an orderly Host restart.
++      verifyOnly = true;
++    } else if (arg == QLatin1String("--expect-im-list") && i + 1 < argc) {
++      const QString csv = QString::fromLocal8Bit(argv[++i]);
++      if (!csv.isEmpty()) {
++        expectedImList = csv.split(QLatin1Char(','));
++      }
+     } else if (arg == QLatin1String("--screenshot") && i + 1 < argc) {
+       screenshot = QString::fromLocal8Bit(argv[++i]);
+     }
+@@ -602,7 +1398,8 @@ int main(int argc, char **argv) {
+                           QStringLiteral("无法确定当前用户和会话的 FusionHost 管道。"));
+     return 2;
+   }
+-  SettingsWindow window(pipeName, selfTest, screenshot);
++  SettingsWindow window(pipeName, selfTest, verifyOnly, screenshot);
++  window.setExpectedImList(expectedImList);
+   window.show();
+   return application.exec();
+ }
+diff --git a/tests/stage4a_ipc.cpp b/tests/stage4a_ipc.cpp
+index 321e886..ce8cdad 100644
+--- a/tests/stage4a_ipc.cpp
++++ b/tests/stage4a_ipc.cpp
+@@ -29,8 +29,11 @@
+ // - hostdiag: the R30 opt-in Host diagnostic log — off by default, file and line
+ //   format when enabled, privacy-marker redaction, the size cap and retention.
+ // - integration: full FusionHost.exe + Fcitx backend over IPC (only in the
+-//   FUSION_WITH_FCITX5 build; requires a running FusionHost.exe and the Fcitx
+-//   runtime). Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip instead of fail.
++//   FUSION_WITH_FCITX5 build). It types into the Host it connects to, so it
++//   requires an explicit isolated endpoint in FUSION_STAGE4A_INTEGRATION_PIPE;
++//   with none set it prints SKIP and connects to nothing, and an endpoint equal to
++//   this user's production pipe is refused before the first request.
++//   Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip explicitly.
+ //
+ // protocol/loopback/hostserver build and run in the Mock-only build too: the
+ // transport, the IpcBackend client and the HostServer do not depend on Fcitx.
+@@ -59,6 +62,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <cwchar>
+ #include <fstream>
+ #include <iostream>
+ #include <memory>
+@@ -96,6 +100,33 @@ std::wstring test_pipe_name(const wchar_t *suffix) {
+   return std::wstring(L"\\\\.\\pipe\\FusionHost-ipc-test-") + suffix;
+ }
+ 
++// The isolated endpoint arrives as an environment variable, so it is UTF-8 text
++// on the way in. An endpoint that is not valid UTF-8 cannot name the pipe the
++// caller meant, so it is rejected rather than converted into a similar name.
++std::wstring wide_from_utf8(const char *text) {
++  if (text == nullptr || *text == '\0')
++    return {};
++  const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
++  if (count <= 0)
++    return {};
++  std::wstring wide(static_cast<std::size_t>(count - 1), L'\0');
++  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide.data(), count) <= 0)
++    return {};
++  return wide;
++}
++
++// True when the endpoint names the pipe the installed product Host listens on for
++// this user and session. Both spellings have to be recognised — the full Win32
++// path and the bare logical name — because both reach the same pipe, and the
++// integration assertions type into whichever Host they connect to.
++bool is_production_endpoint(const std::wstring &endpoint) {
++  const std::wstring logical = logical_pipe_name(endpoint);
++  if (logical.empty())
++    return false;
++  const std::wstring production = logical_pipe_name(compute_pipe_name());
++  return !production.empty() && _wcsicmp(logical.c_str(), production.c_str()) == 0;
++}
++
+ template <typename Predicate>
+ bool wait_until(Predicate predicate, std::chrono::milliseconds limit) {
+   const auto deadline = std::chrono::steady_clock::now() + limit;
+@@ -927,6 +958,29 @@ void test_pipe_endpoint() {
+     require(fusion::ipc::logical_pipe_name(L"\\\\?\\pipe\\fusion").empty(),
+             "an unsupported device path form is rejected");
+   }
++
++  // 4. The integration mode's production-endpoint guard, checked here without a
++  //    Host so the guard itself can never be the thing that reaches the live pipe.
++  //    Both spellings of the live endpoint are recognised; a production-*shaped*
++  //    name that is not this user's endpoint is not mistaken for it.
++  {
++    const std::wstring production = fusion::ipc::compute_pipe_name();
++    const std::wstring logical = fusion::ipc::logical_pipe_name(production);
++    require(!logical.empty(), "the production endpoint has a logical name");
++    require(is_production_endpoint(production),
++            "the full-path production endpoint is recognised");
++    require(is_production_endpoint(logical), "the logical production endpoint is recognised");
++    require(is_production_endpoint(L"\\\\.\\pipe\\" + logical),
++            "the full path of the logical production name is recognised");
++    require(!is_production_endpoint(L"fusion-selftest-8f2c"),
++            "an isolated endpoint is not the production endpoint");
++    require(!is_production_endpoint(L"FusionHost-v1-S-1-5-21-1-1"),
++            "a production-shaped name for another user is not this endpoint");
++    require(!is_production_endpoint(L""), "an empty endpoint is not the production endpoint");
++    require(wide_from_utf8("fusion-selftest-8f2c") == L"fusion-selftest-8f2c",
++            "a UTF-8 endpoint converts to the same logical name");
++    require(wide_from_utf8("\xff\xfe").empty(), "invalid UTF-8 is rejected");
++  }
+ }
+ 
+ void test_loopback() {
+@@ -2398,12 +2452,43 @@ void test_integration() {
+     return;
+   }
+ 
+-  // This test requires FusionHost.exe to be running.
+-  auto backend = make_ipc_backend(std::chrono::milliseconds(2000));
++  // These assertions type into whichever Host owns the endpoint they connect to,
++  // so this mode must never fall back to the default endpoint: that one belongs to
++  // the installed product Host and to the user's live configuration and learning
++  // data. A CTest process cannot isolate a Host it did not start — an environment
++  // variable set here would not reach one — so an explicit isolated endpoint is
++  // required, and its absence skips instead of connecting.
++  const char *configured = std::getenv("FUSION_STAGE4A_INTEGRATION_PIPE");
++  if (configured == nullptr || *configured == '\0') {
++    std::cout << "SKIP integration (FUSION_STAGE4A_INTEGRATION_PIPE not set; the production "
++                 "endpoint is never used)\n";
++    return;
++  }
++  const std::wstring endpoint = wide_from_utf8(configured);
++  const std::wstring isolated = logical_pipe_name(endpoint);
++  if (isolated.empty()) {
++    throw std::runtime_error(
++        "integration: FUSION_STAGE4A_INTEGRATION_PIPE is not a single pipe name");
++  }
++  // Refused before the first request: the caller asked for an isolated run and got
++  // the live endpoint, which is the one case where connecting would corrupt state
++  // outside this test.
++  if (is_production_endpoint(endpoint)) {
++    throw std::runtime_error(
++        "integration: refusing the production endpoint; set FUSION_STAGE4A_INTEGRATION_PIPE "
++        "to the isolated Host's pipe");
++  }
++
++  // IpcBackend hands the name straight to CreateFileW, so it needs the Win32 device
++  // path; only Qt's QLocalSocket completes a logical name by itself.
++  const std::wstring device_path = std::wstring(pipe_device_path_prefix) + isolated;
++  auto backend = make_ipc_backend(device_path, std::chrono::milliseconds(2000));
+   if (!backend) {
+-    std::fprintf(stderr, "FAIL integration: FusionHost not reachable\n");
+-    std::fprintf(stderr, "  Set FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip.\n");
+-    throw std::runtime_error("integration: FusionHost not reachable");
++    std::fprintf(stderr, "FAIL integration: no FusionHost is listening on the isolated endpoint\n");
++    std::fprintf(stderr, "  Start an isolated Host on %ls, or set "
++                         "FUSION_STAGE4A_SKIP_INTEGRATION=1 to skip.\n",
++                 isolated.c_str());
++    throw std::runtime_error("integration: isolated FusionHost not reachable");
+   }
+   require(backend->healthy(), "integration healthy");
+ 
+diff --git a/tests/stage_a_settings.cpp b/tests/stage_a_settings.cpp
+new file mode 100644
+index 0000000..84acedf
+--- /dev/null
++++ b/tests/stage_a_settings.cpp
+@@ -0,0 +1,185 @@
++// Stage A settings/list protocol and validation decisions — the two layers that
++// are pure enough to test on any platform, without a Fcitx instance or a Host.
++//
++// Usage: stage_a_settings <protocol|bounds|validator>
++//
++// `protocol` and `bounds` exercise the additive settings_api_version 2 wire
++// surface: the ImList envelope and the SetImList request. `validator` covers the
++// product-side input-method list validation (im_list.hpp) that closes the two
++// gaps the Fcitx core leaves open (an empty enabled list and an unavailable
++// selection). The Host apply path itself (setGroup/save, the composition guard,
++// global-config reload) needs the Fcitx event loop and is validated on Windows;
++// it is NOT RUN here.
++
++#include "fcitx/im_list.hpp"
++#include "fusion/settings_protocol.hpp"
++
++#include <cstdint>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++#include <vector>
++
++namespace {
++
++using fusion::ipc::detail::Reader;
++using fusion::ipc::settings_detail::read_im_list;
++using fusion::ipc::settings_detail::read_string_list;
++using fusion::ipc::settings_detail::write_im_list;
++using fusion::ipc::settings_detail::write_string_list;
++
++void require(bool ok, const char *message) {
++  if (!ok) {
++    throw std::runtime_error(message);
++  }
++}
++
++std::vector<std::uint8_t> set_request_payload(const std::vector<std::string> &enabled) {
++  return fusion::ipc::serialize_settings_set_im_list_request(enabled);
++}
++
++void test_protocol() {
++  // A full ImList (active, fallback, ordered enabled, available) round-trips.
++  const fusion::ImList list{
++      "pinyin", "shuangpin", {"pinyin", "shuangpin"}, {"pinyin", "shuangpin", "wbpy"}};
++  std::vector<std::uint8_t> payload;
++  require(write_im_list(payload, list), "an in-bound ImList serializes");
++  Reader reader{payload.data(), payload.size()};
++  fusion::ImList back;
++  require(read_im_list(reader, back), "an in-bound ImList deserializes");
++  require(reader.at_end(), "ImList reader consumes the whole payload");
++  require(back == list, "ImList round-trips field-for-field");
++
++  // Empty enabled / available and an empty fallback are representable and stable.
++  const fusion::ImList bare{"pinyin", "", {"pinyin"}, {}};
++  std::vector<std::uint8_t> bare_payload;
++  require(write_im_list(bare_payload, bare), "a single-method ImList serializes");
++  Reader bare_reader{bare_payload.data(), bare_payload.size()};
++  fusion::ImList bare_back;
++  require(read_im_list(bare_reader, bare_back) && bare_reader.at_end(),
++          "a single-method ImList round-trips");
++  require(bare_back == bare, "empty fallback and available are preserved");
++
++  // The SetImList request carries only the ordered enabled list; it round-trips,
++  // including an empty list (which the validator later refuses at the Host).
++  for (const std::vector<std::string> &enabled :
++       {std::vector<std::string>{}, {"pinyin"}, {"shuangpin", "pinyin"}}) {
++    const auto request = set_request_payload(enabled);
++    std::vector<std::string> parsed;
++    require(!request.empty() || enabled.empty(),
++            "a non-empty enabled list never serializes to an empty request");
++    require(fusion::ipc::deserialize_settings_set_im_list_request(request.data(), request.size(),
++                                                                  parsed),
++            "the SetImList request deserializes");
++    require(parsed == enabled, "the SetImList request round-trips the enabled order");
++  }
++
++  // A GetImList / GetSelection request is an empty payload; max_message_type must
++  // admit the new response types so a bound Host accepts the frame.
++  static_assert(fusion::ipc::max_message_type ==
++                static_cast<std::uint8_t>(fusion::ipc::MessageType::SettingsSetImListResponse));
++}
++
++void test_bounds() {
++  // A list longer than max_vector_length is refused on write, not truncated.
++  std::vector<std::string> too_long(fusion::ipc::max_vector_length + 1, "pinyin");
++  std::vector<std::uint8_t> payload;
++  require(!write_string_list(payload, too_long), "an over-bound list is refused on write");
++
++  // Serializing an over-bound SetImList request yields an empty payload (failure).
++  require(set_request_payload(too_long).empty(),
++          "an over-bound SetImList request does not serialize");
++
++  // A crafted list header claiming more entries than the bound must fail closed
++  // when read, before any allocation follows it.
++  std::vector<std::uint8_t> forged;
++  fusion::ipc::detail::write_u32(forged, static_cast<std::uint32_t>(fusion::ipc::max_vector_length) + 1u);
++  Reader reader{forged.data(), forged.size()};
++  std::vector<std::string> items;
++  require(!read_string_list(reader, items), "an over-bound list header fails closed on read");
++
++  // Trailing bytes after a complete ImList are refused (fail-closed framing).
++  const fusion::ImList list{"pinyin", "pinyin", {"pinyin"}, {"pinyin"}};
++  std::vector<std::uint8_t> with_tail;
++  require(write_im_list(with_tail, list), "base ImList serializes");
++  with_tail.push_back(0x00); // one trailing byte
++  Reader tail_reader{with_tail.data(), with_tail.size()};
++  fusion::ImList out;
++  bool consumed = read_im_list(tail_reader, out);
++  require(consumed && !tail_reader.at_end(),
++          "an ImList with trailing bytes is detectable and rejected by the caller");
++
++  // A truncated ImList (declared but not present) fails closed.
++  std::vector<std::uint8_t> truncated;
++  fusion::ipc::detail::write_u32(truncated, 4u); // length prefix says "piny"
++  fusion::ipc::detail::write_u8(truncated, static_cast<std::uint8_t>('p'));
++  Reader short_reader{truncated.data(), truncated.size()};
++  fusion::ImList unused;
++  require(!read_im_list(short_reader, unused), "a truncated ImList fails closed on read");
++}
++
++void test_validator() {
++  using fusion::selection::plan_im_list_update;
++  const std::vector<std::string> available{"pinyin", "shuangpin"};
++
++  // A reorder keeps the requested order and carries the previous fallback through
++  // untouched — Fcitx's setDefaultInputMethod re-establishes its own invariant.
++  const auto reordered = plan_im_list_update({"shuangpin", "pinyin"}, available, "pinyin");
++  require(reordered.has_value(), "a valid reorder is accepted");
++  require(reordered->methods == std::vector<std::string>{"shuangpin", "pinyin"},
++          "the requested order is written verbatim");
++  require(reordered->requested_fallback == "pinyin",
++          "the previous fallback is passed straight to setDefaultInputMethod");
++
++  // The active method is Items/0 — the first entry of the ordered list.
++  require(!reordered->methods.empty() && reordered->methods.front() == "shuangpin",
++          "the first enabled entry is the active method");
++
++  // Duplicates collapse to the first occurrence; order is otherwise preserved.
++  const auto deduped = plan_im_list_update({"pinyin", "shuangpin", "pinyin"}, available, "");
++  require(deduped.has_value(), "a duplicate-bearing request is accepted after dedupe");
++  require(deduped->methods == std::vector<std::string>{"pinyin", "shuangpin"},
++          "duplicates collapse to their first occurrence");
++
++  // An empty enabled list is refused: the core would persist a group with no
++  // input method, leaving contexts nothing to select.
++  require(!plan_im_list_update({}, available, "pinyin").has_value(),
++          "an empty enabled list is refused");
++  require(!plan_im_list_update({"wbpy"}, available, "").has_value(),
++          "a list of only unavailable names is refused");
++
++  // Any name outside the packaged runtime's defined set is refused rather than
++  // silently dropped by setGroup, so a partial success cannot look like a save.
++  require(!plan_im_list_update({"pinyin", "wbpy"}, available, "pinyin").has_value(),
++          "a single unavailable name rejects the whole list");
++
++  // A runtime that defines a single method still accepts that one method.
++  const auto only_pinyin = plan_im_list_update({"pinyin"}, {"pinyin"}, "");
++  require(only_pinyin.has_value() && only_pinyin->methods == std::vector<std::string>{"pinyin"},
++          "a single-method runtime accepts its only method");
++}
++
++} // namespace
++
++int main(int argc, char **argv) {
++  const std::string mode = argc > 1 ? argv[1] : "";
++  try {
++    if (mode == "protocol") {
++      test_protocol();
++      std::cout << "PASS stage_a_settings protocol: ImList + SetImList round-trip\n";
++    } else if (mode == "bounds") {
++      test_bounds();
++      std::cout << "PASS stage_a_settings bounds: over-bound and malformed lists fail closed\n";
++    } else if (mode == "validator") {
++      test_validator();
++      std::cout << "PASS stage_a_settings validator: empty and unavailable lists refused\n";
++    } else {
++      std::cerr << "usage: stage_a_settings <protocol|bounds|validator>\n";
++      return 2;
++    }
++    return 0;
++  } catch (const std::exception &e) {
++    std::cerr << "FAIL stage_a_settings " << mode << ": " << e.what() << "\n";
++    return 1;
++  }
++}
+diff --git a/third_party/settings-ui/SOURCE-ACCESS.txt b/third_party/settings-ui/SOURCE-ACCESS.txt
+index 8d0d903..f748d85 100644
+--- a/third_party/settings-ui/SOURCE-ACCESS.txt
++++ b/third_party/settings-ui/SOURCE-ACCESS.txt
+@@ -6,8 +6,8 @@ Replace <sourceCommit> with package.json.sourceCommit. The source includes src/s
+ 
+ The settings build uses these exact upstream/fork revisions (also recorded in cmake/settings-ui/versions.cmake):
+   configtool upstream base: https://github.com/fcitx/fcitx5-configtool/tree/9bd6022c6f5f768d32b6dbe2012358e4cdb1116b
+-  maintained configtool adaptation PR: https://github.com/choicky/fcitx5-configtool/pull/1, branch windows/fusion-settings, commit d440322d2c8adf75897d19afa411c48e99e9a4d8
+-  pinned configtool fork commit: https://github.com/choicky/fcitx5-configtool/tree/d440322d2c8adf75897d19afa411c48e99e9a4d8
++  maintained configtool adaptation PR: https://github.com/choicky/fcitx5-configtool/pull/2, branch windows/fusion-settings, commit abc2c6644b030d761d3d5e7c27c888af019e63f0
++  pinned configtool fork commit: https://github.com/choicky/fcitx5-configtool/tree/abc2c6644b030d761d3d5e7c27c888af019e63f0
+   fcitx5-qt source base: https://github.com/fcitx/fcitx5-qt/tree/0285a5d18367d8f3af80dab7e4819d5555982340
+   fcitx5: https://github.com/fcitx/fcitx5/tree/a7f2528773ebfec98a20c49b6eea2333110b1c88
+   fcitx5-chinese-addons: https://github.com/fcitx/fcitx5-chinese-addons/tree/61474bd3aa9fca26d1c31df93343035697e9f265
+diff --git a/tools/package/build-package.ps1 b/tools/package/build-package.ps1
+index 280b9c8..94b1358 100644
+--- a/tools/package/build-package.ps1
++++ b/tools/package/build-package.ps1
+@@ -199,7 +199,9 @@ try {
+   if ($dirty) { throw 'Owner-test package must be built from a clean committed fusion-windows worktree' }
+ 
+   $settingsPins = Get-Content -LiteralPath (Join-Path $RepoRoot 'cmake\settings-ui\versions.cmake') -Raw
+-  $vcpkgMatch = [Regex]::Match($settingsPins, '(?m)^set\(FUSION_SETTINGS_VCPKG_COMMIT "([0-9a-f]{40})"\)$')
++  # `[ \t\r]*$` keeps the anchors working on a CRLF checkout, which is what a normal
++  # fresh Windows clone produces with `core.autocrlf=true`.
++  $vcpkgMatch = [Regex]::Match($settingsPins, '(?m)^set\(FUSION_SETTINGS_VCPKG_COMMIT "([0-9a-f]{40})"\)[ \t\r]*$')
+   if (-not $vcpkgMatch.Success) { throw 'Missing exact vcpkg commit pin' }
+   $runtime.vcpkg = $vcpkgMatch.Groups[1].Value
+   $runtime.msvc = '14.51.36231'
+@@ -209,12 +211,19 @@ try {
+       @('fcitx5','FUSION_SETTINGS_FCITX5_COMMIT'),
+       @('fcitx5-chinese-addons','FUSION_SETTINGS_CHINESE_ADDONS_COMMIT'),
+       @('libime','FUSION_SETTINGS_LIBIME_COMMIT'))) {
+-    $match = [Regex]::Match($settingsPins, '(?m)^set\(' + [Regex]::Escape($pair[1]) + ' "([0-9a-f]{40})"\)$')
++    $match = [Regex]::Match($settingsPins, '(?m)^set\(' + [Regex]::Escape($pair[1]) + ' "([0-9a-f]{40})"\)[ \t\r]*$')
+     if (-not $match.Success) { throw "Missing settings source pin $($pair[1])" }
+     $runtime[$pair[0]] = $match.Groups[1].Value
+   }
+   $runtime.qt = '6.8.3 win64_msvc2022_64'
+   $runtime.ecm = '6.30.0 build-time only'
++  # The settings manifest below records the fork revision the settings executable was
++  # actually built from. Read it from the same pin file the build reads, so the manifest
++  # cannot drift from versions.cmake the way a literal did.
++  $configtoolRepository = [Regex]::Match($settingsPins, '(?m)^set\(FUSION_SETTINGS_CONFIGTOOL_REPOSITORY "([^"]+)"\)[ \t\r]*$')
++  if (-not $configtoolRepository.Success) { throw 'Missing maintained configtool fork repository pin' }
++  $configtoolBranch = [Regex]::Match($settingsPins, '(?m)^set\(FUSION_SETTINGS_CONFIGTOOL_BRANCH "([^"]+)"\)[ \t\r]*$')
++  $configtoolBranchName = if ($configtoolBranch.Success) { $configtoolBranch.Groups[1].Value } else { 'windows/fusion-settings' }
+   if (-not $UpstreamRoot) { throw 'The pinned native source root is required to provide corresponding runtime source' }
+   foreach ($pair in @(@('fcitx5', 'fcitx5'), @('fcitx5-chinese-addons', 'chineseAddons'), @('libime', 'libime'))) {
+     $path = Join-Path $UpstreamRoot $pair[0]
+@@ -247,20 +256,20 @@ try {
+     builtAt       = (Get-Date).ToString('o')
+     builtOn       = $env:COMPUTERNAME
+     configuration = 'Release'
+-  runtime       = $runtime
+-  settings      = [ordered]@{
+-    implementationStatus = 'implemented; isolated-product-validated when recorded by the delivery report'
+-    experimentalResult   = 'not owner-installed or owner-accepted; owner-test package only'
+-    selectionUi          = 'official InputMethodManager group APIs; Items/0 selected, DefaultIM preserved as fallback'
+-    applySemantics       = 'official inputmethod/<name> schema and setConfigForInputMethod; changed apply checks contexts and preserves unexposed values'
+-    sourceCommit         = 'covered by package sourceCommit'
+-    repository           = 'https://github.com/choicky/fcitx5-configtool'
+-    branch               = 'windows/fusion-settings'
+-    commit               = '0234c64e93f1d61badc1fd3eaad2ba786ca63850'
+-    sourceAccess         = 'licenses/settings-ui/SOURCE-ACCESS.txt'
+-  }
+-  layout        = 'bin\ (Host + Tray + Settings + TSF DLL + runtime/Qt/plugins), Fcitx data under bin\data\, lib\libime\, licenses\, source\'
+-  files         = $files
++    runtime       = $runtime
++    settings      = [ordered]@{
++      implementationStatus = 'implemented; built and validated against an isolated Host + GUI from this source commit'
++      experimentalResult   = 'not owner-installed, not owner-accepted, not registered; owner-test package only'
++      selectionUi          = 'official InputMethodManager group APIs; Items/0 selected, DefaultIM preserved as fallback'
++      applySemantics       = 'official inputmethod/<name> schema and setConfigForInputMethod; changed apply checks contexts and preserves unexposed values'
++      sourceCommit         = 'covered by package sourceCommit'
++      repository           = $configtoolRepository.Groups[1].Value
++      branch               = $configtoolBranchName
++      commit               = $runtime['fcitx5-configtool']
++      sourceAccess         = 'licenses/settings-ui/SOURCE-ACCESS.txt'
++    }
++    layout        = 'bin\ (Host + Tray + Settings + TSF DLL + runtime/Qt/plugins), Fcitx data under bin\data\, lib\libime\, licenses\, source\'
++    files         = $files
+   }
+   $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'package.json') -Encoding UTF8
+ 
+diff --git a/tools/settings/prepare-settings-sources.ps1 b/tools/settings/prepare-settings-sources.ps1
+index 5fc20ff..80ef2d8 100644
+--- a/tools/settings/prepare-settings-sources.ps1
++++ b/tools/settings/prepare-settings-sources.ps1
+@@ -12,7 +12,10 @@ New-Item -ItemType Directory -Force $sourceRoot | Out-Null
+ $pinsPath = Join-Path $RepoRoot 'cmake\settings-ui\versions.cmake'
+ $pinText = Get-Content -LiteralPath $pinsPath -Raw
+ function Get-Pin([string]$Name) {
+-  $pattern = '(?m)^set\(' + [Regex]::Escape($Name) + ' "([0-9a-f]{40})"\)$'
++  # Tolerate a CRLF checkout: with `core.autocrlf=true` the line ends in `\r\n`, and
++  # an anchor placed directly after `)` would then never match, which made a normal
++  # fresh Windows clone unable to prepare sources.
++  $pattern = '(?m)^set\(' + [Regex]::Escape($Name) + ' "([0-9a-f]{40})"\)[ \t\r]*$'
+   $match = [Regex]::Match($pinText, $pattern)
+   if (-not $match.Success) { throw "Missing exact 40-hex pin: $Name" }
+   return $match.Groups[1].Value
+@@ -84,7 +87,7 @@ function Apply-Patch([string]$Path, [string]$Patch) {
+   if ($LASTEXITCODE -ne 0) { throw "Patch check failed: $Patch" }
+   Invoke-Git @('-C',$Path,'apply',$Patch)
+ }
+-$configtoolRepository = [Regex]::Match($pinText, '(?m)^set\(FUSION_SETTINGS_CONFIGTOOL_REPOSITORY "([^"]+)"\)$')
++$configtoolRepository = [Regex]::Match($pinText, '(?m)^set\(FUSION_SETTINGS_CONFIGTOOL_REPOSITORY "([^"]+)"\)[ \t\r]*$')
+ if (-not $configtoolRepository.Success) { throw 'Missing owner-fork repository URL pin' }
+ $configtool = Get-PinnedCheckout 'fcitx5-configtool' $configtoolRepository.Groups[1].Value `
+   (Get-Pin 'FUSION_SETTINGS_CONFIGTOOL_COMMIT')
+diff --git a/tools/settings/run-isolated-stage-a.ps1 b/tools/settings/run-isolated-stage-a.ps1
+new file mode 100644
+index 0000000..8b5f3d0
+--- /dev/null
++++ b/tools/settings/run-isolated-stage-a.ps1
+@@ -0,0 +1,330 @@
++param(
++  [Parameter(Mandatory = $true)][string]$BuildDir,
++  [Parameter(Mandatory = $true)][string]$ProfileRoot,
++  [Parameter(Mandatory = $true)][string]$PipeName,
++  [string]$OutFile = ''
++)
++
++# Stage A closure checks against a real, isolated Host.
++#
++# One disposable profile, one isolated pipe, two consumers:
++#   1. stage4a integration — the real-engine assertions (Pinyin keys, the commit,
++#      the projected candidate). It types, so it runs only here, against a Host
++#      this script started, with the endpoint passed explicitly.
++#   2. FusionSettings --self-test — global apply, Global Cancel/Reload, the
++#      input-method list and the no-change pass.
++#
++# Around and between them the script asserts the two things the evidence pack
++# claimed but had not shown: configuration the apply does not submit survives, and
++# the engine's learning files are not rewritten by a settings-only session. It also
++# proves the safe default: with no endpoint the integration mode skips, and this
++# user's production endpoint is refused in both spellings before any request.
++#
++# Isolation is applied to the Host itself: APPDATA/LOCALAPPDATA/USERPROFILE are
++# redirected in this process, so every child inherits the disposable profile. The
++# production Host is never addressed — only the named stop event of this scope is
++# signalled, and the production pipe name is rejected as a parameter.
++
++$ErrorActionPreference = 'Stop'
++Set-StrictMode -Version 2.0
++
++trap {
++  [Console]::Error.WriteLine("HARNESS ERROR line={0}: {1}" -f `
++    $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message)
++  exit 1
++}
++
++# The real profile, read-only, before anything is redirected: the refusal checks
++# below must not be able to write to it.
++$realPinyinDir = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'fcitx5\pinyin'
++
++$BuildDir = (Resolve-Path -LiteralPath $BuildDir).Path
++$ProfileRoot = [IO.Path]::GetFullPath($ProfileRoot)
++New-Item -ItemType Directory -Force $ProfileRoot | Out-Null
++
++if ($PipeName -match '^FusionHost-v1-') {
++  throw "Refusing '$PipeName': that is the product pipe identity, and a Host started on it would collide with the installed one. Pass an isolated name."
++}
++if ($PipeName -match '[\\/:*?"<>|\x00-\x1f]') {
++  throw "Refusing '$PipeName': not a single pipe name component."
++}
++
++$bin = Join-Path $BuildDir 'bin'
++$hostExe = Join-Path $bin 'FusionHost.exe'
++$settingsExe = Join-Path $bin 'FusionSettings.exe'
++$stage4aExe = Join-Path $bin 'stage4a.exe'
++foreach ($path in @($hostExe, $settingsExe, $stage4aExe, (Join-Path $bin 'FusionFcitxHost.dll'))) {
++  if (-not (Test-Path -LiteralPath $path)) { throw "Missing isolated product binary: $path" }
++}
++
++$env:APPDATA = Join-Path $ProfileRoot 'AppData\Roaming'
++$env:LOCALAPPDATA = Join-Path $ProfileRoot 'AppData\Local'
++$env:USERPROFILE = Join-Path $ProfileRoot 'User'
++New-Item -ItemType Directory -Force $env:APPDATA, $env:LOCALAPPDATA, $env:USERPROFILE | Out-Null
++$env:PATH = "$bin;$env:PATH"
++$env:FUSION_HOST_DIAGNOSTICS = '1'
++
++$pipe = "\\.\pipe\$PipeName"
++$stopScope = "stage-a-$PipeName"
++$stopEventName = "Local\FusionHost-stop-$stopScope"
++
++Add-Type -Namespace StageAClosure -Name Native -MemberDefinition @'
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true, CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
++public static extern System.IntPtr OpenEventW(uint access, bool inherit, string name);
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]
++public static extern bool SetEvent(System.IntPtr handle);
++[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]
++public static extern bool CloseHandle(System.IntPtr handle);
++'@
++
++# Fcitx resolves its user directory from the profile, not from APPDATA: the files
++# this script seeds and compares live under %USERPROFILE%\AppData\Roaming\Fcitx5.
++$fcitxRoot = Join-Path $env:USERPROFILE 'AppData\Roaming\Fcitx5'
++$configDir = Join-Path $fcitxRoot 'config\fcitx5'
++$globalConfig = Join-Path $configDir 'config'
++$pinyinConfig = Join-Path $configDir 'conf\pinyin.conf'
++$learningDir = Join-Path $fcitxRoot 'pinyin'
++
++function Invoke-Bounded {
++  param(
++    [string]$Exe,
++    [string]$Arguments,
++    [string]$IntegrationEndpoint = '',
++    [int]$TimeoutMs = 60000
++  )
++  # The child inherits this process's environment. An empty value is how this
++  # script says "unset": the integration mode treats an empty
++  # FUSION_STAGE4A_INTEGRATION_PIPE exactly like a missing one, which is the case
++  # the safe-default check needs.
++  $previous = $env:FUSION_STAGE4A_INTEGRATION_PIPE
++  $env:FUSION_STAGE4A_INTEGRATION_PIPE = $IntegrationEndpoint
++  try {
++    $psi = [Diagnostics.ProcessStartInfo]::new()
++    $psi.FileName = $Exe
++    $psi.Arguments = $Arguments
++    $psi.WorkingDirectory = $BuildDir
++    $psi.UseShellExecute = $false
++    $psi.CreateNoWindow = $true
++    $psi.RedirectStandardError = $true
++    $psi.RedirectStandardOutput = $true
++    $sw = [Diagnostics.Stopwatch]::StartNew()
++    $proc = [Diagnostics.Process]::Start($psi)
++    $stderr = $proc.StandardError.ReadToEndAsync()
++    $stdout = $proc.StandardOutput.ReadToEndAsync()
++    $finished = $proc.WaitForExit($TimeoutMs)
++    if (-not $finished) {
++      $proc.Kill()
++      $proc.WaitForExit(5000)
++    }
++    $sw.Stop()
++    return @{
++      ExitCode  = $(if ($finished) { $proc.ExitCode } else { -1 })
++      TimedOut  = (-not $finished)
++      ElapsedMs = $sw.ElapsedMilliseconds
++      Stdout    = $stdout.Result.Trim()
++      Stderr    = $stderr.Result.Trim()
++    }
++  } finally {
++    $env:FUSION_STAGE4A_INTEGRATION_PIPE = $previous
++  }
++}
++
++function Start-IsolatedHost {
++  $psi = [Diagnostics.ProcessStartInfo]::new()
++  $psi.FileName = $hostExe
++  $psi.Arguments = "--console --pipe-name `"$pipe`" --stop-event-scope `"$stopScope`""
++  $psi.WorkingDirectory = $BuildDir
++  $psi.UseShellExecute = $false
++  $psi.CreateNoWindow = $true
++  $proc = [Diagnostics.Process]::Start($psi)
++  # Readiness is taken from the Host's own diagnostic log rather than from a probe
++  # connection: the Host listens on one instance at a time, so a probe would consume
++  # it and leave the consumer that follows with nothing to connect to.
++  $logPath = Join-Path (Join-Path $env:LOCALAPPDATA 'fusion-host') "fusion-host-$($proc.Id).log"
++  $deadline = (Get-Date).AddSeconds(20)
++  while ((Get-Date) -lt $deadline) {
++    if ($proc.HasExited) { throw "FusionHost exited early with code $($proc.ExitCode)" }
++    if (Test-Path -LiteralPath $logPath) {
++      if (Select-String -LiteralPath $logPath -Pattern 'accept_loop' -Quiet -ErrorAction SilentlyContinue) {
++        Start-Sleep -Milliseconds 150
++        return $proc
++      }
++    }
++    Start-Sleep -Milliseconds 50
++  }
++  throw "FusionHost did not reach its accept loop (expected $logPath)"
++}
++
++function Stop-IsolatedHostOrderly {
++  param([Diagnostics.Process]$Process)
++  $handle = [StageAClosure.Native]::OpenEventW(0x0002, $false, $stopEventName)
++  if ($handle -eq [IntPtr]::Zero) { throw "cannot open the isolated stop event $stopEventName" }
++  try {
++    if (-not [StageAClosure.Native]::SetEvent($handle)) { throw 'cannot signal the isolated stop event' }
++  } finally {
++    [void][StageAClosure.Native]::CloseHandle($handle)
++  }
++  if (-not $Process.WaitForExit(30000)) {
++    $Process.Kill()
++    $Process.WaitForExit(5000)
++    return @{ ExitCode = -1; TimedOut = $true }
++  }
++  Start-Sleep -Milliseconds 300
++  return @{ ExitCode = $Process.ExitCode; TimedOut = $false }
++}
++
++function Get-FileFingerprint {
++  param([string]$Path)
++  if (-not (Test-Path -LiteralPath $Path)) { return @{ Exists = $false; Length = 0; Sha256 = '' } }
++  $item = Get-Item -LiteralPath $Path
++  return @{
++    Exists = $true
++    Length = $item.Length
++    Sha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
++  }
++}
++
++# INI value reader: the seeded keys are plain `Key=Value` lines in one section.
++function Get-IniValue {
++  param([string]$Path, [string]$Section, [string]$Key)
++  if (-not (Test-Path -LiteralPath $Path)) { return $null }
++  $current = ''
++  foreach ($line in Get-Content -LiteralPath $Path) {
++    if ($line -match '^\[(.+)\]$') { $current = $Matches[1]; continue }
++    if ($current -ne $Section) { continue }
++    if ($line -match "^\s*$([regex]::Escape($Key))\s*=\s*(.*)$") { return $Matches[1].Trim() }
++  }
++  return $null
++}
++
++$result = [ordered]@{}
++$result.pipe = $PipeName
++$result.profileRoot = $ProfileRoot
++
++# ---- seed: configuration the apply must not submit, plus an unknown key --------
++# Both are written before any Host starts, so their survival spans every save this
++# run performs. ShowInputMethodInformation and SpellEnabled are schema-known and
++# non-default; no step in the self-test changes them, which is what "unexposed by
++# this apply" means. FusionStageAUnknownProbe is not in any schema.
++New-Item -ItemType Directory -Force (Split-Path -Parent $pinyinConfig) | Out-Null
++# DefaultPageSize starts away from the value the self-test applies, so that apply is
++# a real write rather than an empty delta. The files are written without a BOM:
++# Fcitx parses the first line as the first section header.
++[IO.File]::WriteAllText($globalConfig, (@(
++  '[Behavior]',
++  'DefaultPageSize=5',
++  'ShowInputMethodInformation=False',
++  'FusionStageAUnknownProbe=keep-me'
++) -join "`r`n") + "`r`n")
++[IO.File]::WriteAllText($pinyinConfig, (@(
++  'PageSize=8',
++  'SpellEnabled=False',
++  'FusionStageAUnknownProbe=keep-me'
++) -join "`r`n") + "`r`n")
++$result.seededGlobalUnknownKey = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'FusionStageAUnknownProbe')
++$result.seededGlobalKnownValue = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'ShowInputMethodInformation')
++$result.seededPinyinKnownValue = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'SpellEnabled')
++
++# ---- safe default and refusal, before any Host is started ---------------------
++# 1. No endpoint: the mode must skip without connecting.
++$result.missingEndpoint = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint '' -TimeoutMs 20000
++$result.missingEndpointSkipped = ($result.missingEndpoint.ExitCode -eq 0 -and
++  $result.missingEndpoint.Stdout -like 'SKIP integration*')
++
++# 2. This user's production endpoint, in both spellings, must be refused before any
++#    request. The owner's learning files are fingerprinted around the attempt: if
++#    the guard ever stopped working, this run would have typed into them.
++$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
++$session = (Get-Process -Id $PID).SessionId
++$productionLogical = "FusionHost-v1-$sid-$session"
++$before = @{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $before[$name] = Get-FileFingerprint -Path (Join-Path $realPinyinDir $name)
++}
++$result.productionRefusalLogical = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint $productionLogical -TimeoutMs 20000
++$result.productionRefusalFullPath = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint "\\.\pipe\$productionLogical" -TimeoutMs 20000
++$result.malformedEndpointRefusal = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++  -IntegrationEndpoint 'bad\name' -TimeoutMs 20000
++$untouched = $true
++foreach ($name in @('user.dict', 'user.history')) {
++  $after = Get-FileFingerprint -Path (Join-Path $realPinyinDir $name)
++  if ($after.Sha256 -ne $before[$name].Sha256 -or $after.Length -ne $before[$name].Length) {
++    $untouched = $false
++  }
++}
++$refused = { param($r) $r.ExitCode -ne 0 -and $r.Stderr -like '*refusing the production endpoint*' }
++$result.productionEndpointRefused = ((& $refused $result.productionRefusalLogical) -and
++  (& $refused $result.productionRefusalFullPath))
++$result.productionLearningUntouched = $untouched
++$result.malformedEndpointRefused = ($result.malformedEndpointRefusal.ExitCode -ne 0 -and
++  $result.malformedEndpointRefusal.Stderr -like '*not a single pipe name*')
++
++# ---- phase 1: real-engine integration against the isolated Host ---------------
++$host1 = $null
++try {
++  $host1 = Start-IsolatedHost
++  $result.integration = Invoke-Bounded -Exe $stage4aExe -Arguments 'integration' `
++    -IntegrationEndpoint $PipeName -TimeoutMs 120000
++} finally {
++  if ($host1 -and -not $host1.HasExited) {
++    $stop = Stop-IsolatedHostOrderly -Process $host1
++    $result.integrationHostExit = $stop.ExitCode
++    $result.integrationHostStoppedInTime = (-not $stop.TimedOut)
++  }
++}
++
++# ---- learning fixtures: produced by that run, recorded before the settings pass -
++# The engine wrote these while committing; they are the valid fixtures. A synthetic
++# dictionary is not used, and the owner's files are never read as data.
++$learningBefore = [ordered]@{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $learningBefore[$name] = Get-FileFingerprint -Path (Join-Path $learningDir $name)
++}
++$result.learningBefore = $learningBefore
++
++# ---- phase 2: settings session — global apply, Cancel/Reload, list, no-change --
++$host2 = $null
++try {
++  $host2 = Start-IsolatedHost
++  $result.selfTest = Invoke-Bounded -Exe $settingsExe `
++    -Arguments "--pipe-name `"$pipe`" --self-test" -TimeoutMs 120000
++} finally {
++  if ($host2 -and -not $host2.HasExited) {
++    $stop = Stop-IsolatedHostOrderly -Process $host2
++    $result.selfTestHostExit = $stop.ExitCode
++    $result.selfTestHostStoppedInTime = (-not $stop.TimedOut)
++  }
++}
++
++# ---- after: learning files and configuration, compared at the same point ------
++$learningAfter = [ordered]@{}
++foreach ($name in @('user.dict', 'user.history')) {
++  $learningAfter[$name] = Get-FileFingerprint -Path (Join-Path $learningDir $name)
++}
++$result.learningAfter = $learningAfter
++$result.learningDictByteIdentical =
++  ($learningBefore['user.dict'].Sha256 -eq $learningAfter['user.dict'].Sha256)
++$result.learningHistoryByteIdentical =
++  ($learningBefore['user.history'].Sha256 -eq $learningAfter['user.history'].Sha256)
++$result.learningPresentAfter = ($learningAfter['user.dict'].Exists -and
++  $learningAfter['user.history'].Exists)
++
++$result.globalUnknownKeyAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'FusionStageAUnknownProbe')
++$result.globalKnownValueAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'ShowInputMethodInformation')
++$result.globalPageSizeAfter = (Get-IniValue -Path $globalConfig -Section 'Behavior' -Key 'DefaultPageSize')
++$result.pinyinKnownValueAfter = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'SpellEnabled')
++$result.pinyinUnknownKeyAfter = (Get-IniValue -Path $pinyinConfig -Section '' -Key 'FusionStageAUnknownProbe')
++
++$result.globalUnknownKeyPreserved = ($result.globalUnknownKeyAfter -eq 'keep-me')
++$result.pinyinUnknownKeyPreserved = ($result.pinyinUnknownKeyAfter -eq 'keep-me')
++$result.globalKnownUnsubmittedPreserved = ($result.globalKnownValueAfter -eq 'False')
++$result.pinyinKnownUnsubmittedPreserved = ($result.pinyinKnownValueAfter -eq 'False')
++
++$json = $result | ConvertTo-Json -Depth 6
++if ($OutFile) {
++  [IO.File]::WriteAllText($OutFile, $json)
++}
++$json
