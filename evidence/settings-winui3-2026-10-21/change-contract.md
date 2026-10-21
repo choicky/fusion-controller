@@ -3,10 +3,10 @@
 > **Scope of this record.** It bounded the **first** batch of this task: the D087 decision, the migration inventory, and
 > the first implementation attempt. The statements below that say "nothing is compiled" and "only source-level gates can
 > run" describe **that batch**, not the current state. Current outcome: the client is **implemented, compiled, tested and
-> packaged** in fusion-windows PR #32 — core, WinUI views, 422 checks with an isolated Host, and an edit driven through the
-> packaged executable. It is **not installed and not owner-accepted**. See `migration-inventory.md` §6 and the Stage 6
-> plan's settings section for the per-level state. The contract's scope, must-preserve list and hard stops still govern
-> the remaining work.
+> packaged** in fusion-windows PR #32 — core, WinUI views, 515 checks with an isolated Host on a writable disposable profile,
+> and the corrected save path exercised through the packaged executable. It is **not installed and not owner-accepted**. See
+> `migration-inventory.md` §6 and the Stage 6 plan's settings section for the per-level state. The contract's scope,
+> must-preserve list and hard stops still govern the remaining work.
 
 **Goal.** Replace the presentation layer of the Windows settings surface with a Fusion-owned **C# + WinUI 3** client
 that drives the same Host settings protocol and the same official Fcitx configuration, without adding a second

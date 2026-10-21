@@ -190,19 +190,20 @@ owner installation/acceptance are separate states; no installation is claimed he
 **Direction change (2026-10-21, D087).** The owner has replaced the *presentation technology only*: the Windows settings surface is to be a
 Fusion-owned **C# + WinUI 3** client with task-oriented navigation (Input methods · Keys · Candidates and input · About and diagnostics),
 while official Fcitx configuration semantics, storage, defaults and the settings-before-installer order stay as they are. D086's scoped
-licence remains attached to the retained upstream-derived executable and does not extend to the new client. The Qt client recorded below is
-still the **shipped** settings surface — nothing has replaced it.
+licence remains attached to the retained upstream-derived executable and does not extend to the new client. The WinUI client is now the
+settings surface the current owner-test package ships, and it is the only one in that package: the build has `FUSION_WITH_SETTINGS_UI=OFF`,
+so the Qt client below is **not** in it. The Qt client's own record stays as the history of what the earlier packages shipped.
 
-**WinUI 3 client — state by level (2026-10-21, third round).**
+**WinUI 3 client — state by level (2026-10-21, fourth round).**
 
 | Level | State |
 |---|---|
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **422 checks pass** with an isolated Host (347 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, the method list, a failed start and its retry), and read/apply/read-back with incarnation stability. Plus an edit driven through the compiled window: a control toggled, Save pressed, and the Host read back independently |
-| UI verified | **yes, as a running window** — built, launched against an isolated Host, all four pages navigated through UI Automation and captured (`worktmp\fusion-windows\settings-winui3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+bcf4375.zip`, 139 006 737 B, SHA-256 `68F737CB…030F5D`, 652 files, every manifest hash re-verified after extraction, and an edit/save driven through the **packaged** executable |
+| tested | **515 checks pass** with an isolated Host on a disposable **writable** profile (423 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for a reconnect, the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, and read/apply/read-back with incarnation stability |
+| UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
+| packaged | **yes** — `fusion-0.0.0-winui3+ae02af0.zip`, 139 010 202 B, SHA-256 `375AA998…D70CC0`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable exercised against an isolated Host (edit → close → save → read back) |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -213,12 +214,12 @@ and the reproduction steps are in `evidence/settings-winui3-2026-10-21/blocker.m
 Deployment, measured rather than assumed: the client is **self-contained for both .NET and the Windows App SDK**, so the
 ZIP needs nothing installed on the target and no installer. That is why it is about 139 MB. It ships in `bin\settings\`
 because it carries its own runtimes, which must not be mixed with the Host's and the Qt client's DLLs in `bin\`. The tray
-and the Start Menu shortcut point there; the Qt client stays at `bin\FusionSettings.exe` as the rollback path with nothing
-linking to it, and this build tree has it switched off, so this package ships one settings entry.
+and the Start Menu shortcut point there; this build tree has the Qt client switched off, so this package ships one settings
+entry and the rollback path is the previous package rather than a second executable.
 
-What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path
-and that the pages render and navigate; they do not prove that a paging binding pages candidates inside a TSF application,
-and they do not prove that any NV row changes product behaviour.
+What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path,
+the save/recovery behaviour and that the pages render, navigate and reflow; they do not prove that a paging binding pages
+candidates inside a TSF application, and they do not prove that any NV row changes product behaviour.
 
 The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
 indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one
@@ -243,7 +244,26 @@ point, no reset and no warnings.
 
 All nine are fixed, and running the corrected build found a tenth: `FocusManager.TryMoveFocus` without a search root throws
 in a WinUI Desktop app and closed the window on the first Save. `SettingsWorkspace` moved into the core so the edit/save/
-recovery path could be tested against a real Host. Packaging, installation and owner acceptance remain open. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
+recovery path could be tested against a real Host.
+
+**Correction round 3 (2026-10-21, fusion-windows PR #32) — the paths that had only been read.** Six more defects, each found
+by executing the path rather than reviewing it. A cleared `List|String` was still written as an empty scalar and the Host
+refused the whole save; the conversion now lives in the core, and driving the real control exposed two further faults — a
+WinUI text box strips line breaks from text assigned before `AcceptsReturn`, and returns CR where CRLF went in, so a list was
+shown and then saved truncated. An uncertain method-list write replaced the draft with the reread, so a request the Host had
+not applied disappeared while the window said it had been reconciled; the reread now moves the baseline and the request stays
+pending unless it shows the write applied. Closing with a focused text field tested "is anything pending?" before committing
+it, so the last edit was lost with no dialog; close and reload now commit through the control itself, and a close during an
+in-flight request is refused with the reason instead of discarding drafts under it. Retry recreated the drafts, and a
+connection lost after a successful load offered no retry at all. The key-tag reflow found no chips after the first layout, so
+a resize never reflowed — rebuilding rows from a layout callback faults, and deferring it touches replaced elements, so the
+rows are a small `WrapPanel` and the layout system does the wrapping.
+
+The round also closed the validation debt that mattered most: the global configuration now saves **successfully** against an
+isolated Host on a disposable writable profile, survives an orderly restart, and a save with nothing pending rewrites no file
+under that profile. Earlier rounds could only assert the client's handling of the Host's `safeSave()` failure, because a Host
+started without a user configuration directory has nowhere to save to. Packaging, installation and owner acceptance remain
+open. Separately, the **tray entry point** is **merged** (fusion-windows PR #30, `main` `504f48c`): left click opens the settings window or raises the
 existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
 older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a
 launch guard stops repeated clicks from stacking windows during startup. Right-click keeps the full menu and the launch path is unchanged.

@@ -320,8 +320,8 @@ disposition.
 |---|---|
 | design (this document) | done |
 | core (`src/settings-winui3/FusionSettings.Core`) | implemented, compiled, tested |
-| WinUI views (`src/settings-winui3/FusionSettings.App`) | **implemented, compiled, launched** — four pages, every item below has a location |
-| packaged | yes — `fusion-0.0.0-winui3+67f771b.zip` |
+| WinUI views (`src/settings-winui3/FusionSettings.App`) | **implemented, compiled, launched, driven** — four pages, every item below has a location |
+| packaged | yes — `fusion-0.0.0-winui3+ae02af0.zip` (139 010 202 B, SHA-256 `375AA998…D70CC0`, 652 manifest entries re-verified) |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -346,12 +346,18 @@ diagnostics, and every item in §1–§3 has a place in it:
 - **Editable means editable through the asking view's schema.** A row's setter is bound to the configuration that page
   renders, so a Global control cannot reach the Pinyin draft, and the save splits the shared draft across the URIs whose
   schemas describe its fields.
-- **Checks**: **422** with an isolated Host (347 without one). The workspace path is driven against a real Host — Global
-  routing, a Shuangpin-only save, clearing the last binding, the method list, a failed start and its retry — and one edit was
-  driven through the compiled window: a control toggled, Save pressed, and the Host read back independently.
-- **A successful global save is NOT RUN on this Host.** The isolated Host runs without a user config path, and the Host's
-  global apply ends in `safeSave()`, which needs one; it answers "Fcitx could not save the global configuration; reload
-  before retrying." What is checked instead is that the client reports that failure and keeps the edit.
+- **Checks**: **515** with an isolated Host on a disposable **writable** profile (423 without one). The workspace path is
+  driven against a real Host — Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the
+  method list, a failed start and its retry — a scripted peer covers an uncertain method-list write (applied / not applied /
+  reread failed) and a reconnect with edits retained, and the window itself was driven through UI Automation for
+  edit-then-close, close during an in-flight save, a reconnect that saves afterwards, and key-tag reflow at three widths with
+  an add and a remove after a resize.
+- **A successful global save is RUN**, on a Host whose per-user configuration and data paths resolve inside a disposable
+  profile (`FUSION_FCITX_SKIP_USER_PATH` unset, `APPDATA`/`LOCALAPPDATA`/`USERPROFILE` redirected). The value is changed
+  through the workspace, saved, reread, and then confirmed again after the Host is stopped through its stop event and started
+  against the same profile; a second save with nothing pending rewrites no file under that profile. The earlier failure-path
+  assertion — that the client reports the Host's `safeSave()` failure and keeps the edit — is retained for the no-path Host,
+  which is what a Host without a user configuration directory can demonstrate.
 - **Not established**: whether any individual value changes product behaviour (the NV rows). That needs the client used
   against the product Host, which is an owner step.
 - **Not established**: whether the conditional rows can be made to work. That needs either a different delivery path (a TSF

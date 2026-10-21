@@ -71,19 +71,22 @@ so — the window says the change **may have applied**, re-reads the configurati
 the reread does not confirm stay pending. It never silently retries.
 
 **While a request is running** the pages are read-only and the buttons are disabled, so nothing can change under a request
-that has already been sent. Typing in a field commits when you leave it, and Save moves focus for you, so the value you just
-typed is the value that is saved.
+that has already been sent. Typing in a field commits when you leave it, and both Save and closing the window commit it for
+you, so the value you just typed is the value that is saved — and the question "close without saving?" is only asked after
+that last edit has been counted. Closing while a save is in progress is refused with a message rather than discarding the
+draft under it.
 
-**If the Host is not there.** At startup the window says so and offers **重试连接**. Once connected, **重新加载** re-reads
-everything and asks first if anything is unsaved. A reconnect keeps your pending edits; only an explicit reload discards
-them.
+**If the Host is not there.** At startup the window says so and offers **重试连接**. Once connected, the same **重试连接**
+appears if the Host goes away mid-session, and **重新加载** re-reads everything and asks first if anything is unsaved. A
+retry keeps your pending edits; only an explicit reload discards them.
 
 **What the pages do not claim.** A binding stored here is a configuration value; whether that key reaches the engine depends
 on the input path. Combinations with Ctrl/Alt/Win, modifier-only keys and keypad Enter are not delivered on this path, so
 those bindings can be saved but will not fire. The 按键 page says so where it matters. The 关于与诊断 page repeats it.
 
 Packages before this one shipped the Qt client with a different layout (Pinyin/Shuangpin/Global pages and an apply-per-page
-button); that client is still present as the rollback path but nothing links to it.
+button). This package does **not** contain it: the build has the Qt client switched off, so the only settings entry is the
+one described above, and going back to the Qt client means going back to an earlier package.
 
 The current package is an owner-test artifact only. Implementation, isolated validation, packaging, owner installation and
 owner acceptance are separate status claims, and this guide does not imply the last two.

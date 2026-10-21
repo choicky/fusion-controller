@@ -1,4 +1,4 @@
-# Build prerequisite — resolved (2026-10-21, third round)
+# Build prerequisite — resolved (2026-10-21, fourth round)
 
 This file was the blocker record. It is kept as the single prerequisite record and is now a **resolved** one: the WinUI
 client builds, launches and packages. What remains is a note on how the dependency was obtained, so the next person does not
@@ -12,7 +12,16 @@ have to rediscover it.
 | `Microsoft.WindowsAppSDK` | **2.5.1**, restored and verified |
 | `Microsoft.Windows.SDK.BuildTools` | **10.0.28000.2705**, restored and verified |
 | WinUI build | **works** — the app compiles, launches and shows a `WinUIDesktopWin32WindowClass` window |
-| Packaging | **works** — `fusion-0.0.0-winui3+67f771b.zip`, 652 files, every manifest hash verified |
+| Packaging | **works** — `fusion-0.0.0-winui3+ae02af0.zip`, 652 manifest entries, every hash re-verified against the extracted tree |
+
+## Running a Host that can save
+
+A Host started with `FUSION_FCITX_SKIP_USER_PATH=1` has no user configuration directory, so its global apply ends in
+Fcitx's `safeSave()` and fails. That is fine for failure-path checks and useless for proving a save works. For validation,
+start the Host with its per-user directories redirected to a disposable profile instead (`APPDATA`, `LOCALAPPDATA`,
+`USERPROFILE`, and `FUSION_FCITX_SKIP_USER_PATH` unset), and read the two paths the Host prints on startup — both must be
+inside that profile. `src/settings-winui3/README.md` has the exact commands, including the orderly stop through
+`Local\FusionHost-stop-<scope>` and the restart that confirms persistence.
 
 ## How the packages were obtained
 
