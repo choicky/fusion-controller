@@ -27,7 +27,7 @@ policy block: an `HTTP 000` and a `curl` exit 35 are a failed request, and sever
 
 ## Consequence for this batch
 
-- The **client core is implemented, compiled and tested** (`src/settings-winui3/FusionSettings.Core`, 368 checks, of which
+- The **client core is implemented, compiled and tested** (`src/settings-winui3/FusionSettings.Core`, 371 checks, of which
   35 run against a real Host on an isolated pipe). It has no package references, which is why it builds here.
 - The **WinUI 3 presentation is not implemented**: it cannot be compiled, so writing it would produce source recorded only
   as COMPILE UNVERIFIED and still no deliverable. That is a deliberate boundary, not an omission.

@@ -321,8 +321,8 @@ disposition.
 | packaged / installed / owner-accepted | no |
 
 - **Implemented and tested**: the transport, framing, codecs, endpoint naming, connection and handshake, the shared
-  draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft. **368 checks pass**
-  — 333 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read → apply →
+  draft/baseline model, key-chord and key-list model, key-editor state machine and input-method draft. **371 checks pass**
+  — 336 focused, plus 35 against a real Host on an isolated pipe with `FUSION_FCITX_SKIP_USER_PATH=1` (read → apply →
   read-back, a key-list round trip, the shared-configuration claim, IM list and selection, incarnation stability, and the
   Host refusing an unknown URI).
 - **Corrected in the same pass**, because review found the first version got them wrong: the draft no longer stores a

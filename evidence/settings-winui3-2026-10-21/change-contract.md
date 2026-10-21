@@ -3,7 +3,7 @@
 > **Scope of this record.** It bounded the **first** batch of this task: the D087 decision, the migration inventory, and
 > the first implementation attempt. The statements below that say "nothing is compiled" and "only source-level gates can
 > run" describe **that batch**, not the current state. Current outcome: the client **core** is implemented, compiled and
-> tested in fusion-windows PR #31 (368 checks, 35 of them against a real Host on an isolated pipe); the **WinUI views**
+> tested in fusion-windows PR #31 (371 checks, 35 of them against a real Host on an isolated pipe); the **WinUI views**
 > are still not written because `Microsoft.WindowsAppSDK` cannot be restored here. See `migration-inventory.md` §6 and the
 > Stage 6 plan's settings section for the per-level state. The contract's scope, must-preserve list and hard stops still
 > govern the remaining work.
