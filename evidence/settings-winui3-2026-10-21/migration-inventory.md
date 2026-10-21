@@ -49,6 +49,16 @@ writes of a schema field, and must not be presented as one atomic save with opti
 One shared engine configuration. Shuangpin is a *profile value* inside it, not a separate schema, so a single draft per
 option serves both views; the views may show different subsets, but must not keep separate copies.
 
+**Shared-field identity (explicit mapping).** The two input methods declare the same addon: `data/fcitx5/inputmethod/pinyin.conf`
+and `shuangpin.conf` both carry `Addon=pinyin`, while the settings layer addresses each method by its **own public URI**
+(`fcitx://config/inputmethod/pinyin` and `fcitx://config/inputmethod/shuangpin`). Both URIs resolve to the **same**
+`PinyinEngineConfig` instance owned by the `pinyin` addon. The draft identity is therefore normalised to
+**`(addon:pinyin, option path)`**, not to the public URI: a literal `(URI, path)` key would give the two views independent
+drafts of one value, and saving the stale one would revert the other. Method-specific fields (`ShuangpinProfile`,
+`ShowShuangpinMode`) are ordinary fields of that same object, not a second store. Visibility stays per schema: the views may
+place or hide options differently (e.g. `OptionalHideInDescription` entries live under More), but a field hidden in one view
+is never fabricated there, and the value edited in either view is the same one.
+
 ### 2.1 Engine, candidates and preedit
 
 | Path | Type · default · constraints | Consumer | New location | Disposition |
@@ -61,10 +71,10 @@ option serves both views; the views may show different subsets, but must not kee
 | `ChaiziEnabled` | bool · `true` | pinyin engine | Candidates and input · More | R |
 | `ExtBEnabled` | bool · `true` on desktop | pinyin engine | Candidates and input · More | R |
 | `StrokeCandidateEnabled` | bool · `true` | pinyin engine | Candidates and input · stroke candidates | R |
-| `CloudPinyinEnabled` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — addon packaged, network path never exercised here; NV |
-| `CloudPinyinIndex` | int · `2` · 1–10 | cloudpinyin addon | Candidates and input · More | C |
-| `CloudPinyinAnimation` | bool · `true` | cloudpinyin addon | Candidates and input · More | C |
-| `KeepCloudPinyinPlaceHolder` | bool · `false` | cloudpinyin addon | Candidates and input · More | C |
+| `CloudPinyinEnabled` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — the `cloudpinyin` addon is **not** in the packaged set, so the value is stored but the feature cannot act here |
+| `CloudPinyinIndex` | int · `2` · 1–10 | cloudpinyin addon | Candidates and input · More | C — same missing addon |
+| `CloudPinyinAnimation` | bool · `true` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
+| `KeepCloudPinyinPlaceHolder` | bool · `false` | cloudpinyin addon | Candidates and input · More | C — same missing addon |
 | `PreeditMode` | enum · `ComposingPinyin` on desktop | pinyin engine | Candidates and input · preedit mode | R |
 | `PreeditCursorPositionAtBeginning` | bool · `true` | pinyin engine | Candidates and input · preedit cursor | R |
 | `PinyinInPreedit` | bool · `false` | pinyin engine | Candidates and input · show full pinyin | R |
@@ -138,6 +148,7 @@ All children: **R**, on Candidates and input · fuzzy pinyin (advanced items und
 | `DictManager` | `ExternalOption` | `fcitx://config/addon/pinyin/dictmanager` | addon `pinyin` packaged | X — link only; the dictionary tool is not implemented on Windows |
 | `CustomPhrase` | `ExternalOption` | `fcitx://config/addon/pinyin/customphrase` | addon `pinyin` packaged | X — link only; tool not implemented |
 | `QuickPhrase` | `ExternalOption` | `fcitx://config/addon/quickphrase/editor` | addon `quickphrase` packaged | X — link only; editor not implemented |
+| `CloudPinyin` | `SubConfigOption` | `fcitx://config/addon/cloudpinyin` | addon `cloudpinyin` **not** in the packaged addon set | X — link only; the sub-page is unreachable in this runtime and is shown as unavailable |
 | `Punctuation` | `SubConfigOption` | `fcitx://config/addon/punctuation/punctuationmap/zh_CN` | addon `punctuation` packaged | X — link only; the punctuation map is a separate schema page |
 | `Chttrans` | `SubConfigOption` | `fcitx://config/addon/chttrans` | **not packaged** (`data/fcitx5/addon` has no `chttrans.conf`) | X with a stated reason: shown as unavailable in this runtime, not silently dropped |
 
@@ -167,7 +178,7 @@ are not counted as settings.
 | `EnumerateWithTriggerKeys` | bool · `true` | `instance.cpp` trigger path | same | C |
 | `ActivateKeys` | `Hangul_Hanja` | `instance.cpp:813` | same | C |
 | `DeactivateKeys` | `Hangul_Romaja` | `instance.cpp:816` | same | C |
-| `ConsumeRedundantActivateKeys` | bool · `true` | `instance.cpp` activate path | same | C |
+| `ConsumeRedundantActivateKeys` | bool · `false` | `instance.cpp` activate path | same | C |
 | `AltTriggerKeys` | `Shift_L` | `instance.cpp:810` | modifier-only keys are not delivered | C |
 | `EnumerateForwardKeys` | empty | `instance.cpp:819` | modified keys | C |
 | `EnumerateBackwardKeys` | empty | `instance.cpp:822` | same | C |
@@ -207,8 +218,9 @@ earlier blanket claim: each has a real consumer, and only the *event delivery* i
 
 ## 4. Cross-cutting rules the client must honour
 
-1. **One draft per underlying option**, keyed by `(URI, path)`. Pinyin and Shuangpin share one schema; a stale second copy
-   would revert the other view's save.
+1. **One draft per underlying option**, keyed by the **addon identity** `(addon:pinyin | addon:<other>, path)` — never by the
+   public URI alone. Pinyin and Shuangpin publish different URIs over one configuration object; a stale second copy would revert
+   the other view's save. The same rule applies to any future method that shares an addon.
 2. **Lists are ordered.** Only `ChooseCharFromPhrase` is positional; the others are ordered alternatives. No sorting or
    de-duplication anywhere.
 3. **Empty ≠ default.** `SecondCandidate`/`ThirdCandidate`/`EnumerateForwardKeys` are empty by default; reset restores the
@@ -223,23 +235,39 @@ earlier blanket claim: each has a real consumer, and only the *event delivery* i
 
 ## 5. Coverage (recomputed)
 
-| Group | Fields | Containers | Links (X) | Hidden (H) | Conditional (C) | Reachable (R) | NV-only |
-|---|---|---|---|---|---|---|---|
-| Input-method operations | 5 | 0 | 0 | 0 | 0 | 5 | 0 |
-| Pinyin engine/candidates/preedit | 21 | 1 (`Fuzzy`) | 0 | 0 | 4 (cloud pinyin) | 17 | 0 |
-| Fuzzy children | 21 | 0 | 0 | 0 | 0 | 21 | 0 |
-| Pinyin key bindings | 16 | 0 | 0 | 0 | 1 (`CommitRawInput`, partly) | 15 (+1 partial) | 0 |
-| Advanced values | 4 | 0 | 0 | 1 (`FirstRun`) | 0 | 4 | 0 |
-| External / sub-config links | 5 | 0 | 5 | 0 | 0 | 0 | 0 |
-| Global `Hotkey` | 17 | 1 container | 0 | 0 | 13 | 4 | 0 |
-| Global `Behavior` | 17 | 1 container | 0 | 4 | 4 (notifications) | 1 (`AutoSavePeriod`) | 8 |
+`Items` counts every schema field or operation listed above, hidden ones included. The five disposition columns are
+**mutually exclusive** and sum to `Items`: X = link to another surface, H = hidden by upstream, C = conditional limit
+stated in the row, NV = reachable in the design but explicitly unvalidated, R = reachable with no stated limit.
 
-Totals: **107 schema fields/operations** = 5 input-method operations + 21 pinyin engine/candidate/preedit + 21 fuzzy
-children + 16 pinyin key options + 5 advanced values (1 of them hidden) + 5 external/sub-config links + 17 `Hotkey` children
-+ 17 `Behavior` children. The three containers (`Fuzzy`, `Hotkey`, `Behavior`) are not counted as fields. Of the 107: 5 are
-links to other surfaces, 5 are hidden by upstream, 18 carry a stated conditional limitation, and 8 are reachable-in-design
-but explicitly **not validated**.
-The earlier "17 global settings have no effect" claim is withdrawn: it conflated a missing event with a missing consumer.
+| Group | Items | X | H | C | NV | R |
+|---|---|---|---|---|---|---|
+| Input-method operations | 5 | 0 | 0 | 0 | 0 | 5 |
+| Pinyin engine / candidates / preedit | 21 | 0 | 0 | 4 | 0 | 17 |
+| Fuzzy children | 21 | 0 | 0 | 0 | 0 | 21 |
+| Pinyin key options | 16 | 0 | 0 | 1 | 0 | 15 |
+| Advanced values | 5 | 0 | 1 | 0 | 0 | 4 |
+| External / sub-config links | 6 | 6 | 0 | 0 | 0 | 0 |
+| Global `Hotkey` children | 17 | 0 | 0 | 13 | 0 | 4 |
+| Global `Behavior` children | 17 | 0 | 5 | 4 | 8 | 0 |
+| **Total** | **108** | **6** | **6** | **22** | **8** | **66** |
+
+Reading the totals:
+
+- **6 links**: `DictManager`, `CustomPhrase`, `QuickPhrase`, `Punctuation`, `Chttrans`, `CloudPinyin`. Of these, `Chttrans`
+  and `CloudPinyin` point at addons that are **not** in the packaged set and are shown as unavailable.
+- **6 hidden**: `FirstRun`; `OverrideXkbOption`, `CustomXkbOption` (conditional on a keyboard layout this runtime lacks);
+  `EnabledAddons`, `DisabledAddons`, `PreloadInputMethod` (hidden upstream).
+- **22 conditional**: 4 CloudPinyin values (missing addon), `CommitRawInput` (partly: modified and `KP_Enter` entries are
+  not delivered), 13 `Hotkey` children (modified keys, Super+Space or modifier-only keys are not delivered), 4
+  notifications-related `Behavior` children (addon not packaged).
+- **8 not validated**: `ActiveByDefault`, `resetStateWhenFocusIn`, `ShareInputState`, `PreeditEnabledByDefault`,
+  `DefaultPageSize`, `AllowInputMethodForPassword`, `ShowPreeditForPassword`, and `AutoSavePeriod` — each has a consumer,
+  none was measured in the product.
+- Containers (`Fuzzy`, `Hotkey`, `Behavior`) are **not** counted as items; the input-method group is counted as 5
+  operations, not as configuration fields.
+
+The headline total is a bookkeeping check, not a product feature: completeness here means every schema item listed above
+has a disposition.
 
 ## 6. What this inventory still does not establish
 

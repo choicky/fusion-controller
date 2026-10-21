@@ -195,9 +195,12 @@ still the **shipped** settings surface — nothing has replaced it. The WinUI 3 
 environment has no .NET SDK and its package/SDK acquisition requests currently fail, so the client is not compiled, packaged or validated
 (`evidence/settings-winui3-2026-10-21/blocker.md` — an environment prerequisite, not a design limitation and not a proven network policy).
 Option coverage is complete as a **design** record in `evidence/settings-winui3-2026-10-21/migration-inventory.md`; it is not implemented
-behaviour. Separately, the **tray entry point** is implemented and tested in fusion-windows PR #30 (left click opens or activates the
-settings window, right-click menu unchanged, duplicate windows avoided); it launches the current `FusionSettings.exe` and does not depend on
-the replacement client. The three-round feasibility
+behaviour. Separately, the **tray entry point** is implemented in fusion-windows PR #30: left click opens the settings window or raises the
+existing one; identity is the exact executable path, this session and the production endpoint, so an isolated `--pipe-name` instance or an
+older copy is never raised; a found window whose foreground activation is refused is flashed instead of launching a second copy; and a
+launch guard stops repeated clicks from stacking windows during startup. Right-click keeps the full menu and the launch path is unchanged.
+**Validated at the unit level only** (lookup/decision/launch-guard tests plus a cross-process lookup against child processes); a real
+installed tray click was **not** performed, and the change is not in an installed package. The three-round feasibility
 investigation stays historical evidence in `docs/windows-settings-ui-feasibility.md`, and the per-correction detail lives in
 `evidence/stage-a-global-settings-2026-10-20/` (`change-contract.md`, `correction-inventory.md`, `capability-mapping.md`, `handoff.md`).
 Implementation, compilation, isolated validation, packaging, owner installation and owner acceptance are separate states; the first four
