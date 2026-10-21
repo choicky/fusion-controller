@@ -553,7 +553,8 @@ semantics over writing a Fusion-specific configuration surface. Whether that is 
 established**: the upstream UI's Windows dependencies and the way it would communicate with this product's Host must be
 inspected before an implementation approach is chosen. A Fusion-written UI is a fallback, not the default, and it is not
    authorized here. *(Partially superseded 2026-10-21 by D087: the presentation layer is now a Fusion-owned C# + WinUI 3 client.
-   Everything else in this decision — official configuration formats and storage, no additional configuration store, the user-data policy,
+   Everything else in this decision — official configuration formats and storage, no additional configuration store
+   *(narrowed for Windows presentation settings by D088, 2026-10-22)*, the user-data policy,
    the settings-before-EXE-installer order, the EXE deliverable form and U4 remaining open — remains effective.)*
 
 **Partial supersession.** Exactly two accepted statements are narrowed:
@@ -561,6 +562,10 @@ inspected before an implementation approach is chosen. A Fusion-written UI is a 
 - **U1's "selection only through Fcitx's existing configuration files"** was a *no-UI* decision. It remains the
   configuration model — the UI is a front end to those same files — but it no longer excludes a UI, and "no
   Fusion-specific file, switch or registry key" now means no *additional* configuration store, not the absence of a UI.
+  *(That phrase is narrowed once more on 2026-10-22 by **D088**, for Windows presentation settings only: one Fusion-owned
+  Fcitx configuration may exist for how the Windows candidate window presents itself. It duplicates no engine or global
+  value, and every other constraint in this decision — official formats, per-user paths, no Fusion-specific data
+  location, the user-data policy — remains effective.)*
 - **The Stage 6 plan's exclusion of "a broad settings UI"** is superseded for this settings-UI work and only for it:
   the UI is the product's own settings surface, not an attempt at a general desktop-configuration product.
 
@@ -606,9 +611,10 @@ owner stated for the key editor, shared Pinyin/Shuangpin state and saving.
 
 **Unchanged.** D085's **work order** (settings UI, then the EXE installer), its **EXE** deliverable form, official Fcitx
 configuration formats, storage in Fcitx's standard per-user paths, the prohibition on an additional Fusion configuration
-store, the user-data policy (upgrade keeps data; uninstall leaves it unless chosen), and every other U1 constraint. U4
-(signing/channel) stays open; the installer framework stays undecided; no merge, installation, registration or publication
-is authorized by this record.
+store *(narrowed on 2026-10-22 by **D088** for Windows presentation settings only; it stands unchanged for every engine
+and global value)*, the user-data policy (upgrade keeps data; uninstall leaves it unless chosen), and every other U1
+constraint. U4 (signing/channel) stays open; the installer framework stays undecided; no merge, installation,
+registration or publication is authorized by this record.
 
 **D086 is not changed.** Its scoped GPL-2.0-or-later authorization remains attached to the retained upstream-derived
 `FusionSettings.exe` and the `fcitx5-configtool`-derived sources. The new client is Fusion-owned code and does **not**
@@ -616,7 +622,8 @@ inherit that authorization, and this decision selects **no repository-wide licen
 executable continues to ship, its notices, corresponding source and build instructions remain required; whether it is
 retained or retired is a packaging decision taken with its own evidence.
 
-**Out of scope.** No engine-semantic change, no new configuration store, no TSF key-routing policy (the bare-Shift
+**Out of scope.** No engine-semantic change, no new configuration store beyond the single Windows presentation
+configuration D088 authorizes, no TSF key-routing policy (the bare-Shift
 boundary stays unresolved), no EXE installer implementation, no machine installation.
 
 **Status.** The presentation change is **accepted**; implementation state is tracked in the Stage 6 plan and the product

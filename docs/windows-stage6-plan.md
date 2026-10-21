@@ -201,9 +201,9 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **580 checks pass** with an isolated Host on a disposable **writable** profile (454 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, **the candidate-presentation configuration saved in both directions with its default, its file location, discard, reload and its persistence across the same orderly restart**, and read/apply/read-back with incarnation stability. Separately, `candidate_window_layout` creates the **real popup** and measures its window rectangle per geometry (724×24 horizontal, 180×198 vertical), and the four layout-precedence cases are asserted through the projection against a real engine list |
+| tested | **589 checks pass** with an isolated Host on a disposable **writable** profile (454 without one) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, **the candidate-presentation configuration saved in both directions with its default, its file location, discard, reload and its persistence across the same orderly restart**, **a save the filesystem refuses** (the stored file held open so Fcitx's rename cannot replace it) which is reported as not saved with the reported value and the file unchanged, whose identical retry then really writes the value, and read/apply/read-back with incarnation stability. Separately, `candidate_window_layout` creates the **real popup** and measures its window rectangle per geometry (724×24 horizontal, 180×198 vertical), and the four layout-precedence cases are asserted through the projection against a real engine list |
 | UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+9a1d51a.zip`, 139 014 811 B, SHA-256 `9F6E4946…A737DD`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable launched against an isolated Host (endpoint resolved from `--pipe-name`, window activated, page loaded and refreshed). `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B) is retained as the previous package and is superseded |
+| packaged | **yes** — `fusion-0.0.0-winui3+4160e66.zip`, 139 015 158 B, SHA-256 `E3E24218…E5A3F9`, 652 manifest entries re-verified against the extracted tree, and the **packaged** executable launched against an isolated Host (endpoint resolved from `--pipe-name`, window titled "Fusion 设置", exit 0, Host stopped in order). `fusion-0.0.0-winui3+9a1d51a.zip` (139 014 811 B) is superseded — it predates the save-failure fix — and `fusion-0.0.0-winui3+502d5ec.zip` (139 010 396 B) remains the installed rollback |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -229,11 +229,19 @@ formats, per-user paths, no duplicated engine or global value, the user-data pol
 Fcitx's own `safeSave` beside `pinyin.conf`, owned and read/written by the Host, and edited only through the Host. Precedence is
 classicui's rule adopted verbatim rather than invented: an engine hint that names a layout wins, the stored preference applies
 only when the hint is `NotSet`, and the default is vertical so an upgrade changes nothing for a user who never opens the setting.
-The resolution lives in `project_candidate_page`, so `CandidatePage::layout` carries the effective layout and a saved value cannot
-be silently ignored; `candidate_layout.hpp` and its hit-testing were already correct and are unchanged. The checks prove the
-configuration path and the popup geometry (a real window measured 724×24 horizontal and 180×198 vertical); they do **not** prove
-that a composition inside a real application reaches that popup, because that path is unchanged by this work and exercising it
-would need an installed TIP, which this round must not touch.
+The resolution lives in `project_candidate_page`, so `CandidatePage::layout` carries the effective layout rather than the
+hint's verbatim value, and `candidate_layout.hpp` with its hit-testing needed no change. A save that succeeds is what the
+next projected page uses. A save the filesystem refuses reports a failure and leaves the stored file, the value `GetConfig`
+reports and the effective layout exactly as they were, because the Host writes first and publishes afterwards — that
+ordering is what makes a retry a real retry instead of a no-op reported as success. The checks prove the configuration path,
+the refused-write path and the popup geometry (a real window measured 724×24 horizontal and 180×198 vertical); they do
+**not** prove that a composition inside a real application reaches that popup, because that path is unchanged by this work
+and exercising it would need an installed TIP, which this round must not touch.
+
+**Follow-up, deliberately not in this batch.** `fcitx://config/global` applies in the same load-then-save order
+(`globalConfig().load(raw, partial=true)` before `safeSave()`), so a refused global save can leave the running instance
+holding a value the file does not have. It is recorded as separate work: it is an official configuration whose in-memory
+value also feeds live hotkey state, which is a wider change than this one and was outside what the owner authorized here.
 
 What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path,
 the save/recovery behaviour and that the pages render, navigate and reflow; they do not prove that a paging binding pages
@@ -242,8 +250,10 @@ candidates inside a TSF application, and they do not prove that any NV row chang
 The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
 indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one
 keysym, two names); `[`/`]`/`;` arrive as `bracketleft`/`bracketright`/`semicolon`; `Behavior` exposes 12 children, not 17;
-`CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 items, with the five value-tree-only fields
-(the four `CloudPinyin*` values and `FirstRun`) classified separately and given no editable location.
+`CloudPinyin` is not in the runtime schema at all. Coverage is recomputed at 97 **official** items, with the five
+value-tree-only fields (the four `CloudPinyin*` values and `FirstRun`) classified separately and given no editable
+location; the Windows candidate-presentation item added on 2026-10-22 is not one of those 97, so the window exposes 98
+items in total (see the inventory's §5 scope note).
 
 **Correction round 1 (2026-10-21, fusion-windows PR #31) — core.** Five defects, all fixed with regression coverage: the
 draft stored a schema and so let one Pinyin view adopt the other's; a mutation whose request had started was reported as
