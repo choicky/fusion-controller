@@ -75,7 +75,11 @@ rather than as done.
   way of a click on a candidate. The panel itself opens below the caret and moves above it when there is no room, staying
   inside the display's work area; moving the caret to another monitor re-measures for that monitor's scaling instead of
   reusing the old size, and a column that cannot fit the screen at the chosen size continues in a second column rather than
-  running off the bottom.
+  running off the bottom. **Implemented and verified in isolation (fusion-windows PR #36, head `83f0cf4`: native 88/88,
+  real-window geometry checks, 622 settings checks); not yet verified in a real application and the non-default-DPI visual
+  check is still unobserved (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the
+  current package (`fusion-0.0.0-winui3+83f0cf4.zip`) and type in any text field. The candidate layout preference itself
+  (竖排 / 横排) is D088, implemented in PR #33 and documented in PR #56; the geometry, font and DPI work above is R39.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
