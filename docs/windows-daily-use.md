@@ -100,18 +100,20 @@ rather than as done.
   the highlighted candidate in view and the rows before it as context, a shaded bar at the top or the bottom of the candidate
   area shows that more candidates are hidden that way, and the paging keys walk the list one row at a time — no candidate is
   dropped, the font is never shrunk, and the list never continues into a second column. **Implemented and verified in
-  isolation (fusion-windows PR #36, head `ff3bd8f`: native 88/88 Release, real-window geometry checks including the
+  isolation** (fusion-windows PR #36, head `ff3bd8f`: real-window geometry checks including the
   continuous candidate → gap → box path, the measure-at-the-width-it-is-drawn check and the never-overlap-the-panel cases,
-  622 settings checks — 457 of them without a Host — plus 8 after an orderly Host restart, and 恢复默认字体 refreshing both
-  font editors); not yet verified in a real application and the non-default-DPI visual check is still unobserved
-  (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the current package
-  (`fusion-0.0.0-winui3+37057ee.zip`) and type in any text field. Three arrangements are implemented in isolation and
-  verified against the real engine and the real popup, and **not yet in a real application**: 竖排 and 横排 are D088
-  (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is R39 (PR #36), and 自动卷轴 is R40
-  (fusion-windows PR #37: real-engine one-line → expansion, row and scroll-page steps with the column kept, a click on
-  another row committing that candidate, 634 + 8 settings checks against the packaged Host at protocol 7, native 89/89). The 自动卷轴 pass is yours to
-  make: select it, type a syllable, press the configured next-page once and check the panel grows, that the numbers sit on
-  the row the keys act on, that clicking another row commits that candidate, and that a new word starts on one line again.
+  and 恢复默认字体 refreshing both font editors); **not yet verified in a real application**, and the non-default-DPI visual
+  check is still unobserved (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending (plan R39). Three
+  arrangements are implemented in isolation and verified against the real engine and the real popup, and **not yet in a
+  real application**: 竖排 and 横排 are D088 (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is
+  R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
+  kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
+  paragraphs rather than repeated here. **Install the package this batch builds**
+  (`fusion-0.0.0-winui3+6e6e250.zip`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+43a832f`, predates R40's corrections — and note that installing is not acceptance. The 自动卷轴 pass is
+  yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
+  numbers sit on the row the keys act on, that clicking another row commits that candidate, and that a new word starts on
+  one line again.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
@@ -121,8 +123,18 @@ not discard the other, and an unapplied edit stays in the draft. **放弃修改*
 unsaved edits asks first. Changing pages never loses edits.
 
 A save that changes nothing sends no request at all. Clearing every binding of an action, or emptying a rule list, is a
-change and saves like any other. If the Host is busy composing, the save is refused with a visible message: finish the
-composition and save again. If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
+change and saves like any other.
+
+**Saving while you are still typing.** You do not have to finish a word to store most settings. The **候选窗口** page (排列方向,
+字体, 字号) and the **全局** page save while a composition is in progress: the candidate panel already on screen keeps its size
+and its place, and the new value is used from the next candidate page. The **拼音/双拼** configuration and the **输入方式列表**
+are the two exceptions, and the reason is the input method's, not the window's: the only way to store either one is the call
+that also applies it, and applying either ends the composition that is running — the Pinyin engine clears its buffer when its
+options change, and changing the list switches the input method a context uses. So those two are refused with a message that
+names the reason, the edit stays in the draft, and one more **保存** after you finish the word stores it. A refusal is never
+reported as a save, and nothing on this path is applied later on its own.
+
+If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
 so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
 the reread does not confirm stay pending. It never silently retries.
 
