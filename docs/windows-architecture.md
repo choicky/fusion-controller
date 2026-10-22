@@ -283,7 +283,8 @@ prior EFFECT unresolved
   也不硬编码任何键。**inactive 的“直接交给应用”由前端实现**（`inactive_passthrough`），因为本运行时没有编译
   keyboard 输入法，而 Linux 上那正是 inactive 的含义。
   **已知行为（已记录，未改变）：** 每个 Shift 按下都被 TSF 服务消费，以便引擎能看到单独的按下；若释放到达时
-  文档工作仍未结算，则该释放被丢弃，此时切换需要再按一次。
+  文档工作仍未结算，则 `release_admissible` 返回 false，TIP 不声明该释放——它直接交给应用，永远不到引擎，
+  所以单独 Shift 的切换不会触发，需要再按一次。
   **测试覆盖教训：** 此前的 `stage3c` 只跑了 5/19 个分段（ leftover `return 0`）却仍以 exit 0 通过；现以 `SectionCoverage`
   计数并失败。此前的 v4/v5 C++–C# 协议版本 skew 在 88/88 中未被检出；现以 `ProtocolVersionTests` 比较两侧字面量并失败。
   未覆盖：其它修饰键、按住修饰键的完整语义、不带修饰键的普通字符键作为全局热键，以及 inactive 下的 Ctrl/Alt/Win
