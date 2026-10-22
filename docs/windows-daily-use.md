@@ -125,14 +125,14 @@ unsaved edits asks first. Changing pages never loses edits.
 A save that changes nothing sends no request at all. Clearing every binding of an action, or emptying a rule list, is a
 change and saves like any other.
 
-**Saving while you are still typing.** You do not have to finish a word to store most settings. The **候选窗口** page (排列方向,
-字体, 字号) and the **全局** page save while a composition is in progress: the candidate panel already on screen keeps its size
-and its place, and the new value is used from the next candidate page. The **拼音/双拼** configuration and the **输入方式列表**
-are the two exceptions, and the reason is the input method's, not the window's: the only way to store either one is the call
-that also applies it, and applying either ends the composition that is running — the Pinyin engine clears its buffer when its
-options change, and changing the list switches the input method a context uses. So those two are refused with a message that
-names the reason, the edit stays in the draft, and one more **保存** after you finish the word stores it. A refusal is never
-reported as a save, and nothing on this path is applied later on its own.
+**Saving while you are still typing.** You never have to finish a word twice. The **候选窗口** page (排列方向, 字体, 字号) and
+the **全局** page are written immediately, as before: the panel already on screen keeps its size and place, and the new value
+is used from the next candidate page. The **拼音/双拼** configuration and the **输入方式列表** cannot be applied without ending
+the composition that is running — the input method's own setter clears its buffer, and reordering the list switches the
+method a context uses — so the Host **takes the request and holds it**: the bar says the change is submitted and will be
+applied when the current input finishes, and the Host applies it by itself at that moment, through the same official setter
+it always used. Nothing is written before then, so the window never calls it saved; if you keep editing, the newest value is
+the one that applies, and if applying fails you get the stored value back with your edit still there to submit again.
 
 If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
 so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits

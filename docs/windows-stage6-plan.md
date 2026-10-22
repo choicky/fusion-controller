@@ -316,25 +316,36 @@ presentation apply uses one: the options carry their owner pointer. `safeSave` o
 official sequence makes on the live one, so the serialization, the default-filtering (a cleared value stays cleared), the
 file and the atomic replace are unchanged; what changed is only that a failed write now publishes nothing.
 
-The **composition gate** was removed where it was not protecting anything and kept where it was. `has_active_composition_on_loop`
-still refuses three requests, and each refusal now names the engine fact behind it instead of saying "busy":
+The **composition gate** no longer decides whether a save is accepted; it decides only *when* the Host applies it. A page
+whose value is read by the next projection is written and published immediately; a page whose only official setter publishes
+by applying is **staged** and applied by the Host itself at the first safe point, so the user saves once:
 
-| Request | Refused while composing? | Why |
+| Request | While a composition is live | Why |
 |---|---|---|
-| `fcitx://config/candidate-presentation` | no | the layout and the font are read once per projected page, so the panel on screen keeps its geometry until the next projection — which is the first moment a new value could be drawn. A click already in flight is fenced to the displayed page and bounded by its entry count (`semantic.cpp`, `begin_candidate_action`), and this path changes neither the engine's list nor that page |
-| `fcitx://config/global` | no | `reloadConfig()` does not reset a context: it re-reads the file, re-applies `ShareInputState` and the preedit default, re-arms autosave and posts `GlobalConfigReloadedEvent`, and the Pinyin engine is not a listener of that event |
-| `fcitx://config/inputmethod/pinyin|shuangpin` | yes | the only official way to store it is the engine's own setter, and that setter publishes immediately: `populateConfig` installs a new `ShuangpinProfile`, `PinyinIME` emits `optionChanged`, and `PinyinContext` connects that signal to `clear()` (`libime/pinyin/pinyincontext.cpp:432`) — every composing context loses the buffer. There is no official call that persists without publishing, and a tree held in Host memory would be neither the store nor a save |
-| `settings_set_im_list`, `settings_select_input_method` | yes | the switch is `setGroup` on the current group: `CurrentGroupChanged` re-resolves every context's input method and deactivates the engine that was composing, and the profile is written by that same call |
+| `fcitx://config/candidate-presentation` | written and applied at once | the layout and the font are read once per projected page, so the panel on screen keeps its geometry until the next projection — which is the first moment a new value could be drawn. A click already in flight is fenced to the displayed page and bounded by its entry count (`semantic.cpp`, `begin_candidate_action`), and this path changes neither the engine's list nor that page |
+| `fcitx://config/global` | written and applied at once | `reloadConfig()` does not reset a context: it re-reads the file, re-applies `ShareInputState` and the preedit default, re-arms autosave and posts `GlobalConfigReloadedEvent`, and the Pinyin engine is not a listener of that event |
+| `fcitx://config/inputmethod/pinyin\|shuangpin` | **staged**, then applied by the Host | the only official way to store it is the engine's own setter, and that setter publishes immediately: `populateConfig` installs a new `ShuangpinProfile`, `PinyinIME` emits `optionChanged`, and `PinyinContext` connects that signal to `clear()` (`libime/pinyin/pinyincontext.cpp:432`) — every composing context would lose the buffer |
+| `settings_set_im_list` | **staged**, then applied by the Host | the switch is `setGroup` on the current group: `CurrentGroupChanged` re-resolves every context's input method and deactivates the engine that was composing, and the profile is written by that same call |
+| `settings_select_input_method` | refused, with the reason | the same `setGroup`, but this entry point answers with the *selected* method, which a staged switch could not confirm. The client does not use it (the list is written with SetImList) |
 
-So the honest answer to "saved but not yet in effect" is that this Host has no such state: everything it accepts it also
-applies. What it refuses, it refuses because applying would end the user's composition — and it reports that as **not
-saved**, with the edit kept, rather than as a save that will happen later.
+So "accepted but not yet written" is now a real state, and it is named as one: the reply carries `Pending` plus a `detail`
+byte, never `Ok`. The staged record is bounded (three entries at most, one per engine page plus the list), holds only the
+delta the client submitted, and is dropped — applied or failed — as soon as the safe point comes; a failure is logged and
+not replayed, and the next read shows the stored value. The `detail` byte also carries the Host's reason for a `Busy`
+(`RequestInProgress`, `CompositionInProgress`, `UnsettledWork`), so the client no longer infers "you are typing" from the
+page it happened to be on.
+
+The safe point is the Host's own: before and after a stimulus on the Fcitx loop, and only when no context has a client or
+server preedit and none owes the frontend unsettled ordered work. A candidate panel with no buffer behind it — a prediction
+shown before anything was typed — does not hold a staged change up, which is what keeps the wait finite.
 
 **Verified** (fusion-windows PR #38): a new native check, `settings_save_while_composing`, against the real pinned engine and
 Fcitx's own files — the layout and a global option are saved while `nihao` is composing and the candidate that was on screen
 is still what selecting commits afterwards, the next projection uses the new layout, the Pinyin page and the list are
-refused while composing with the stored value unchanged, and a global write the filesystem refuses (the target file held
-open, so Fcitx's rename fails) leaves `GetConfig` and the file at the old value with the identical retry really writing. It
+accepted as `Pending` with the stored value unchanged and then applied when that composition ends (no second save, and a
+second submission while one waits wins path by path), the reason a refusal carries is `CompositionInProgress` rather than a
+guess, and a global write the filesystem refuses (the target file held open, so Fcitx's rename fails) leaves `GetConfig` and
+the file at the old value with the identical retry really writing. It
 needs a writable per-user directory, so it runs only under a launcher that names a throwaway profile
 (`FUSION_TEST_SETTINGS_PROFILE`, APPDATA inside it) and prints `SKIP` otherwise; the product's profile is fingerprinted
 before and after every run. Three of its assertions fail against the previous order (counter-proof run and recorded). The
