@@ -210,9 +210,11 @@ on its own, the legal short last page, the capacity's range); the settings harne
 Host speaking protocol 7, including an orderly restart with `CandidateLayout=AutoScroll`; native 89/89. Three
 discriminating failures recorded (no paging policy → the column is lost, capacity ignored → the grouping is wrong, no
 completeness decision → a hole is published). **Not executed:** any in-application check, a real dual-monitor visual check,
-and an observed engine cursor on a later row. **The owner runs** `+37057ee`: pick 自动卷轴, type, press the configured
-next-page once, check the panel grows, that the numbers are on the row the keys act on, that paging keeps the column and a
-short last row clamps, that a click on another row commits that candidate, and that a new word starts on one line again. See
+and an observed engine cursor on a later row. **The owner installs** `+37057ee` — the A–D findings above were fixed after
+`+43a832f`, which is what the owner had installed at the time and which carries them — and then: pick 自动卷轴, type, press
+the configured next-page once, check the panel grows, that the numbers are on the row the keys act on, that paging keeps the
+column and a short last row clamps, that a click on another row commits that candidate, and that a new word starts on one
+line again. Installing is not acceptance: no in-application result is claimed. See
 `research/R40-task3-analysis.md` (research input plus the owner's decision, not an Accepted Decision) and
 `docs/windows-architecture.md` §7.2.
 
@@ -262,9 +264,9 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **622 checks pass** with an isolated Host on a disposable **writable** profile (457 without one, `--no-integration`) — the protocol and model checks, a controlled pipe peer for mutation outcomes and handshake versions, a scripted peer for an uncertain method-list write and for the three reconnect cases (a clean list adopting a changed Host order, a pending one keeping its request, and a request the Host already reflects), the workspace path against a real Host (Global routing, a Shuangpin-only save, clearing the last binding, clearing a string list, the method list, a failed start and its retry), **a successful global save with its persistence across an orderly restart and a no-change save that rewrites nothing**, **the candidate-presentation configuration saved in both directions with its default, its file location, discard, reload and its persistence across the same orderly restart**, **a save the filesystem refuses** (the stored file held open so Fcitx's rename cannot replace it) which is reported as not saved with the reported value and the file unchanged, whose identical retry then really writes the value, and read/apply/read-back with incarnation stability. A cross-language protocol-version guard (`ProtocolVersionTests`) reads the C++ header and fails when it differs from the C# constant, preventing the v4/v5 skew that passed silently in the previous round. Separately, `candidate_window_layout` creates the **real popup** and measures its window rectangle per geometry (712×26 horizontal, 180×214 vertical, single column on this machine's 168 dpi), and the four layout-precedence cases are asserted through the projection against a real engine list |
+| tested | **yes** — 721 checks against an isolated Host with a writable throwaway profile (**530** of them need no Host), plus **8** after an orderly restart. The rounds below record what each part covers and which defects its assertions discriminate |
 | UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
-| packaged | **yes** — `fusion-0.0.0-winui3+ff3bd8f.zip`, 139 035 392 B, SHA-256 `D10D0CD69DB1A254EA15A00A7F200064FAAC198DCD08CC33FDEDE29C0E661DE1`, 652 per-file SHA-256 manifest entries re-verified against an independent extraction (0 mismatches, 0 missing, 0 unlisted), `sourceCommit` `ff3bd8f9b6ce54c947925cc39b0744b5d075c82f`, `sourceDirty` false, WinUI settings client only (no Qt client in this tree). The packaged `FusionTsf.dll`, `FusionHost.exe`, `FusionFcitxHost.dll` and `FusionTray.exe` are byte-identical to this pass's Release build outputs, and the packaged settings client is the previously verified publish tree, re-checked here: all **515** of its files match the `+00622f0` manifest entry for entry, and the settings source has not changed since `00622f0` (only its README). This pass also ran the packaged `FusionHost.exe` through the same 622-check harness and drove the packaged `FusionSettings.exe` once through UI Automation (window “Fusion 设置”, four pages, an edit, 保存, `pinyin.conf` changed in the throwaway profile) — both against an isolated Host on a unique pipe, with the throwaway profile removed and only the installed Host left running. `fusion-0.0.0-winui3+00622f0.zip` (139 034 048 B, SHA-256 `8F06984E…5490DE`), `+83f0cf4` (139 030 899 B) and the older `+4160e66` (139 015 158 B, which predates the release-admission guard and the protocol-version check) are superseded. Nothing was installed or registered. Currently installed: `0.0.0-wp7+d095a44` (R25 diagnostic build, capture complete, to be replaced by `+ff3bd8f`); the installed rollback zip is `fusion-0.0.0-wp7+d095a44.zip` at `~/worktmp/fusion-windows/stage6-incidents/packages/`. `+502d5ec` is no longer the installed version and no zip for it exists on disk. |
+| packaged | **yes** — `fusion-0.0.0-winui3+ff3bd8f.zip`, 139 035 392 B, SHA-256 `D10D0CD69DB1A254EA15A00A7F200064FAAC198DCD08CC33FDEDE29C0E661DE1`, 652 per-file SHA-256 manifest entries re-verified against an independent extraction (0 mismatches, 0 missing, 0 unlisted), `sourceCommit` `ff3bd8f9b6ce54c947925cc39b0744b5d075c82f`, `sourceDirty` false, WinUI settings client only (no Qt client in this tree). The packaged `FusionTsf.dll`, `FusionHost.exe`, `FusionFcitxHost.dll` and `FusionTray.exe` are byte-identical to this pass's Release build outputs, and the packaged settings client is the previously verified publish tree, re-checked here: all **515** of its files match the `+00622f0` manifest entry for entry, and the settings source has not changed since `00622f0` (only its README). This pass also ran the packaged `FusionHost.exe` through the same 622-check harness and drove the packaged `FusionSettings.exe` once through UI Automation (window “Fusion 设置”, four pages, an edit, 保存, `pinyin.conf` changed in the throwaway profile) — both against an isolated Host on a unique pipe, with the throwaway profile removed and only the installed Host left running. `fusion-0.0.0-winui3+00622f0.zip` (139 034 048 B, SHA-256 `8F06984E…5490DE`), `+83f0cf4` (139 030 899 B) and the older `+4160e66` (139 015 158 B, which predates the release-admission guard and the protocol-version check) are superseded. Nothing was installed or registered by the `+ff3bd8f` pass. **Installed on the owner's machine:** `0.0.0-winui3+43a832f`, installed by the owner on 2026-10-23 00:40 — the running `FusionHost.exe` under `<install root>\0.0.0-winui3+43a832f\bin\` is the evidence. It predates R40's A–D corrections, so the newer package is what to install next; `0.0.0-wp7+d095a44` is not on disk any more (the earlier `0.0.0-settings+fe65d08`, `+3ebf048` and `+502d5ec` directories are, as R28 expects for versions whose DLLs a process may still hold). |
 | installed | **no** |
 | owner-accepted | **no** |
 
@@ -296,14 +298,82 @@ next projected page uses. A save the filesystem refuses reports a failure and le
 reports and the effective layout exactly as they were, because the Host writes first and publishes afterwards — that
 ordering is what makes a retry a real retry instead of a no-op reported as success. The checks prove the configuration path,
 the refused-write path and the popup geometry (a real window measured 724×24 horizontal and 180×198 vertical in this round;
-after R39's re-measurement the same check reports 712×26 and 180×214), they do
+after R39's re-measurement the same check reports 712×26 and 180×214), and the four layout-precedence cases — hint wins,
+stored value when the hint is `NotSet`, both directions — are asserted through the projection against a real engine list;
+they do
 **not** prove that a composition inside a real application reaches that popup, because that path is unchanged by this work
 and exercising it would need an installed TIP, which this round must not touch.
 
-**Follow-up, deliberately not in this batch.** `fcitx://config/global` applies in the same load-then-save order
-(`globalConfig().load(raw, partial=true)` before `safeSave()`), so a refused global save can leave the running instance
-holding a value the file does not have. It is recorded as separate work: it is an official configuration whose in-memory
-value also feeds live hotkey state, which is a wider change than this one and was outside what the owner authorized here.
+**Settings saved while typing, and the global write order (2026-10-23, sixth round).** Two things the earlier rounds recorded
+as separate work are done in one batch, because they meet in the same function.
+
+The **global apply order** was the recorded follow-up: `globalConfig().load(raw, partial=true)` before `safeSave()` left a
+refused write holding a value the file did not have, so `GetConfig` reported it, the derived state (hotkeys, preedit default,
+property policy) was never refreshed, and resubmitting the same change matched the "nothing changed" branch and returned
+success without writing. The Host now writes a **throwaway `GlobalConfig`** first and touches the live object only after the
+file is on disk, then runs Fcitx's own `reloadConfig()`. A fresh object rather than a copy, for the same reason the
+presentation apply uses one: the options carry their owner pointer. `safeSave` on a fresh object is the same call the
+official sequence makes on the live one, so the serialization, the default-filtering (a cleared value stays cleared), the
+file and the atomic replace are unchanged; what changed is only that a failed write now publishes nothing.
+
+The **composition gate** no longer decides whether a save is accepted; it decides only which pages a request can touch. A
+page whose value is read by the next projection is written and published immediately; a page whose only official setter
+publishes by applying is **refused**, because there is no way to store it without ending the composition — and the window,
+not the Host, is what waits:
+
+| Request | While a composition is live | Why |
+|---|---|---|
+| `fcitx://config/candidate-presentation` | written and applied at once | the layout and the font are read once per projected page, so the panel on screen keeps its geometry until the next projection — which is the first moment a new value could be drawn. A click already in flight is fenced to the displayed page and bounded by its entry count (`semantic.cpp`, `begin_candidate_action`), and this path changes neither the engine's list nor that page |
+| `fcitx://config/global` | written and applied at once | `reloadConfig()` does not reset a context: it re-reads the file, re-applies `ShareInputState` and the preedit default, re-arms autosave and posts `GlobalConfigReloadedEvent`, and the Pinyin engine is not a listener of that event |
+| `fcitx://config/inputmethod/pinyin\|shuangpin` | `Busy`, nothing written | the only official way to store it is the engine's own setter, and that setter publishes immediately: `populateConfig` installs a new `ShuangpinProfile`, `PinyinIME` emits `optionChanged`, and `PinyinContext` connects that signal to `clear()` (`libime/pinyin/pinyincontext.cpp:432`) — every composing context would lose the buffer |
+| `settings_set_im_list` | `Busy`, nothing written | the switch is `setGroup` on the current group: `CurrentGroupChanged` re-resolves every context's input method and deactivates the engine that was composing, and the profile is written by that same call |
+| `settings_select_input_method` | `Busy` | the same `setGroup`. The client does not use it (the list is written with SetImList) |
+
+**What the gate actually asks.** It used to be `InputPanel::empty()` — which is false while *any* candidate, auxiliary row or
+preedit is set — so a panel with no buffer behind it (a prediction shown before anything was typed, or a list left over
+after a commit) refused a save for as long as it happened to be on screen. It now asks the two questions the refused setters
+actually destroy: is there a preedit, client or server, in any context, and does this Host still owe the frontend ordered
+work (`hasPendingEventsStrictOrder`). Anything that ends a real composition ends its preedit first.
+
+**Who waits, and how.** The request is refused, the reply says so and says `Nothing was written`, and the *window* keeps the
+edit and resubmits it: `Busy` is the one answer the Host gives without having written anything, so a save that arrives at it
+keeps the draft unsaved, says `尚未保存，等待当前输入结束或 Host 空闲后自动重试`, and tries again every 400 ms — serially, off
+the UI thread, cancellable with 停止等待, and capped at a minute so a Host that never frees up ends in a stated "still
+unsaved" instead of a frozen window. Each attempt sends only the pages that answered `Busy` — the one answer that guarantees
+nothing was written — so a page that already saved is never submitted twice, and a page that failed another way (`Error`,
+`Invalid`, `Indeterminate`) keeps its edit without being re-sent just because some other page is still waiting; a different
+Host incarnation ends the wait rather than receiving an intent formed against another instance. Nothing else is retried: a timeout, a dropped connection, a cancellation, an `Indeterminate` outcome or an
+`Invalid` rejection ends the save exactly as before, and an `Indeterminate` is still reconciled by a reread and never
+replayed. Closing the window while it waits stops the wait and lets a request already sent finish, rather than refusing to
+close; a reload stops it first.
+
+**Why not hold the request in the Host.** An earlier pass did exactly that: it staged the submitted delta, applied it at a
+safe point on the Fcitx loop, and answered `Pending`. It worked, and it made the Host carry a second piece of state — what to
+apply, to whom, how long — plus a `Pending` status, a `detail` byte on every reply, and an `awaiting` layer in the client to
+describe a change that was neither unsaved nor saved. The user still had to watch, and could not stop it. The wait belongs in
+the window, where it is visible and cancellable; the Host keeps no request beyond the reply. The settings wire format is
+unchanged at API version 2.
+
+**Verified** (fusion-windows PR #38): a new native check, `settings_save_while_composing`, against the real pinned engine and
+Fcitx's own files — the layout and a global option are saved while `nihao` is composing and the candidate that was on screen
+is still what selecting commits afterwards, the next projection uses the new layout, the Pinyin page and the list are
+refused with `Nothing was written`, the stored value unchanged and the buffer intact, the identical request then succeeds
+once the composition ends, and a global write the filesystem refuses (the target file held open, so Fcitx's rename fails) leaves `GetConfig` and
+the file at the old value with the identical retry really writing. It
+needs a writable per-user directory, so it runs only under a launcher that names a throwaway profile
+(`FUSION_TEST_SETTINGS_PROFILE`, APPDATA inside it) and prints `SKIP` otherwise; the product's profile is fingerprinted
+before and after every run. Three of its assertions fail against the previous order (counter-proof run and recorded). The
+settings harness also gained a section for the save bar: one click that stores the global page and is refused for the
+candidate page reports both, keeps the refused edit, and finishes on retry. **Numbers:** CTest 90 registered, **88 passed, 2
+skipped by design** (the new check without its throwaway profile, and `stage4a_ipc_integration` without a pipe); the new
+check passes under its launcher; settings harness **721 checks** against an isolated packaged Host plus **8** after an
+orderly restart (530 of the 721 need no Host). **Not executed:** any in-application check, and the presentation apply inside
+a real TSF application — the composition that must survive is created by the real engine in isolation, not by typing into an
+installed TIP. The owner's acceptance of the change is pending, and installing remains the owner's step.
+
+**Package:** this change ships in the package the next round builds from its own head, which contains it — the second task is
+stacked on this one, so one package carries both. Its identity is recorded once, in that round's paragraph, rather than
+copying a hash into two places: `fusion-0.0.0-winui3+7c30a8c.zip`. Nothing was installed or registered.
 
 What the window is **not**: it is not installed, not registered, and not accepted. Its checks prove the configuration path,
 the save/recovery behaviour and that the pages render, navigate and reflow; they do not prove that a paging binding pages
