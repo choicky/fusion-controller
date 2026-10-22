@@ -392,13 +392,15 @@ No daily report is required, and no feedback is needed for a day without problem
   method you were using, Shuangpin or Pinyin, without changing any scheme. It is not a way to rotate between schemes and
   not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
   `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
-  setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine, but
-  not yet checked inside an application** (plan R38): install a package from `+2941d3e` or later, click into a text field
-  and tap the key the settings page shows. In the English state your other configured keys keep working: a key you bound
+  setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine in isolation,
+  not yet verified in a real application; owner acceptance is pending** (plan R38): install the current package (`+83f0cf4`),
+  click into a text field and tap the key the settings page shows. In the English state your other configured keys keep working: a key you bound
   to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
   composed. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
+  **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
+  that arrives while document work is outstanding is dropped, so that toggle needs a second press.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
   packaging and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically and the tray does not detect it; use

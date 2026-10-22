@@ -266,19 +266,26 @@ prior EFFECT unresolved
   同一方案；③ 组的 `Items/0` 放**另一个**输入法（上游放键盘布局）并在其 `Layout` 字段写本产品自己的格式标记
   （`fusion-off`），使 `canTrigger()`（= 列表长度 > 1）成立、`DefaultIM` 不再被改写成 `Items/1`，并让切换时 Fcitx
   看到方案变化从而调用引擎的 `deactivate()`（其 `reset()` 清掉预编辑）。标记只标识**组格式**，不参与行为判断；
+  本运行时编译时既无 `ENABLE_KEYBOARD` 也无 D-Bus 模块，所以 `layout()` 在此侧没有任何读取者。
   没有标记的组按“Items 即用户启用的方法、顺序不变、首项即该版本实际在用的方法”迁移，因此旧配置不会被误读成新格式，
   重复启动也不会叠加槽位。**用户条目按原样搬运**：`InputMethodGroupItem` 上只有名字与 layout，而 layout 是用户
   自己的持久化字段（`Items/N/Layout`），因此迁移与列表更新都直接沿用原条目，不用 `layoutFor(name)` 反查——
   它在同名时返回**第一个**同名项，会把槽位的标记写到真实条目上；标记在读写两侧都会从用户条目上清除，只可能
   留在槽位。`Items[1..]` 仍是用户的列表与顺序；只有一项时也能切换。
-  ④ **释放的文档操作走既有结算路径**：引擎对 modifier-only 释放的回答和按键一样是有序文档操作（实测两条：提交组合、
+  ④ **释放的准入由 T 和 K 共享同一个 predicate**：`release_admissible` 包含 routing、ledger、pass barrier、
+  hard policy 与未结算工作检查；T 的返回值即 K 的准入条件，二者不再可能分歧——一个 T 声明了而 K 拒绝的释放
+  会让应用的修饰键卡住。⑤ **释放的文档操作走既有结算路径**：引擎对 modifier-only 释放的回答和按键一样是有序文档操作（实测两条：提交组合、
   清空预编辑），必须经 `settle_frontend_work`/Core/EditSession 结算，且与按键同样先过硬策略与未结算工作检查；释放
-  没有自己的 pass barrier，故不参与 barrier 收尾。⑤ **配对绑定到“真正转发送达的按下”**：只有 dispatch 成功后才记录
+  没有自己的 pass barrier，故不参与 barrier 收尾。⑥ **配对绑定到“真正转发送达的按下”**：只有 dispatch 成功后才记录
   该次按下及其 binding/incarnation/connection，释放必须全部匹配，`release_key` 不重连、不跨实例结算。
-  ⑥ **inactive 不等于“Fcitx 看不到按键”**：带字符的键仍直接交给应用（这就是英文），不带字符的键照旧 dispatch，
+  ⑦ **inactive 不等于“Fcitx 看不到按键”**：带字符的键仍直接交给应用（这就是英文），不带字符的键照旧 dispatch，
   由引擎决定——绑定的全局键（`Hotkey/TriggerKeys` 等）因此能在 inactive 下把输入法重新打开；不另实现匹配器，
   也不硬编码任何键。**inactive 的“直接交给应用”由前端实现**（`inactive_passthrough`），因为本运行时没有编译
   keyboard 输入法，而 Linux 上那正是 inactive 的含义。
+  **已知行为（已记录，未改变）：** 每个 Shift 按下都被 TSF 服务消费，以便引擎能看到单独的按下；若释放到达时
+  文档工作仍未结算，则该释放被丢弃，此时切换需要再按一次。
+  **测试覆盖教训：** 此前的 `stage3c` 只跑了 5/19 个分段（ leftover `return 0`）却仍以 exit 0 通过；现以 `SectionCoverage`
+  计数并失败。此前的 v4/v5 C++–C# 协议版本 skew 在 88/88 中未被检出；现以 `ProtocolVersionTests` 比较两侧字面量并失败。
   未覆盖：其它修饰键、按住修饰键的完整语义、不带修饰键的普通字符键作为全局热键，以及 inactive 下的 Ctrl/Alt/Win
   组合（本产品不把这些键类交给引擎），均未因此获得支持。
 - **不存在普遍回调保证**：不得表述为 “K always exists” 或 “sync EditSession always succeeds”。
