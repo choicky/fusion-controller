@@ -32,7 +32,9 @@ after merely *looking* at candidates. The pinned source offers a direct read, an
   itself as its own bulk source (`candidatelist.cpp:465-473`), and `candidateFromAll` is `candidateAt(global)`, i.e. the
   same word the engine would hand out for that page (`candidatelist.cpp`, `candidateFromAll`/`candidateAt`).
 - `CommonCandidateList::pageSize()`, `currentPage()`, `totalPages()`, `usedNextBefore()`. Together with the bulk read these
-  are enough to know which pages are on screen, where the engine is, and whether anything has been turned yet.
+  say which pages are on screen, where the engine is, and whether anything has been turned yet (**necessary, and — as the
+  second pass below found — not sufficient**: they describe the engine, and know nothing about how many rows the window can
+  actually draw, nor whether the window was read in full).
 - `BulkCursorCandidateList` (`setGlobalCursorIndex`) exists but is a *cursor* interface: it does not move the page, and it
   is therefore not a way to select a candidate on another page. Selection goes through the word itself.
 - A `CandidateWord::select` implementation depends on the word and the engine's context, not on the page — measured by
@@ -46,6 +48,28 @@ Two things the research had listed as open were then settled by measurement rath
 - **`label()` is page-local.** Pinyin returns `1.`…`7.` for its current page and nothing beyond it, so numbers can only
   honestly be drawn on the row the engine is on. Drawing them on every row would name keys that select other candidates.
 
+## What the second pass corrected
+
+The first implementation of this record's plan was wrong in four ways, each found by review and each now measured:
+
+1. **"The four numbers decide the window" was too strong.** They decide what the engine is doing; they say nothing about the
+   window. Two facts live only on the Windows side and had to travel to the host: how many complete rows the popup can draw
+   (`CandidatePanelLayout::row_capacity`, carried per key in `BackendStimulus::window_rows`, protocol 6 → 7), and — on the
+   engine side, but not visible from the four numbers — whether the window was read *completely*. Without the first, the host
+   grouped five rows while a short screen drew three, and the last visible row was a mid-page row; without the second, a
+   window could be published with the engine's own page missing from it while its number keys still selected from that page.
+2. **Paging does not keep the column.** Pinned pinyin sets `CursorPositionAfterPaging::ResetToFirst` on its list
+   (`pinyin.cpp:562`, `1677`), so every page turn put the cursor on the first column — the opposite of the confirmed
+   behaviour. No second cursor was needed: the list's own public policy setter is set to `SameAsLast`, whose implementation
+   (`fixCursorAfterPaging`) is exactly "same index, or the last candidate when the page is shorter". The engine keeps owning
+   the cursor; both the configured paging keys and the popup's arrow reach it through the engine's own `setPage`.
+3. **A truncated window is worse than no window.** The fallback rule is now a decision the projection makes before publishing:
+   contiguous, and containing every candidate of the engine's page, or the ordinary page projection is sent instead. A short
+   last page is not a failure — it is where the candidates end — so the window is bounded by the list's real total size.
+4. **The wire checks were weaker than they looked.** `current_page == total_pages` passed, and the test that claimed to prove
+   "an ordinary page carries no scrolling fields" also changed the page size, so it would have passed with the relation
+   unchecked. Both are fixed, and the arithmetic is now done in 64-bit after the bounds are checked.
+
 ## What the implementation is
 
 The product side is described in `docs/windows-architecture.md` §7.2 and in fusion-windows PR #37. In short: the page
@@ -55,12 +79,18 @@ row is selected by global index; and a list that cannot supply any of that keeps
 
 ## Verification
 
-- `tests/candidate_auto_scroll.cpp` — real pinned engine, Pinyin and Shuangpin: one row → first next expands to five rows of
-  seven → row steps follow the engine page → the next screenful's first row → a global selection equal to paging there and
-  selecting the same cell → number keys equal to the row's cells → new input back to one row → vertical/horizontal unchanged.
+- `tests/candidate_auto_scroll.cpp` — real pinned engine, Pinyin and Shuangpin: one row → first next expands → row steps
+  follow the engine page **and keep the column** (3 → 3, 1 → 1) → the next screenful's first row → a short last page clamps
+  the cursor → a global selection equal to paging there and selecting the same cell → number keys equal to the row's cells →
+  a capacity of 3 (and of 2) groups and steps correctly → new input back to one row → vertical/horizontal unchanged.
 - `tests/candidate_window_layout.cpp` — the real popup: column alignment, a page size of seven, a short last row, a work
-  area too short for five rows, a long cell's full text.
-- Three discriminating failures: no window, labels on every row, a global index read as page-local.
+  area too short for five rows, the reported capacity equal to the rows actually drawn (five budgets, and a 60 px font),
+  a long cell's full text.
+- `tests/fcitx_candidate_filter.cpp` — the fallbacks the real engine cannot provoke: a byte budget that cannot hold the
+  window, a bulk read that refuses an index mid-window, a list that is not paged, and a short last page that stays a window.
+- Six discriminating failures across the two passes: no window, labels on every row, a global index read as page-local, no
+  paging policy (the column is lost), the capacity ignored (wrong grouping), and no completeness decision (a hole is
+  published).
 - Settings: 634 checks + 8 after an orderly Host restart, run against the **packaged** Host.
 
 ## Not executed

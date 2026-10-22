@@ -71,14 +71,19 @@ rather than as done.
   **自动卷轴** is the third arrangement, and it is about how much of the list is on screen at once rather than about a
   direction. A new word starts on **one line**, exactly like 横排. The first time you press the configured "next page" key
   the panel grows: each row is one page of candidates — the number of columns is the input method's own page size, so a
-  page of seven gives seven columns — and up to five rows are shown at once, fewer if the screen is too short (the font is
-  never shrunk to make more fit). From there each "next page" moves down **one row**, and when you are on the last row of
-  what is on screen it moves to the first row of the next screenful; "previous page" goes back the same way, into the last
-  row of the previous screenful. It stops at the ends instead of wrapping around. The **numbers** are drawn only on the row
-  the keys act on — that row is the engine's current page — so pressing `3` selects the candidate labelled 3 on that row and
-  nothing else; the **mouse** can click any visible row, and that candidate is what gets committed. Type anything new, pick a
-  partial candidate, or switch input method, and the panel is back to one line. If an input method does not publish its
-  pages (or asks for a particular direction itself), this setting simply leaves its usual arrangement in place.
+  page of seven gives seven columns — and the rows you get are the rows your screen holds, up to five. A short screen simply
+  turns shorter pages (three visible rows page three at a time), so "next page" always means the next row you can see, and
+  the font is never shrunk to make more fit. From there each "next page" moves down **one row** and **keeps the column you
+  were on**; when the next page has fewer candidates than that, the highlight lands on its last candidate instead of jumping
+  back to the first. On the last row of what is on screen it moves to the first row of the next screenful, "previous page"
+  goes back the same way, into the last row of the previous screenful, and it stops at the ends instead of wrapping around.
+  The **numbers** are drawn only on the row the keys act on — that row is the engine's current page — so pressing `3`
+  selects the candidate labelled 3 on that row and nothing else; the **mouse** can click any visible row, and that candidate
+  is what gets committed. Type anything new, pick a partial candidate, or switch input method, and the panel is back to one
+  line. If an input method does not publish its pages (or asks for a particular direction itself), this setting simply
+  leaves its usual arrangement in place; and if the list cannot be read in full — a page whose candidates exceed what one
+  update may carry, or a list that refuses a candidate — the window stays the ordinary single row or column rather than
+  showing a grid with a hole in it.
 
   A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
@@ -100,11 +105,11 @@ rather than as done.
   622 settings checks — 457 of them without a Host — plus 8 after an orderly Host restart, and 恢复默认字体 refreshing both
   font editors); not yet verified in a real application and the non-default-DPI visual check is still unobserved
   (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the current package
-  (`fusion-0.0.0-winui3+43a832f.zip`) and type in any text field. Three arrangements are implemented in isolation and
+  (`fusion-0.0.0-winui3+9cb3e13.zip`) and type in any text field. Three arrangements are implemented in isolation and
   verified against the real engine and the real popup, and **not yet in a real application**: 竖排 and 横排 are D088
   (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is R39 (PR #36), and 自动卷轴 is R40
-  (fusion-windows PR #37: real-engine one-line → five-row expansion, row and scroll-page steps, a click on another row
-  committing that candidate, 634 + 8 settings checks against the packaged Host, native 89/89). The 自动卷轴 pass is yours to
+  (fusion-windows PR #37: real-engine one-line → expansion, row and scroll-page steps with the column kept, a click on
+  another row committing that candidate, 634 + 8 settings checks against the packaged Host at protocol 7, native 89/89). The 自动卷轴 pass is yours to
   make: select it, type a syllable, press the configured next-page once and check the panel grows, that the numbers sit on
   the row the keys act on, that clicking another row commits that candidate, and that a new word starts on one line again.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
