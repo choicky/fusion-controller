@@ -281,12 +281,18 @@ prior EFFECT unresolved
   ⑦ **inactive 不等于“Fcitx 看不到按键”**：带字符的键仍直接交给应用（这就是英文），不带字符的键照旧 dispatch，
   由引擎决定——绑定的全局键（`Hotkey/TriggerKeys` 等）因此能在 inactive 下把输入法重新打开；不另实现匹配器，
   也不硬编码任何键。**inactive 的“直接交给应用”由前端实现**（`inactive_passthrough`），因为本运行时没有编译
-  keyboard 输入法，而 Linux 上那正是 inactive 的含义。
+  keyboard 输入法，而 Linux 上那正是 inactive 的含义。**“inactive”按送达按键的那个 context 自己判定**：读
+  `Instance::inputMethod(ic)` 取该 context 的 per-context 输入法，等于 `Items/0` 卸载槽即 inactive（引擎无输入法则
+  交回应用）；不得读 `mostRecentInputContext()` 或某个共享的“当前”状态——那会让后台未激活 context 的按键被前台
+  context 的状态误判，把本应直接交给应用的字符键当成引擎输入吞掉。
   **已知行为（已记录，未改变）：** 每个 Shift 按下都被 TSF 服务消费，以便引擎能看到单独的按下；若释放到达时
   文档工作仍未结算，则 `release_admissible` 返回 false，TIP 不声明该释放——它直接交给应用，永远不到引擎，
   所以单独 Shift 的切换不会触发，需要再按一次。
   **测试覆盖教训：** 此前的 `stage3c` 只跑了 5/19 个分段（ leftover `return 0`）却仍以 exit 0 通过；现以 `SectionCoverage`
   计数并失败。此前的 v4/v5 C++–C# 协议版本 skew 在 88/88 中未被检出；现以 `ProtocolVersionTests` 比较两侧字面量并失败。
+  **inactive 的 per-context 判定此前从未被真正测到**：所有既有 `stage3c` 分段都只绑一个 InputContext，单 context 下
+  “该 context 的状态”与“最近 context 的状态”恒等，用错来源也测不出来；本轮新增一个双 context 判别段（A 激活、B 未激活），
+  证明 B 的带字符键无论 A 处于何状态都直接交给应用，且在改动前的旧代码上反证该断言会失败。
   未覆盖：其它修饰键、按住修饰键的完整语义、不带修饰键的普通字符键作为全局热键，以及 inactive 下的 Ctrl/Alt/Win
   组合（本产品不把这些键类交给引擎），均未因此获得支持。
 - **不存在普遍回调保证**：不得表述为 “K always exists” 或 “sync EditSession always succeeds”。
