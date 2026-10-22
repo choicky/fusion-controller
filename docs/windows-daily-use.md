@@ -378,7 +378,7 @@ No daily report is required, and no feedback is needed for a day without problem
   not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
   `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
   setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine, but
-  not yet checked inside an application** (plan R38): install a package from `+b1ddd39` or later, click into a text field
+  not yet checked inside an application** (plan R38): install a package from `+2941d3e` or later, click into a text field
   and tap the key the settings page shows. In the English state your other configured keys keep working: a key you bound
   to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
   composed. A lone `Shift` does not commit raw input either, and
