@@ -179,7 +179,7 @@ existing `FUSION_TSF_DIAGNOSTICS` opt-in for one process, so nothing is added to
    - **Identity:** the pid and start time of the window-owning process must be newer than the launch. Only that
      process maps the TIP; its content/renderer children do not.
    - **Loaded build:** compare the path with the **intended installed version** — currently
-     `C:\Program Files\Fcitx5 Fusion\0.0.0-wp7+995e5a5\bin\FusionTsf.dll`, and after any later upgrade whatever
+     `C:\Program Files\Fcitx5 Fusion\0.0.0-wp7+d095a44\bin\FusionTsf.dll`, and after any later upgrade whatever
      version directory `HKLM\SOFTWARE\Classes\CLSID\{8B7C4A90-5E2D-4B1F-9A31-6C0F42D1E7A4}\InprocServer32` names.
      A *different* version directory means that process still holds an older build: exit it and repeat from step 1.
      `-` only means no `FusionTsf.dll` was observed in that process — it does not establish an old build or a product
@@ -353,11 +353,11 @@ No daily report is required, and no feedback is needed for a day without problem
   PR #34 claims those keys only while they really are engine work (a composition, a candidate page, unfinished work) and
   keeps them engine-owned while composing; every other key keeps the admission it had before, including the function
   keys you may have bound as Fcitx global hotkeys — the first version of the fix would have blocked those.
-  **Implemented, compiled, checked against the engine and packaged; not installed, not checked in WeChat, not accepted.**
-  Install `fusion-0.0.0-winui3+3ebf048.zip`, restart WeChat, commit Chinese text and then try Backspace, Delete,
-  Left/Right and Up/Down on text with several lines; Notepad is the comparison. If a key is still lost, take the ordinary
-  per-process capture from §5 and read its log: a key the TIP still claims is followed by a `CLASSIFY` line, while a key
-  left to the application shows `TEST_KEY` alone.
+  **Owner-confirmed on 2026-10-22:** after installing the package built from that change, the owner reports the WeChat
+  editing keys work again. That confirmation covers these keys in WeChat; it is not a claim about every key in every
+  application, and it does not turn the WeChat-side mechanism into a measured fact — it was never captured. If a key is
+  ever lost again, take the ordinary per-process capture from §5 and read its log: a key the TIP still claims is followed
+  by a `CLASSIFY` line, while a key left to the application shows `TEST_KEY` alone.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
@@ -367,12 +367,26 @@ No daily report is required, and no feedback is needed for a day without problem
   run, the fault balloon and the install/upgrade/uninstall handling are described in §5 "The Fusion tray", including what
   has not been observed yet.
 - **Fusion Settings changes less than the schema shows.** 全局设置 renders Fcitx's whole global schema, but the hotkey,
-  input-status/panel and password-field categories have no effect on this product (Fusion never gives a lone modifier or a
-  `Ctrl`/`Alt`/`Win` combination to the engine, `Ctrl+Space` is Windows input switching, there is no Fcitx panel, and the
+  input-status/panel and password-field categories have no effect on this product (Fusion never gives a
+  `Ctrl`/`Alt`/`Win` combination to the engine, and a lone modifier only as the 临时切换输入法 binding below, `Ctrl+Space`
+  is Windows input switching, there is no Fcitx panel, and the
   Windows input-scope policy applies first) — the page says so in one sentence. `Shift`+`Return` commits raw input only
-  because the Pinyin `CommitRawInput` option lists it; a **lone `Shift` does not commit** and is not implemented, and
+  because the Pinyin `CommitRawInput` option lists it. **A lone `Shift` is the "temporarily switch input method" key.** That
+  is the official setting "系统快捷键 → 临时切换输入法" (`Hotkey/AltTriggerKeys`, `Shift_L` unless you change it): tap it
+  once and the keys go to the application — English, nothing composed — and tap it again and you are back in the input
+  method you were using, Shuangpin or Pinyin, without changing any scheme. It is not a way to rotate between schemes and
+  not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
+  `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
+  setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine in isolation,
+  not yet verified in a real application; owner acceptance is pending** (plan R38): install the current package (`+83f0cf4`),
+  click into a text field and tap the key the settings page shows. In the English state your other configured keys keep working: a key you bound
+  to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
+  composed. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
+  **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
+  that is not admissible (because document work is outstanding) is not claimed by the TIP — it is passed to the application and
+  never reaches the engine, so the lone-Shift toggle does not fire and needs a second press.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
   packaging and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically and the tray does not detect it; use
