@@ -105,7 +105,7 @@ rather than as done.
   622 settings checks — 457 of them without a Host — plus 8 after an orderly Host restart, and 恢复默认字体 refreshing both
   font editors); not yet verified in a real application and the non-default-DPI visual check is still unobserved
   (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the current package
-  (`fusion-0.0.0-winui3+9cb3e13.zip`) and type in any text field. Three arrangements are implemented in isolation and
+  (`fusion-0.0.0-winui3+37057ee.zip`) and type in any text field. Three arrangements are implemented in isolation and
   verified against the real engine and the real popup, and **not yet in a real application**: 竖排 and 横排 are D088
   (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is R39 (PR #36), and 自动卷轴 is R40
   (fusion-windows PR #37: real-engine one-line → expansion, row and scroll-page steps with the column kept, a click on
