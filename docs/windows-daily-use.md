@@ -70,19 +70,25 @@ rather than as done.
   A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
   changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
-  is taller than the box, the box scrolls: move the pointer *into* it — the box stays open while the pointer is inside, and
-  only leaving the box itself closes it — then use the wheel and the end of the text is reachable, with a scrollbar showing
-  where you are. The box is placed in the largest space beside the panel that does not overlap it, so a scrollable full-text
-  box never covers the candidates. A text short enough to fit does not scroll and lets the pointer through, so it can never get in the
+  is taller than the box, the box scrolls: move the pointer *into* it — across the gap as well, since a pointer on its way
+  from the candidate to the box no longer dismisses it — then use the wheel and the end of the text is reachable, with a
+  scrollbar showing where you are. The box closes when the pointer leaves both the candidates and the box, and a pointer that
+  simply stops beside them leaves nothing behind. The box is placed in the largest space beside the panel that does not
+  overlap it, so a scrollable full-text box never covers the candidates; if no such space exists at all it is not shown
+  rather than shown over them. A text short enough to fit does not scroll and lets the pointer through, so it can never get in the
   way of a click on a candidate. The panel itself opens below the caret and moves above it when there is no room, staying
   inside the display's work area; moving the caret to another monitor re-measures for that monitor's scaling instead of
-  reusing the old size, and a column that cannot fit the screen at the chosen size continues in a second column rather than
-  running off the bottom. **Implemented and verified in isolation (fusion-windows PR #36, head `00622f0`: native 88/88 Debug and Release,
-  real-window geometry checks including the hover-into and the never-overlap-the-panel cases, 622 settings checks with
-  Host-restart persistence, and 恢复默认字体 now refreshing both font editors); not yet verified in a real application and the non-default-DPI visual
-  check is still unobserved (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the
-  current package (`fusion-0.0.0-winui3+00622f0.zip`) and type in any text field. The candidate layout preference itself
-  (竖排 / 横排) is D088, implemented in PR #33 and documented in PR #56; the geometry, font and DPI work above is R39.
+  reusing the old size. A vertical list stays **one column**: when it is taller than the space it is given, the list keeps
+  the highlighted candidate in view and the rows before it as context, a shaded bar at the top or the bottom of the candidate
+  area shows that more candidates are hidden that way, and the paging keys walk the list one row at a time — no candidate is
+  dropped, the font is never shrunk, and the list never continues into a second column. **Implemented and verified in
+  isolation (fusion-windows PR #36, head `ff3bd8f`: native 88/88 Release, real-window geometry checks including the
+  continuous candidate → gap → box path, the measure-at-the-width-it-is-drawn check and the never-overlap-the-panel cases,
+  622 settings checks — 457 of them without a Host — plus 8 after an orderly Host restart, and 恢复默认字体 refreshing both
+  font editors); not yet verified in a real application and the non-default-DPI visual check is still unobserved
+  (`WM_DPICHANGED` is unit-tested only); owner acceptance is pending** (plan R39). Install the current package
+  (`fusion-0.0.0-winui3+ff3bd8f.zip`) and type in any text field. The candidate layout preference itself (竖排 / 横排) is
+  D088, implemented in PR #33 and documented in PR #56; the geometry, font and DPI work above is R39.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
@@ -400,7 +406,7 @@ No daily report is required, and no feedback is needed for a day without problem
   not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
   `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
   setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine in isolation,
-  not yet verified in a real application; owner acceptance is pending** (plan R38): install the current package (`+00622f0`),
+  not yet verified in a real application; owner acceptance is pending** (plan R38): install the current package (`+ff3bd8f`),
   click into a text field and tap the key the settings page shows. Whether a window is in the switched-off (English) state is
   judged by **that window's own input context**: a background window that is switched off passes its typed characters straight
   to the application even while another window is still composing in Chinese, and it is not read off whichever window most
