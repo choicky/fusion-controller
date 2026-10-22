@@ -68,15 +68,14 @@ rather than as done.
   with the reason.
 
   A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
-  or leave the keyboard highlight on it, and the full text appears next to it. That popup never takes focus and never changes
-  what is selected, and what is committed is always the engine's own full string, not the shortened one. The panel itself
-  opens below the caret and moves above it when there is no room, staying inside the display's work area; moving the caret
-  to another monitor re-measures for that monitor's scaling instead of reusing the old size.
-
-  **This package's settings window predates 候选字体／字号.** Those two rows exist in the settings source and are compiled into
-  the next settings build; the settings program shipped here was built before them, so it still shows only 候选排列方向 (now
-  labelled 竖排／横排). Until that rebuild the candidate window draws with the defaults above, and the rows appear as soon as
-  the settings client is rebuilt — nothing else in the package has to change for them.
+  or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
+  changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
+  is taller than the box, the box scrolls: use the wheel over it and the end of the text is reachable, with a scrollbar
+  showing where you are. A text short enough to fit does not scroll and lets the pointer through, so it can never get in the
+  way of a click on a candidate. The panel itself opens below the caret and moves above it when there is no room, staying
+  inside the display's work area; moving the caret to another monitor re-measures for that monitor's scaling instead of
+  reusing the old size, and a column that cannot fit the screen at the chosen size continues in a second column rather than
+  running off the bottom.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
