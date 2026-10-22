@@ -58,12 +58,15 @@ rather than as done.
   系统输入行为. The **候选窗口** section at the top holds **候选排列方向** — **竖排** (one candidate per row), **横排** (this
   page's candidates on one row) or **自动卷轴** (below), shown in Chinese rather than as the stored
   `Vertical`/`Horizontal`/`AutoScroll` — plus **候选字体** and
-  **字号（磅）**, with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
+  **字号（磅）** — 候选字体 is now a searchable list of the fonts this Windows session has, and any name it does not contain
+  can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
   Host schema's defaults — and it now rebuilds the page so the two editors show the reset values straight away, not only the preview. They save with the same **保存** button as everything else — there is no separate apply — and they
   take effect from the next candidate page, so the popup already on screen does not move under the pointer. A profile that
   never touched them keeps the vertical list and the Microsoft YaHei UI look this product has always drawn, so upgrading
   changes nothing. The size is in **points**, so the same setting stays the same physical size on a 150 % or 200 % display;
-  a font name Windows does not have is substituted, and missing characters are filled in by the system font linking. When an
+  the list is the system's own font collection, so a name you pick is one the popup can draw, and a name that is *not*
+  installed is never rewritten on your behalf: the stored name stays, the row says Windows will substitute its default, and
+  missing characters are filled in by the system font linking. When an
   input method asks for a particular direction for one list (quick phrase, Unicode and the input-method selector do), the
   input method's choice wins over this setting. The 外部工具 section lists the upstream tools this package does not ship,
   with the reason.
@@ -79,13 +82,20 @@ rather than as done.
   goes back the same way, into the last row of the previous screenful, and it stops at the ends instead of wrapping around.
   The **numbers** are drawn only on the row the keys act on — that row is the engine's current page — so pressing `3`
   selects the candidate labelled 3 on that row and nothing else; the **mouse** can click any visible row, and that candidate
-  is what gets committed. Type anything new, pick a partial candidate, or switch input method, and the panel is back to one
+  is what gets committed. **Left and right arrows** move the highlight between candidates in this window — the highlight is
+  the engine's own cursor — **space** commits the one it is on, and up/down keep the row navigation described above. At the
+  first or the last candidate the arrows stop instead of wrapping, and there the key goes back to the input method, which is
+  how the caret inside the pinyin string is moved; so editing what has been typed stays possible, and 竖排 and 横排 keep the
+  arrow keys they have always had. Type anything new, pick a partial candidate, or switch input method, and the panel is back to one
   line. If an input method does not publish its pages (or asks for a particular direction itself), this setting simply
   leaves its usual arrangement in place; and if the list cannot be read in full — a page whose candidates exceed what one
   update may carry, or a list that refuses a candidate — the window stays the ordinary single row or column rather than
   showing a grid with a hole in it.
 
-  A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
+  A candidate is drawn whole whenever it fits — one character, two characters and ordinary short words are no longer
+  shortened (an earlier build measured them one way and drew them another, so every 横排 cell lost a little text and the
+  full-text box never appeared for the case that needed it). Only a candidate genuinely longer than its cell is shortened
+  with an ellipsis instead of widening the window past the screen — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
   changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
   is taller than the box, the box scrolls: move the pointer *into* it — across the gap as well, since a pointer on its way
