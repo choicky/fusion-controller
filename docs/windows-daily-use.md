@@ -126,13 +126,13 @@ A save that changes nothing sends no request at all. Clearing every binding of a
 change and saves like any other.
 
 **Saving while you are still typing.** You never have to finish a word twice. The **候选窗口** page (排列方向, 字体, 字号) and
-the **全局** page are written immediately, as before: the panel already on screen keeps its size and place, and the new value
-is used from the next candidate page. The **拼音/双拼** configuration and the **输入方式列表** cannot be applied without ending
-the composition that is running — the input method's own setter clears its buffer, and reordering the list switches the
-method a context uses — so the Host **takes the request and holds it**: the bar says the change is submitted and will be
-applied when the current input finishes, and the Host applies it by itself at that moment, through the same official setter
-it always used. Nothing is written before then, so the window never calls it saved; if you keep editing, the newest value is
-the one that applies, and if applying fails you get the stored value back with your edit still there to submit again.
+the **全局** page are written immediately: the panel already on screen keeps its size and place, and the new value is used from
+the next candidate page. The **拼音/双拼** configuration and the **输入方式列表** cannot be applied without ending the
+composition that is running — the input method's own setter clears its buffer, and reordering the list switches the method a
+context uses — so the Host refuses that save and says it wrote nothing. The window then does the waiting for you: the bar says
+`尚未保存，等待当前输入结束或 Host 空闲后自动重试`, keeps your edit, and submits it again by itself as soon as the word is
+finished. 停止等待 stops that; the edit then stays unsaved until you save again. Only a refusal is retried — a timeout, a
+dropped connection or an uncertain write is reported and left to you, and a page that already saved is not sent again.
 
 If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
 so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
