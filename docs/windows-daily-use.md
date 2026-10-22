@@ -179,7 +179,7 @@ existing `FUSION_TSF_DIAGNOSTICS` opt-in for one process, so nothing is added to
    - **Identity:** the pid and start time of the window-owning process must be newer than the launch. Only that
      process maps the TIP; its content/renderer children do not.
    - **Loaded build:** compare the path with the **intended installed version** — currently
-     `C:\Program Files\Fcitx5 Fusion\0.0.0-wp7+995e5a5\bin\FusionTsf.dll`, and after any later upgrade whatever
+     `C:\Program Files\Fcitx5 Fusion\0.0.0-wp7+d095a44\bin\FusionTsf.dll`, and after any later upgrade whatever
      version directory `HKLM\SOFTWARE\Classes\CLSID\{8B7C4A90-5E2D-4B1F-9A31-6C0F42D1E7A4}\InprocServer32` names.
      A *different* version directory means that process still holds an older build: exit it and repeat from step 1.
      `-` only means no `FusionTsf.dll` was observed in that process — it does not establish an old build or a product
@@ -385,7 +385,8 @@ No daily report is required, and no feedback is needed for a day without problem
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
   **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
-  that arrives while document work is outstanding is dropped, so that toggle needs a second press.
+  that is not admissible (because document work is outstanding) is not claimed by the TIP — it is passed to the application and
+  never reaches the engine, so the lone-Shift toggle does not fire and needs a second press.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
   packaging and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically and the tray does not detect it; use
