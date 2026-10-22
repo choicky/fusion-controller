@@ -30,4 +30,4 @@ Whether a multi-row matrix is ever implemented depends on:
 
 ## Authority
 
-This analysis is research input, not an Accepted Decision. The current product boundary is the single-row horizontal/vertical layout implemented in R39 (fusion-windows PR #36, D088).
+This analysis is research input, not an Accepted Decision. The current product boundary is the single-row horizontal/vertical layout preference (D088, fusion-windows PR #33, merged); the candidate-window geometry, font and DPI fixes are R39 (fusion-windows PR #36).
