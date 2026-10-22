@@ -55,12 +55,28 @@ rather than as done.
   **系统回退翻页** are separate sections: the first is the system's own shortcuts, the second is the core's fallback paging,
   and neither is the Pinyin engine's paging keys.
 - **候选与输入** — the candidate window itself, then candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and
-  系统输入行为. The **候选窗口** section at the top holds **候选排列方向** (horizontal or vertical); it saves with the same
-  **保存** button as everything else — there is no separate apply — and it takes effect from the next candidate page, so the
-  popup already on screen does not move under the pointer. A profile that never touched it keeps the vertical list this
-  product has always drawn, so upgrading changes nothing. When an input method asks for a particular direction for one list
-  (quick phrase, Unicode and the input-method selector do), the input method's choice wins over this setting. The 外部工具
-  section lists the upstream tools this package does not ship, with the reason.
+  系统输入行为. The **候选窗口** section at the top holds **候选排列方向** — 竖排 (one candidate per row) or 横排 (this page's
+  candidates on one row), shown in Chinese rather than as the stored `Vertical`/`Horizontal` — plus **候选字体** and
+  **字号（磅）**, with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
+  Host schema's defaults. They save with the same **保存** button as everything else — there is no separate apply — and they
+  take effect from the next candidate page, so the popup already on screen does not move under the pointer. A profile that
+  never touched them keeps the vertical list and the Microsoft YaHei UI look this product has always drawn, so upgrading
+  changes nothing. The size is in **points**, so the same setting stays the same physical size on a 150 % or 200 % display;
+  a font name Windows does not have is substituted, and missing characters are filled in by the system font linking. When an
+  input method asks for a particular direction for one list (quick phrase, Unicode and the input-method selector do), the
+  input method's choice wins over this setting. The 外部工具 section lists the upstream tools this package does not ship,
+  with the reason.
+
+  A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
+  or leave the keyboard highlight on it, and the full text appears next to it. That popup never takes focus and never changes
+  what is selected, and what is committed is always the engine's own full string, not the shortened one. The panel itself
+  opens below the caret and moves above it when there is no room, staying inside the display's work area; moving the caret
+  to another monitor re-measures for that monitor's scaling instead of reusing the old size.
+
+  **This package's settings window predates 候选字体／字号.** Those two rows exist in the settings source and are compiled into
+  the next settings build; the settings program shipped here was built before them, so it still shows only 候选排列方向 (now
+  labelled 竖排／横排). Until that rebuild the candidate window draws with the defaults above, and the rows appear as soon as
+  the settings client is rebuilt — nothing else in the package has to change for them.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
