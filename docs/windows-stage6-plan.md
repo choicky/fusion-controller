@@ -264,7 +264,7 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (four pages: 输入方式 · 按键 · 候选与输入 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **yes** — 681 checks against an isolated Host with a writable throwaway profile (**490** of them need no Host), plus **8** after an orderly restart. The rounds below record what each part covers and which defects its assertions discriminate |
+| tested | **yes** — 721 checks against an isolated Host with a writable throwaway profile (**530** of them need no Host), plus **8** after an orderly restart. The rounds below record what each part covers and which defects its assertions discriminate |
 | UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
 | packaged | **yes** — `fusion-0.0.0-winui3+ff3bd8f.zip`, 139 035 392 B, SHA-256 `D10D0CD69DB1A254EA15A00A7F200064FAAC198DCD08CC33FDEDE29C0E661DE1`, 652 per-file SHA-256 manifest entries re-verified against an independent extraction (0 mismatches, 0 missing, 0 unlisted), `sourceCommit` `ff3bd8f9b6ce54c947925cc39b0744b5d075c82f`, `sourceDirty` false, WinUI settings client only (no Qt client in this tree). The packaged `FusionTsf.dll`, `FusionHost.exe`, `FusionFcitxHost.dll` and `FusionTray.exe` are byte-identical to this pass's Release build outputs, and the packaged settings client is the previously verified publish tree, re-checked here: all **515** of its files match the `+00622f0` manifest entry for entry, and the settings source has not changed since `00622f0` (only its README). This pass also ran the packaged `FusionHost.exe` through the same 622-check harness and drove the packaged `FusionSettings.exe` once through UI Automation (window “Fusion 设置”, four pages, an edit, 保存, `pinyin.conf` changed in the throwaway profile) — both against an isolated Host on a unique pipe, with the throwaway profile removed and only the installed Host left running. `fusion-0.0.0-winui3+00622f0.zip` (139 034 048 B, SHA-256 `8F06984E…5490DE`), `+83f0cf4` (139 030 899 B) and the older `+4160e66` (139 015 158 B, which predates the release-admission guard and the protocol-version check) are superseded. Nothing was installed or registered by the `+ff3bd8f` pass. **Installed on the owner's machine:** `0.0.0-winui3+43a832f`, installed by the owner on 2026-10-23 00:40 — the running `FusionHost.exe` under `<install root>\0.0.0-winui3+43a832f\bin\` is the evidence. It predates R40's A–D corrections, so the newer package is what to install next; `0.0.0-wp7+d095a44` is not on disk any more (the earlier `0.0.0-settings+fe65d08`, `+3ebf048` and `+502d5ec` directories are, as R28 expects for versions whose DLLs a process may still hold). |
 | installed | **no** |
@@ -339,9 +339,10 @@ work (`hasPendingEventsStrictOrder`). Anything that ends a real composition ends
 edit and resubmits it: `Busy` is the one answer the Host gives without having written anything, so a save that arrives at it
 keeps the draft unsaved, says `尚未保存，等待当前输入结束或 Host 空闲后自动重试`, and tries again every 400 ms — serially, off
 the UI thread, cancellable with 停止等待, and capped at a minute so a Host that never frees up ends in a stated "still
-unsaved" instead of a frozen window. Each attempt sends only the pages that are still dirty, so a page that already saved is
-never submitted twice; a different Host incarnation ends the wait rather than receiving an intent formed against another
-instance. Nothing else is retried: a timeout, a dropped connection, a cancellation, an `Indeterminate` outcome or an
+unsaved" instead of a frozen window. Each attempt sends only the pages that answered `Busy` — the one answer that guarantees
+nothing was written — so a page that already saved is never submitted twice, and a page that failed another way (`Error`,
+`Invalid`, `Indeterminate`) keeps its edit without being re-sent just because some other page is still waiting; a different
+Host incarnation ends the wait rather than receiving an intent formed against another instance. Nothing else is retried: a timeout, a dropped connection, a cancellation, an `Indeterminate` outcome or an
 `Invalid` rejection ends the save exactly as before, and an `Indeterminate` is still reconciled by a reread and never
 replayed. Closing the window while it waits stops the wait and lets a request already sent finish, rather than refusing to
 close; a reload stops it first.
@@ -365,8 +366,8 @@ before and after every run. Three of its assertions fail against the previous or
 settings harness also gained a section for the save bar: one click that stores the global page and is refused for the
 candidate page reports both, keeps the refused edit, and finishes on retry. **Numbers:** CTest 90 registered, **88 passed, 2
 skipped by design** (the new check without its throwaway profile, and `stage4a_ipc_integration` without a pipe); the new
-check passes under its launcher; settings harness **681 checks** against an isolated packaged Host plus **8** after an
-orderly restart (490 of the 681 need no Host). **Not executed:** any in-application check, and the presentation apply inside
+check passes under its launcher; settings harness **721 checks** against an isolated packaged Host plus **8** after an
+orderly restart (530 of the 721 need no Host). **Not executed:** any in-application check, and the presentation apply inside
 a real TSF application — the composition that must survive is created by the real engine in isolation, not by typing into an
 installed TIP. The owner's acceptance of the change is pending, and installing remains the owner's step.
 
