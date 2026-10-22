@@ -263,11 +263,21 @@ prior EFFECT unresolved
   （`VK_SHIFT` 用扫描码区分），**只有 Shift** 的释放会以新的 `KeyRelease` 刺激回投，且仅当这次按下是本层转发的、
   中间没有别的按键（Shift+字母是应用自己的文本，引擎看不到，因此这一事实由前端提供）；② 绑定上下文通过公共
   `Instance::activate()` 进入 active，输入法用 `setCurrentInputMethod(DefaultIM, local)` 固定，所以切换前后解析到
-  同一方案；③ 组的 `Items/0` 放**另一个**输入法（上游放键盘布局），使 `canTrigger()`（= 列表长度 > 1）成立、
-  `DefaultIM` 不再被改写成 `Items/1`，并让切换时 Fcitx 看到方案变化从而调用引擎的 `deactivate()`（其 `reset()`
-  清掉预编辑）。`Items[1..]` 仍是用户的列表与顺序；只有一项时也能切换。**inactive 的“直接交给应用”由前端实现**
-  （`inactive_passthrough`），因为本运行时没有编译 keyboard 输入法，而 Linux 上那正是 inactive 的含义。
-  未覆盖：其它修饰键、系统级热键、按住修饰键的完整语义，均未因此获得支持。
+  同一方案；③ 组的 `Items/0` 放**另一个**输入法（上游放键盘布局）并在其 `Layout` 字段写本产品自己的格式标记
+  （`fusion-off`），使 `canTrigger()`（= 列表长度 > 1）成立、`DefaultIM` 不再被改写成 `Items/1`，并让切换时 Fcitx
+  看到方案变化从而调用引擎的 `deactivate()`（其 `reset()` 清掉预编辑）。标记只标识**组格式**，不参与行为判断；
+  没有标记的组按“Items 即用户启用的方法、顺序不变、首项即该版本实际在用的方法”迁移，因此旧配置不会被误读成新格式，
+  重复启动也不会叠加槽位。`Items[1..]` 仍是用户的列表与顺序；只有一项时也能切换。
+  ④ **释放的文档操作走既有结算路径**：引擎对 modifier-only 释放的回答和按键一样是有序文档操作（实测两条：提交组合、
+  清空预编辑），必须经 `settle_frontend_work`/Core/EditSession 结算，且与按键同样先过硬策略与未结算工作检查；释放
+  没有自己的 pass barrier，故不参与 barrier 收尾。⑤ **配对绑定到“真正转发送达的按下”**：只有 dispatch 成功后才记录
+  该次按下及其 binding/incarnation/connection，释放必须全部匹配，`release_key` 不重连、不跨实例结算。
+  ⑥ **inactive 不等于“Fcitx 看不到按键”**：带字符的键仍直接交给应用（这就是英文），不带字符的键照旧 dispatch，
+  由引擎决定——绑定的全局键（`Hotkey/TriggerKeys` 等）因此能在 inactive 下把输入法重新打开；不另实现匹配器，
+  也不硬编码任何键。**inactive 的“直接交给应用”由前端实现**（`inactive_passthrough`），因为本运行时没有编译
+  keyboard 输入法，而 Linux 上那正是 inactive 的含义。
+  未覆盖：其它修饰键、按住修饰键的完整语义、不带修饰键的普通字符键作为全局热键，以及 inactive 下的 Ctrl/Alt/Win
+  组合（本产品不把这些键类交给引擎），均未因此获得支持。
 - **不存在普遍回调保证**：不得表述为 “K always exists” 或 “sync EditSession always succeeds”。
 
 ### 7.3 回调不可用 / drain 无法在 PASS 前到达所需 terminal

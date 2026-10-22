@@ -378,8 +378,10 @@ No daily report is required, and no feedback is needed for a day without problem
   not the Windows input-method switch (`Win+Space`, or `Ctrl+Space` where Windows does it); those stay as they were.
   `Shift`+key combinations are ordinary text input and never toggle, a right `Shift` only does something if you bind the
   setting to it, and holding `Shift` down does not repeat the switch. **Implemented and verified against the engine, but
-  not yet checked inside an application** (plan R38): install a package from `+e537927` or later, click into a text field
-  and tap the key the settings page shows. A lone `Shift` does not commit raw input either, and
+  not yet checked inside an application** (plan R38): install a package from `+b1ddd39` or later, click into a text field
+  and tap the key the settings page shows. In the English state your other configured keys keep working: a key you bound
+  to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
+  composed. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
 - The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
