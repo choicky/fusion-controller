@@ -446,14 +446,35 @@ and the transcript path (`%LOCALAPPDATA%\fusion-installer\`), a failed uninstall
 the EXE is the repair path — it recognises an installed version and either re-applies the same version or upgrades through
 the existing stop-then-install order. **Not signed**; U4 is untouched.
 
+**Two corrections inside this round.** (1) *The scripts ran under the wrong PowerShell.* An NSIS installer is a 32-bit
+process, so `$SYSDIR` is redirected to SysWOW64 and `$SYSDIR\WindowsPowerShell\v1.0\powershell.exe` was the **32-bit**
+shell. Measured with a read-only NSIS probe that makes the same `nsExec` call the installer makes: the old path reports
+`Is64BitProcess=False`, `C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe` and
+`GetFolderPath('ProgramFiles')=C:\Program Files (x86)`; `$WINDIR\Sysnative\…` reports `True`,
+`C:\Windows\System32\…` and `C:\Program Files`. install.ps1 would therefore have installed into "Program Files (x86)"
+rather than the install root the version directories, shortcuts and tasks assume; host-state.ps1 would have read HKLM in
+the WOW64 view, so the registered-DLL lookup and the orderly stop would not have found the 64-bit registration; and the
+bare `regsvr32` that register.ps1 runs would have been the 32-bit one, which cannot register a 64-bit TSF DLL. Both halves
+now call the one `SHELL` define — `$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe` — so install and uninstall
+cannot disagree, and both check `${RunningX64}` first and refuse a 32-bit Windows by name instead of failing inside
+`regsvr32`. This is a **source-level bitness gap confirmed by measurement, not a reproduced install failure**: no install
+has ever been run through this installer, so the failure the probe implies has not occurred here. (2) *The uninstaller left
+its own file behind.* After a successful `uninstall.ps1` the entry was removed and `RMDir "$INSTDIR"` was attempted while
+`uninstall.exe` was still in the way, so the install root survived every uninstall. It is now deleted explicitly before the
+`RMDir` (the uninstaller runs from its own copy in `%TEMP%`), and the `RMDir` still removes the root only if that left it
+empty — a version directory a process holds keeps it, and nothing recurses. A failed `uninstall.ps1` still aborts before any
+of this, so the entry stays for a retry.
+
 **State by level.** *Implemented* (`tools/installer/fusion-installer.nsi`, `tools/installer/build-installer.ps1`).
-*Built and delivered:* `fusion-0.0.0-winui3+29a0433-setup.exe`, 104 365 547 B, SHA-256
-`9E388FBB7C49A3E61D935A59BE1170C38312601A2F039CD68B13A660900388EC`, from `sourceCommit`
-`29a04331336894713467772b4b2e184f99993e4e` (`sourceDirty` false), carrying the owner-test package
-`fusion-0.0.0-winui3+29a0433.zip` (652 manifest entries) whose manifest the product's own `install.ps1 -VerifyOnly` checked before the
+*Built and delivered:* `fusion-0.0.0-winui3+c2a5ee1-setup.exe`, 104 400 429 B, SHA-256
+`7C3C2A2429282964E250475BB28FE4FEF0B20CBFFC9BD59A7300F8896A2D910B`, from `sourceCommit`
+`c2a5ee19bfcafcc87bd80eb5e4c37f968fe2570a` (`sourceDirty` false), carrying the owner-test package
+`fusion-0.0.0-winui3+c2a5ee1.zip` (652 manifest entries) whose manifest the product's own `install.ps1 -VerifyOnly` checked before the
 payload was compressed — the identical check runs at install time on the files the EXE unpacks, so a corrupt embed cannot
 install silently — and two builds from that payload produced the same SHA-256. The artifact itself is delivered to the owner
-and is not a project authority; the PR carries the build evidence. *Isolated install: NOT executed.* This machine has no Windows Sandbox
+and is not a project authority; the PR carries the build evidence. *Read-only bitness probe: verified* — the shell both
+halves launch is a 64-bit process at `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` reporting
+`C:\Program Files`. *Isolated install: NOT executed.* This machine has no Windows Sandbox
 and no clean VM (the feature is absent), installing or upgrading on the owner's own Windows is not authorized, so first
 install, upgrade from a script-installed version, same-version re-run, cancel, failure reporting and uninstall are **reasoned
 from the reviewed code and from the existing scripts' verified behaviour, not measured with this EXE**. *Owner install and
