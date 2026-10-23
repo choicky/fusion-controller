@@ -158,7 +158,11 @@ rather than as done.
   starts on one line again.
 - **English words and 墨奇 in the candidate list (new in this build).** The Chinese engine is now the same one the
   Android product runs, so a Latin word can be a candidate in its own right: type `hello` and the list offers `hello`
-  beside the Chinese candidates, and selecting it commits it as typed. **显示英文候选** (`SpellEnabled`, in
+  beside the Chinese candidates, and selecting it commits it as typed. Typing one string that mixes both gives a
+  candidate carrying both — `woxiangmaiiphone` offers `我想买iPhone`, and in 双拼 `woiphone` offers `我iPhone`; either
+  one commits as the whole mixed string, but the fused candidate is **not** always first (in 双拼 an English tail is
+  also a run of valid two-letter codes, so it sits behind the Chinese list), so page through before concluding it is
+  missing. **显示英文候选** (`SpellEnabled`, in
   候选与输入 → 候选) is the only switch and it is on by default; turn it off and no English candidate appears, while
   pinyin, its candidates and 双拼 behave exactly as before — there is **no separate “mixed input” switch**, and
   **MixedAutoSpacing** (spaces at Chinese/English boundaries) stays off unless you turn it on. **辅助筛选**
@@ -166,7 +170,9 @@ rather than as done.
   (the backquote key, bound as “Auxiliary Filter Trigger”) and the band above the candidates says `[Stroke Filtering]`.
   Set the option to **墨奇** and the same key says `[MoQi Filtering]`; then type the two letters of a character’s 墨奇
   code — `nz` for 好, `rx` for 你 — and the list narrows to what that code names, with the first candidate committing.
-  Both the table and the English word list travel inside the package, so this works with no network. The two options
+  Both the table and the English word list travel inside the package, so this works with no network. The English, 墨奇
+  and mixed candidates above are verified on the real engine in isolation; **none of them has been accepted inside the
+  running application yet** — that is what the owner's own checks would establish. The two options
   still appear in the settings page under their upstream names (笔画／墨奇 and the English-candidate switch) until the
   next task gives them Chinese labels and grouping.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.

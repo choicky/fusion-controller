@@ -707,23 +707,29 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 
 **共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #43，head `30e744e`）。** Windows 此前在官方
 `61474bd` 上运行 fcitx5-chinese-addons，因此既没有墨奇辅助筛选、也没有中英混输，而 Android 早已在所有者维护的 fork 上——两个产品
-因此各有一套中文引擎。本轮把 Windows 的钉点移到 `choicky/fcitx5-chinese-addons` 的 `a04bcd4`（Android 发布流程检出的同一提交），
+因此各有一套中文引擎。本轮把 Windows 的钉点移到 `choicky/fcitx5-chinese-addons` 的 `a04bcd4`——该 fork `fusion` 分支的 tip，同时包含 Android **发布**流程钉住的
+`0d0102b`（落后 66 个提交）与其 test-APK 流程跟随的 `feature/moqi-filter` tip `21eecda`（落后 64 个）：同一功能线、领先一代，而不是同一个提交——
 Fcitx 核心 `a7f2528` 与 LibIME `171edcf` **保持官方钉点不动**：不为与 Android 一致而降级，也不顺带升级。**一套实现，不是两套**：
 墨奇反查码表、混输的分段/排序/候选（`im/pinyin/mixed/*`）与英文词库都在这一处，Windows 不另写一份算法、不做第二套过滤。
 **MSVC 适配**只剩两处——拼音历史文件打开失败时的有效性保护，以及 `loadDict` 收 `std::filesystem::path`（窄字符串路径在
 Windows 上会丢非 ASCII）；其余历史片段（含两处 EOF 空行）删除。**资源**：墨奇码表由 addon 自己在 configure 期按
 `modules/pinyinhelper/moqima-gb18030.cmake` 的 URL 与 SHA-256 取，构建脚本用与语言模型/词典同一条规则（缓存 + 哈希，失配重下）
-取到并交给 configure，因此构建不依赖 raw.githubusercontent 可达、包里的码表就是固定的那张；英文词库随源码提交
+取到并交给 configure，因此构建不依赖 raw.githubusercontent 可达、包里的码表就是固定的那张；那份 pin 文件的 URL 里带
+`${MOQI_TABLE_COMMIT}`，脚本现在从同样三行读出提交、URL 与哈希并展开变量，展开后仍含 `${` 就报错而不是发请求（旧版本原样传下去，
+只被暖缓存掩盖）；英文词库随源码提交
 （`im/pinyin/english_lexicon.tsv`，configure 期对 `data-licenses/english/manifest.json` 校验）。两者都进包
 （`data/fcitx5/pinyin/english_lexicon.tsv`、`data/fcitx5/pinyinhelper/moqima_gb18030.txt`），安装与日常输入都不再联网取文件。
 **Windows 检出**：addon 按 SHA-256 校验自己提交的资源，而 `core.autocrlf=true` 的 git 检出会把文本改成 CRLF 使校验失败（哈希并
 没有被改），所以构建脚本在克隆内先固定按提交字节检出（`core.autocrlf=false`、`core.eol=lf`）再打补丁。**配置语义不变**：
 `AuxiliaryFilter` 默认仍是 Stroke，选 MoQi 才启用墨奇；`SpellEnabled`（默认 true）仍是英文候选的唯一开关，**没有**「启用混输」
 总开关；`MixedAutoSpacing` 默认 false；既有用户值不被覆盖。**验证**：真实引擎上的两项新检查——`mixed_runtime`（`hello` 得到
-词库里的英文候选并上屏、混输候选并列其后；`nihao` 仍以 你好 为首并上屏；辅助筛选触发键默认仍进 Stroke）与 `moqi_filter`
+词库里的英文候选并上屏、混输候选并列其后；`nihao` 仍以 你好 为首并上屏；辅助筛选触发键默认仍进 Stroke；**真正的混输**：
+`woxiangmaiiphone` 的第一候选即 `我想买iPhone` 并原样上屏，双拼（自然码）`woiphone` 的 `我iPhone` 落在引擎第 16 页、选中后同样整串上屏
+——两条都按候选文本定位、不要求排第一，也不以「出现拉丁字符」代替断言）与 `moqi_filter`
 （一次性 `%TEMP%` profile 里写 `AuxiliaryFilter=MoQi`：`hao` + 触发键 → `[MoQi Filtering]`，码 `nz` 只剩 好 并上屏；随后
-`SpellEnabled=False` 时 `hello` 没有英文候选而 `nihao` 不受影响）。Release 92/92（2 项按自身设计跳过）、settings 540 项。
-**未执行**：任何应用内 TSF 检查；这套候选与墨奇行为的应用内验收。
+`SpellEnabled=False` 时 `hello` 没有英文候选而 `nihao` 不受影响）。Release 92/92（2 项按自身设计跳过）、settings 540 项。构建脚本
+自身也跑到 `Native runtime ready`、退出码 0（码表缓存清空时按展开后的 URL 下载并得到钉住的哈希，暖缓存时直接复用）；装配段曾用缺
+`-ChildPath` 的 `Join-Path` 让 PowerShell 等待控制台输入而停住，已修。**未执行**：任何应用内 TSF 检查；这套候选与墨奇行为的应用内验收。
 
 
 
