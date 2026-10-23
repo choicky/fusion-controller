@@ -705,7 +705,7 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 跳过）、Debug 79/79（`FUSION_WITH_FCITX5=OFF`，`candidate_window_layout` 在 Debug 亦通过）、settings 540 项。
 **未执行**：任何应用内 TSF 检查；这套几何的所有者目视验收（本轮的四步清单在计划 R42 行与 PR 里）。
 
-**共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #94，head `496514c`）。** Windows 此前在官方
+**共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #43，head `30e744e`）。** Windows 此前在官方
 `61474bd` 上运行 fcitx5-chinese-addons，因此既没有墨奇辅助筛选、也没有中英混输，而 Android 早已在所有者维护的 fork 上——两个产品
 因此各有一套中文引擎。本轮把 Windows 的钉点移到 `choicky/fcitx5-chinese-addons` 的 `a04bcd4`（Android 发布流程检出的同一提交），
 Fcitx 核心 `a7f2528` 与 LibIME `171edcf` **保持官方钉点不动**：不为与 Android 一致而降级，也不顺带升级。**一套实现，不是两套**：

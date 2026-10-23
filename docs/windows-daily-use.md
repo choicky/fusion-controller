@@ -149,7 +149,7 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+496514c-setup.exe`) before checking any of it — the version installed on this machine,
+  (`fusion-0.0.0-winui3+30e744e-setup.exe`) before checking any of it — the version installed on this machine,
   `0.0.0-winui3+bf74f1d`, predates the enhanced Chinese engine described in the next item — and note that
   installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
