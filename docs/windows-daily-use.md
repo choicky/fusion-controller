@@ -6,19 +6,34 @@ This is the owner-facing guide for the Stage 6 WP7 daily-use period. The durable
 
 ## 1. Install, upgrade, uninstall
 
-The package is owner-only and unsigned. Everything except the last step is elevated.
+**The installer is one EXE.** Download `fusion-<version>-setup.exe` and run it; nothing has to be unpacked first and
+nothing is downloaded while it installs — the whole product travels inside the EXE. It is owner-only and **unsigned**, so
+Windows shows the usual "unknown publisher" prompt, and it asks for administrator rights once because the persistent
+registration of the input-method component writes `HKLM`. The wizard is in Chinese, shows the version it is about to
+install, and reports what happened at the end.
 
-| step | command |
+| step | what to do |
 |---|---|
-| install | extract the zip, then run `install.ps1` **elevated** (`-PackageDir <extracted folder>`, default is the script's own folder) |
-| upgrade | extract the new zip and run its `install.ps1` elevated; it closes the running tray, stops the running Host in order, copies the new version directory, re-registers the TIP, refreshes the logon tasks and starts the new tray |
-| uninstall (keep user data) | run `uninstall.ps1` **elevated** from the installed version directory |
-| uninstall (remove user data) | `uninstall.ps1 -RemoveUserData` — also deletes `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` |
+| install | run `fusion-<version>-setup.exe`, accept the elevation prompt, follow the wizard |
+| upgrade | run the newer `fusion-<version>-setup.exe`; it names the version already installed, then closes the tray, stops the running Host in order, installs the new version directory, re-registers the TIP, refreshes the logon tasks and starts the new Host and tray |
+| same version again | run it again; it says this version is already installed and re-applies the install. Files whose SHA-256 already match are skipped, so nothing is rewritten |
+| uninstall, keeping user data | **设置 → 应用 → 已安装的应用 → Fusion 输入法 → 卸载** (or `C:\Program Files\Fcitx5 Fusion\uninstall.exe`), answering 否 to the user-data question |
+| uninstall, removing user data | the same uninstaller, answering 是 — it also deletes `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` |
 
-`install.ps1 -VerifyOnly` checks the manifest and hashes without changing anything. The installer never modifies `PATH`,
-never force-deletes a directory a process holds, and never touches `%APPDATA%\Fcitx5` unless `-RemoveUserData` is given.
-A version directory held by a running application stays until the next uninstall after sign-out (R28); the installer
-reports the holders.
+The wizard runs the package's own `install.ps1` / `uninstall.ps1`; the progress page shows the same phase-by-phase output
+those scripts print, and both write a transcript to `%LOCALAPPDATA%\fusion-installer\`. A failed install aborts the wizard
+with the exit code and that path instead of finishing as if it had worked, and re-running the EXE retries it from the
+start; a failed uninstall keeps the "已安装的应用" entry so it can be retried. Neither path modifies `PATH`, force-deletes a
+directory a process holds, or touches `%APPDATA%\Fcitx5` unless removal was chosen. A version directory held by a running
+application stays until the next uninstall after sign-out (R28); both paths report the holders.
+
+**The zip is the fallback, not the normal route.** Every version is also published as `fusion-<version>.zip` for the cases
+the EXE does not serve: a machine where an unsigned EXE may not run, a scripted or unattended install, and rolling back to
+an older version. Extract it and run `install.ps1` **elevated** (`-PackageDir <extracted folder>`, default is the script's
+own folder); run `uninstall.ps1` **elevated** from the installed version directory to remove it, with `-RemoveUserData` to
+delete the user data as well, and `-VerifyOnly` to check the manifest and hashes without changing anything. Two differences
+are worth knowing: a zip-based install does **not** create the "已安装的应用" entry, and a zip-based upgrade *after* an EXE
+install leaves that entry naming the version the EXE last installed — its uninstall command still removes every version.
 
 **Rollback:** run the previous version's `install.ps1` elevated (it installs side by side and re-registers that version),
 or uninstall and install the earlier package. User data is kept either way.
@@ -58,12 +73,15 @@ rather than as done.
   系统输入行为. The **候选窗口** section at the top holds **候选排列方向** — **竖排** (one candidate per row), **横排** (this
   page's candidates on one row) or **自动卷轴** (below), shown in Chinese rather than as the stored
   `Vertical`/`Horizontal`/`AutoScroll` — plus **候选字体** and
-  **字号（磅）**, with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
+  **字号（磅）** — 候选字体 is now a searchable list of the fonts this Windows session has, and any name it does not contain
+  can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
   Host schema's defaults — and it now rebuilds the page so the two editors show the reset values straight away, not only the preview. They save with the same **保存** button as everything else — there is no separate apply — and they
   take effect from the next candidate page, so the popup already on screen does not move under the pointer. A profile that
   never touched them keeps the vertical list and the Microsoft YaHei UI look this product has always drawn, so upgrading
   changes nothing. The size is in **points**, so the same setting stays the same physical size on a 150 % or 200 % display;
-  a font name Windows does not have is substituted, and missing characters are filled in by the system font linking. When an
+  the list is the system's own font collection, so a name you pick is one the popup can draw, and a name that is *not*
+  installed is never rewritten on your behalf: the stored name stays, the row says Windows will substitute its default, and
+  missing characters are filled in by the system font linking. When an
   input method asks for a particular direction for one list (quick phrase, Unicode and the input-method selector do), the
   input method's choice wins over this setting. The 外部工具 section lists the upstream tools this package does not ship,
   with the reason.
@@ -79,13 +97,20 @@ rather than as done.
   goes back the same way, into the last row of the previous screenful, and it stops at the ends instead of wrapping around.
   The **numbers** are drawn only on the row the keys act on — that row is the engine's current page — so pressing `3`
   selects the candidate labelled 3 on that row and nothing else; the **mouse** can click any visible row, and that candidate
-  is what gets committed. Type anything new, pick a partial candidate, or switch input method, and the panel is back to one
+  is what gets committed. **Left and right arrows** move the highlight between candidates in this window — the highlight is
+  the engine's own cursor — **space** commits the one it is on, and up/down keep the row navigation described above. At the
+  first or the last candidate the arrows stop instead of wrapping, and there the key goes back to the input method, which is
+  how the caret inside the pinyin string is moved; so editing what has been typed stays possible, and 竖排 and 横排 keep the
+  arrow keys they have always had. Type anything new, pick a partial candidate, or switch input method, and the panel is back to one
   line. If an input method does not publish its pages (or asks for a particular direction itself), this setting simply
   leaves its usual arrangement in place; and if the list cannot be read in full — a page whose candidates exceed what one
   update may carry, or a list that refuses a candidate — the window stays the ordinary single row or column rather than
   showing a grid with a hole in it.
 
-  A candidate longer than its cell is shortened with an ellipsis instead of widening the window past the screen — hover it,
+  A candidate is drawn whole whenever it fits — one character, two characters and ordinary short words are no longer
+  shortened (an earlier build measured them one way and drew them another, so every 横排 cell lost a little text and the
+  full-text box never appeared for the case that needed it). Only a candidate genuinely longer than its cell is shortened
+  with an ellipsis instead of widening the window past the screen — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
   changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
   is taller than the box, the box scrolls: move the pointer *into* it — across the gap as well, since a pointer on its way
@@ -108,8 +133,8 @@ rather than as done.
   real application**: 竖排 and 横排 are D088 (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
-  paragraphs rather than repeated here. **Install the package this batch builds**
-  (`fusion-0.0.0-winui3+6e6e250.zip`) before checking any of it — the version installed on this machine,
+  paragraphs rather than repeated here. **Install the build this batch packages**
+  (`fusion-0.0.0-winui3+c2a5ee1-setup.exe`) before checking any of it — the version installed on this machine,
   `0.0.0-winui3+43a832f`, predates R40's corrections — and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, and that a new word starts on
@@ -453,8 +478,8 @@ No daily report is required, and no feedback is needed for a day without problem
   **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
   that is not admissible (because document work is outstanding) is not claimed by the TIP — it is passed to the application and
   never reaches the engine, so the lone-Shift toggle does not fire and needs a second press.
-- The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
-  packaging and a distribution channel are not decided (U4).
+- The TIP is a development build: its description and identifiers are the development ones (R29); the installer is
+  **unsigned**, and signing and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically and the tray does not detect it; use
   the restart shortcut or the tray's **Restart FusionHost**.
 - Multi-account machines: the logon task name is global (R32, hypothesis); this guide covers one interactive account.

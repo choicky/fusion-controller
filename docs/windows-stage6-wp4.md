@@ -138,7 +138,10 @@ Evidence (`a3-smoke.txt`):
 Chinese locale catalogs, scoped settings license notices, corresponding-source archives for the pinned Fcitx runtime,
 and the exact fcitx5-qt patch/source instructions. The installer creates the `Fusion Settings.lnk` Start Menu entry;
 the tray exposes Settings. Test executables and `FusionTsfProfile.exe` are not packaged. No MSI, no installer toolchain,
-no signing (U4 stays open; decided with WP8). The owner-maintained configtool fork source is pinned by exact commit and
+no signing (U4 stays open; decided with WP8). *(The single-EXE installer added on 2026-10-23 wraps exactly this package
+and these two scripts — it changes none of A4's install, upgrade, task, entry or user-data behaviour, and at WP4 there was
+no installer toolchain. Its current state is recorded once, in `docs/windows-stage6-plan.md`.)* The owner-maintained
+configtool fork source is pinned by exact commit and
 its fork PR remains separately reviewable.
 
 **Manifest.** `package.json` records package name, version, source commit and dirty flag, build time, configuration,
