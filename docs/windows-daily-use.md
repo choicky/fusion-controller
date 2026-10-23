@@ -6,19 +6,34 @@ This is the owner-facing guide for the Stage 6 WP7 daily-use period. The durable
 
 ## 1. Install, upgrade, uninstall
 
-The package is owner-only and unsigned. Everything except the last step is elevated.
+**The installer is one EXE.** Download `fusion-<version>-setup.exe` and run it; nothing has to be unpacked first and
+nothing is downloaded while it installs — the whole product travels inside the EXE. It is owner-only and **unsigned**, so
+Windows shows the usual "unknown publisher" prompt, and it asks for administrator rights once because the persistent
+registration of the input-method component writes `HKLM`. The wizard is in Chinese, shows the version it is about to
+install, and reports what happened at the end.
 
-| step | command |
+| step | what to do |
 |---|---|
-| install | extract the zip, then run `install.ps1` **elevated** (`-PackageDir <extracted folder>`, default is the script's own folder) |
-| upgrade | extract the new zip and run its `install.ps1` elevated; it closes the running tray, stops the running Host in order, copies the new version directory, re-registers the TIP, refreshes the logon tasks and starts the new tray |
-| uninstall (keep user data) | run `uninstall.ps1` **elevated** from the installed version directory |
-| uninstall (remove user data) | `uninstall.ps1 -RemoveUserData` — also deletes `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` |
+| install | run `fusion-<version>-setup.exe`, accept the elevation prompt, follow the wizard |
+| upgrade | run the newer `fusion-<version>-setup.exe`; it names the version already installed, then closes the tray, stops the running Host in order, installs the new version directory, re-registers the TIP, refreshes the logon tasks and starts the new Host and tray |
+| same version again | run it again; it says this version is already installed and re-applies the install. Files whose SHA-256 already match are skipped, so nothing is rewritten |
+| uninstall, keeping user data | **设置 → 应用 → 已安装的应用 → Fusion 输入法 → 卸载** (or `C:\Program Files\Fcitx5 Fusion\uninstall.exe`), answering 否 to the user-data question |
+| uninstall, removing user data | the same uninstaller, answering 是 — it also deletes `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` |
 
-`install.ps1 -VerifyOnly` checks the manifest and hashes without changing anything. The installer never modifies `PATH`,
-never force-deletes a directory a process holds, and never touches `%APPDATA%\Fcitx5` unless `-RemoveUserData` is given.
-A version directory held by a running application stays until the next uninstall after sign-out (R28); the installer
-reports the holders.
+The wizard runs the package's own `install.ps1` / `uninstall.ps1`; the progress page shows the same phase-by-phase output
+those scripts print, and both write a transcript to `%LOCALAPPDATA%\fusion-installer\`. A failed install aborts the wizard
+with the exit code and that path instead of finishing as if it had worked, and re-running the EXE retries it from the
+start; a failed uninstall keeps the "已安装的应用" entry so it can be retried. Neither path modifies `PATH`, force-deletes a
+directory a process holds, or touches `%APPDATA%\Fcitx5` unless removal was chosen. A version directory held by a running
+application stays until the next uninstall after sign-out (R28); both paths report the holders.
+
+**The zip is the fallback, not the normal route.** Every version is also published as `fusion-<version>.zip` for the cases
+the EXE does not serve: a machine where an unsigned EXE may not run, a scripted or unattended install, and rolling back to
+an older version. Extract it and run `install.ps1` **elevated** (`-PackageDir <extracted folder>`, default is the script's
+own folder); run `uninstall.ps1` **elevated** from the installed version directory to remove it, with `-RemoveUserData` to
+delete the user data as well, and `-VerifyOnly` to check the manifest and hashes without changing anything. Two differences
+are worth knowing: a zip-based install does **not** create the "已安装的应用" entry, and a zip-based upgrade *after* an EXE
+install leaves that entry naming the version the EXE last installed — its uninstall command still removes every version.
 
 **Rollback:** run the previous version's `install.ps1` elevated (it installs side by side and re-registers that version),
 or uninstall and install the earlier package. User data is kept either way.
@@ -118,8 +133,8 @@ rather than as done.
   real application**: 竖排 and 横排 are D088 (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
-  paragraphs rather than repeated here. **Install the package this batch builds**
-  (`fusion-0.0.0-winui3+6e6e250.zip`) before checking any of it — the version installed on this machine,
+  paragraphs rather than repeated here. **Install the build this batch packages**
+  (`fusion-0.0.0-winui3+29a0433-setup.exe`) before checking any of it — the version installed on this machine,
   `0.0.0-winui3+43a832f`, predates R40's corrections — and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, and that a new word starts on
@@ -463,8 +478,8 @@ No daily report is required, and no feedback is needed for a day without problem
   **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
   that is not admissible (because document work is outstanding) is not claimed by the TIP — it is passed to the application and
   never reaches the engine, so the lone-Shift toggle does not fire and needs a second press.
-- The TIP is a development build: its description and identifiers are the development ones (R29); signing, installer
-  packaging and a distribution channel are not decided (U4).
+- The TIP is a development build: its description and identifiers are the development ones (R29); the installer is
+  **unsigned**, and signing and a distribution channel are not decided (U4).
 - An alive-but-unhealthy Host (2 s request bound, R7) is not restarted automatically and the tray does not detect it; use
   the restart shortcut or the tray's **Restart FusionHost**.
 - Multi-account machines: the logon task name is global (R32, hypothesis); this guide covers one interactive account.
