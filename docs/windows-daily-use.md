@@ -30,7 +30,10 @@ application stays until the next uninstall after sign-out (R28); both paths repo
 The first real attempt (2026-10-23, `+c2a5ee1`) failed exactly this way: it stopped at exit 1 in `Add-Type` — NSIS had
 unpacked its own native `System.dll` into the working directory the installer gave PowerShell, and `Add-Type` resolved the
 default reference to that file — and, as the paragraph above says, nothing on the machine changed: no version directory, no
-entry, no registration. The build named in §7 is the fixed one; there is nothing to repair before running it.
+entry, no registration. **The next attempt, `+3325514`, is the accepted installer build:** installing (over the
+zip-installed `0.0.0-winui3+43a832f`), Chinese input in Notepad, the "已安装的应用" entry with that version,
+uninstalling from it while keeping user data, and a reinstall that kept learning data and settings were all carried
+out and all passed. The build named in §7 is newer than it and is the one to install now.
 
 **The zip is the fallback, not the normal route.** Every version is also published as `fusion-<version>.zip` for the cases
 the EXE does not serve: a machine where an unsigned EXE may not run, a scripted or unattended install, and rolling back to
@@ -100,6 +103,9 @@ rather than as done.
   were on**; when the next page has fewer candidates than that, the highlight lands on its last candidate instead of jumping
   back to the first. On the last row of what is on screen it moves to the first row of the next screenful, "previous page"
   goes back the same way, into the last row of the previous screenful, and it stops at the ends instead of wrapping around.
+  **Each column is as wide as its own widest candidate**, so a page with one long candidate and single characters
+  beside it draws one wide column and narrow ones instead of widening all of them; the columns still line up from row
+  to row, and the widths are taken from every row of the scroll window so the grid does not shift while you move.
   The **numbers** are drawn only on the row the keys act on — that row is the engine's current page — so pressing `3`
   selects the candidate labelled 3 on that row and nothing else; the **mouse** can click any visible row, and that candidate
   is what gets committed. **Left and right arrows** move the highlight between candidates in this window — the highlight is
@@ -114,7 +120,9 @@ rather than as done.
 
   A candidate is drawn whole whenever it fits — one character, two characters and ordinary short words are no longer
   shortened (an earlier build measured them one way and drew them another, so every 横排 cell lost a little text and the
-  full-text box never appeared for the case that needed it). Only a candidate genuinely longer than its cell is shortened
+  full-text box never appeared for the case that needed it). A cell shows at most **eight characters' worth of
+  candidate text** — eight 汉字 measured in your candidate font, with the number (`1.`) and the cell's own padding
+  added on top rather than taken out of the eight — and only a candidate genuinely longer than that is shortened
   with an ellipsis instead of widening the window past the screen — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
   changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
@@ -139,11 +147,13 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+3325514-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+43a832f`, predates R40's corrections — and note that installing is not acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+711bd48-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+3325514`, is the accepted installer build but predates R42's column widths — and note that installing
+  is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
-  numbers sit on the row the keys act on, that clicking another row commits that candidate, and that a new word starts on
-  one line again.
+  numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
+  candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
+  starts on one line again.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
