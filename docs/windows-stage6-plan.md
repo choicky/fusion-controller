@@ -255,7 +255,8 @@ owner installation/acceptance are separate states; no installation is claimed he
 
 **Work after the enhanced Chinese runtime (R43): the client's Chinese presentation is done, the rest is recorded and not
 started.** Chinese names, groups and help for the new and existing candidate options were the first item of this list;
-they are **implemented in fusion-windows PR #45** (head `031f1ba`, package `0.0.0-winui3+031f1ba`). 辅助筛选方式
+they are **implemented in fusion-windows PR #45** (head `031f1ba`, merged as `main` `c369bc2`, package
+`0.0.0-winui3+031f1ba`). 辅助筛选方式
 (`AuxiliaryFilter`, 关闭／笔画／墨奇) and 混输候选自动加空格 (`MixedAutoSpacing`) have their own groups next to
 显示英文候选, the trigger key stays the one option on the 按键 page (辅助筛选触发键), and no "enable mixed input" switch was
 added. The same pass finished the enumeration values that page still showed in English — 预编辑模式, 联想时的退格行为,
@@ -537,23 +538,29 @@ status `failed` and produced no findings, so the review record for that pair is 
 real-install acceptance — not an automated review.
 
 **State by level.** *Implemented* (`tools/installer/fusion-installer.nsi`, `tools/installer/build-installer.ps1`).
-*Built and delivered:* `fusion-0.0.0-winui3+7c076e7-setup.exe`, 105 225 499 B, SHA-256
+*Built and delivered:* `fusion-0.0.0-winui3+031f1ba-setup.exe`, 105 278 774 B, SHA-256
+`51824A25D35E0BFA588EFE5B897AE83393D6AC24174B1FA12ADF8A443F2637E7`, from `sourceCommit`
+`031f1ba4c38ed464d3725e819d1313c2363e4999` (`sourceDirty` false — the head of PR #45, merged as `main`
+`c369bc2`), carrying the owner-test package `fusion-0.0.0-winui3+031f1ba.zip` (658 manifest entries; `Zip SHA-256`
+`B9B40272…E6EA`) whose manifest the product's own `install.ps1 -VerifyOnly` checked before the payload was
+compressed — the identical check runs at install time on the files the EXE unpacks, so a corrupt embed cannot
+install silently. The previous build was `fusion-0.0.0-winui3+7c076e7-setup.exe`, 105 225 499 B, SHA-256
 `ABF775A13E95D4CEED3F212828E86AB3248F7680F0F8CF005D0D9771A1756628`, from `sourceCommit`
-`7c076e7e91b8bcb43009a1631f7c83808a7594b3` (`sourceDirty` false), carrying the owner-test package
-`fusion-0.0.0-winui3+7c076e7.zip` (657 manifest entries — the 652 of the first packaged build plus the MoQi
-table, the English lexicon, and the three licence files that travel with them: the table's MIT licence, the
-lexicon's `NOTICE` and the lexicon's own `manifest.json`; `Zip SHA-256` `04ED87DF…02DA`) whose manifest the
-product's own `install.ps1 -VerifyOnly` checked before the payload was compressed — the identical check runs at
-install time on the files the EXE unpacks, so a corrupt embed cannot install silently. `+30e744e` (installed before this build), `+bf74f1d` (installed before it) and `+711bd48` (never installed) are
-**superseded** by this build — `+30e744e` predates the mixed-slot fix, so a Ziranma fused reading sat behind
-the whole classical list; no second build of this payload was made, so reproducibility is claimed for the earlier ones only. **`+3325514` is the accepted installer build** (see the acceptance paragraph above) and is
+`7c076e7e91b8bcb43009a1631f7c83808a7594b3`, carrying `fusion-0.0.0-winui3+7c076e7.zip` (657 manifest entries —
+the 652 of the first packaged build plus the MoQi table, the English lexicon, and the three licence files that
+travel with them: the table's MIT licence, the lexicon's `NOTICE` and the lexicon's own `manifest.json`;
+`Zip SHA-256` `04ED87DF…02DA`). `+7c076e7` (the previous build, and the version installed on this machine), `+30e744e`
+(installed before it), `+bf74f1d` (before that) and `+711bd48` (never installed) are **superseded** by this build —
+`+30e744e` predates the mixed-slot fix, so a Ziranma fused reading sat behind the whole classical list; no second
+build of the `+7c076e7` payload was made, so reproducibility is claimed for the earlier ones only. **`+3325514` is
+the accepted installer build** (see the acceptance paragraph above) and is
 kept as the rollback; it is not the current package. The artifact itself is delivered to the owner and is not a project
 authority; the PR carries the build evidence. *Read-only probes: verified* — the shell both halves launch is a 64-bit
 process at `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` reporting `C:\Program Files`; the working-directory defect reproduces with NSIS's `System.dll` beside the
 script and disappears in an empty directory; the uninstall scan picks `0.0.0-winui3+3325514` on this machine. *Owner
 install: **accepted** with `+3325514`* — install, upgrade from the zip-installed `+43a832f`, uninstall keeping user data and
-reinstall were exercised for real; the only EXE that failed is `+c2a5ee1`, which cannot install and is superseded. *This
-round's EXE: not installed.* *Isolated install: NOT executed* — this machine has no Windows Sandbox and no clean VM, and
+reinstall were exercised for real; the only EXE that failed is `+c2a5ee1`, which cannot install and is superseded. *The
+current EXE (`+031f1ba`): not installed.* *Isolated install: NOT executed* — this machine has no Windows Sandbox and no clean VM, and
 installing or upgrading on the owner's own Windows is not authorized, so a same-version re-run, a cancel mid-install and
 failure reporting remain **reasoned from the reviewed code and the scripts' verified behaviour, not measured by me**.
 *Owner installation and acceptance: **the installer**: accepted for `+3325514`, and the owner has since installed `+bf74f1d`, `+30e744e` and then `+7c076e7` — that last one is what is installed now, and the owner reports the mixed-input fix passing its own test on it; **R42's geometry and R43's runtime**: not accepted — installing `+031f1ba` is the owner's next step, and installing is not acceptance.*
