@@ -123,7 +123,9 @@ rather than as done.
   full-text box never appeared for the case that needed it). A cell shows at most **eight characters' worth of
   candidate text** — eight 汉字 measured in your candidate font, with the number (`1.`) and the cell's own padding
   added on top rather than taken out of the eight — and only a candidate genuinely longer than that is shortened
-  with an ellipsis instead of widening the window past the screen — hover it,
+  with an ellipsis instead of widening the window past the screen. The eight belongs to the **cell**, not to the
+  column or the row: a candidate on an unnumbered row of the grid (the rows above and below the engine's own page)
+  gets the same eight, without the numbering allowance a numbered cell carries — hover it,
   or leave the keyboard highlight on it, and the full text appears beside the panel. That popup never takes focus and never
   changes what is selected, and what is committed is always the engine's own full string, not the shortened one. If the text
   is taller than the box, the box scrolls: move the pointer *into* it — across the gap as well, since a pointer on its way
@@ -147,9 +149,9 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+711bd48-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+3325514`, is the accepted installer build but predates R42's column widths — and note that installing
-  is not acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+bf74f1d-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+3325514`, is the accepted installer build but predates R42's column widths and per-cell limits — and
+  note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
