@@ -705,6 +705,27 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 跳过）、Debug 79/79（`FUSION_WITH_FCITX5=OFF`，`candidate_window_layout` 在 Debug 亦通过）、settings 540 项。
 **未执行**：任何应用内 TSF 检查；这套几何的所有者目视验收（本轮的四步清单在计划 R42 行与 PR 里）。
 
+**共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #94，head `496514c`）。** Windows 此前在官方
+`61474bd` 上运行 fcitx5-chinese-addons，因此既没有墨奇辅助筛选、也没有中英混输，而 Android 早已在所有者维护的 fork 上——两个产品
+因此各有一套中文引擎。本轮把 Windows 的钉点移到 `choicky/fcitx5-chinese-addons` 的 `a04bcd4`（Android 发布流程检出的同一提交），
+Fcitx 核心 `a7f2528` 与 LibIME `171edcf` **保持官方钉点不动**：不为与 Android 一致而降级，也不顺带升级。**一套实现，不是两套**：
+墨奇反查码表、混输的分段/排序/候选（`im/pinyin/mixed/*`）与英文词库都在这一处，Windows 不另写一份算法、不做第二套过滤。
+**MSVC 适配**只剩两处——拼音历史文件打开失败时的有效性保护，以及 `loadDict` 收 `std::filesystem::path`（窄字符串路径在
+Windows 上会丢非 ASCII）；其余历史片段（含两处 EOF 空行）删除。**资源**：墨奇码表由 addon 自己在 configure 期按
+`modules/pinyinhelper/moqima-gb18030.cmake` 的 URL 与 SHA-256 取，构建脚本用与语言模型/词典同一条规则（缓存 + 哈希，失配重下）
+取到并交给 configure，因此构建不依赖 raw.githubusercontent 可达、包里的码表就是固定的那张；英文词库随源码提交
+（`im/pinyin/english_lexicon.tsv`，configure 期对 `data-licenses/english/manifest.json` 校验）。两者都进包
+（`data/fcitx5/pinyin/english_lexicon.tsv`、`data/fcitx5/pinyinhelper/moqima_gb18030.txt`），安装与日常输入都不再联网取文件。
+**Windows 检出**：addon 按 SHA-256 校验自己提交的资源，而 `core.autocrlf=true` 的 git 检出会把文本改成 CRLF 使校验失败（哈希并
+没有被改），所以构建脚本在克隆内先固定按提交字节检出（`core.autocrlf=false`、`core.eol=lf`）再打补丁。**配置语义不变**：
+`AuxiliaryFilter` 默认仍是 Stroke，选 MoQi 才启用墨奇；`SpellEnabled`（默认 true）仍是英文候选的唯一开关，**没有**「启用混输」
+总开关；`MixedAutoSpacing` 默认 false；既有用户值不被覆盖。**验证**：真实引擎上的两项新检查——`mixed_runtime`（`hello` 得到
+词库里的英文候选并上屏、混输候选并列其后；`nihao` 仍以 你好 为首并上屏；辅助筛选触发键默认仍进 Stroke）与 `moqi_filter`
+（一次性 `%TEMP%` profile 里写 `AuxiliaryFilter=MoQi`：`hao` + 触发键 → `[MoQi Filtering]`，码 `nz` 只剩 好 并上屏；随后
+`SpellEnabled=False` 时 `hello` 没有英文候选而 `nihao` 不受影响）。Release 92/92（2 项按自身设计跳过）、settings 540 项。
+**未执行**：任何应用内 TSF 检查；这套候选与墨奇行为的应用内验收。
+
+
 
 **编辑/保存/恢复的边界。** 一次编辑只写它所属的那个配置：行的 setter 绑定在页面渲染的 target 上，所以全局控件不可能落到拼音草稿。保存时，共享草稿按「哪个视图的 schema 描述该字段」拆成两部分，分别通过允许它的 URI 提交——Host 会用该 URI 的 schema 校验提交的字段，Shuangpin 专属字段走拼音 URI 会被拒绝。成功写入按**已发送的路径**确认，而不是比较值：空列表以空 map 写入、以空标量读回，两者相等性永远不成立。写入结果不确定时不重放，而是重读并按重读结果确认：已生效的编辑消失，未确认的保留；重读失败则如实报告失败。输入方式列表遵循同一条规则，但区分「用户是否真的改过」：重读成为新基线；列表在重读前**有未提交改动**时保留用户请求的顺序，请求的顺序只在重读显示它已生效时才消失，因此「没生效」不会被写成「已保存」；列表在重读前**没有改动**时不是用户意图，直接采纳 Host 的顺序——否则缓存顺序会被当成一次本地修改，下一次保存就会提交没人要求过的倒序。同一时刻只允许一个操作，运行期间页面只读，因此请求发出后不会再有编辑被覆盖；关闭窗口与保存互斥——保存进行中拒绝关闭并说明原因，其余情况在判断「有没有未保存修改」之前先提交聚焦控件，只弹一次对话框。启动失败与连接丢失各有一个显式动作：**重试连接**在两种情况下都可用，有草稿时保留草稿、没有草稿时才创建，**重新加载**在丢弃未保存修改前先询问。连接状态与「是否已加载」是两个独立事实，所以一次成功的加载之后掉线仍然能看到重试。
 

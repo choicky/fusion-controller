@@ -149,13 +149,26 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+bf74f1d-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+3325514`, is the accepted installer build but predates R42's column widths and per-cell limits — and
-  note that installing is not acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+496514c-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+bf74f1d`, predates the enhanced Chinese engine described in the next item — and note that
+  installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
   starts on one line again.
+- **English words and 墨奇 in the candidate list (new in this build).** The Chinese engine is now the same one the
+  Android product runs, so a Latin word can be a candidate in its own right: type `hello` and the list offers `hello`
+  beside the Chinese candidates, and selecting it commits it as typed. **显示英文候选** (`SpellEnabled`, in
+  候选与输入 → 候选) is the only switch and it is on by default; turn it off and no English candidate appears, while
+  pinyin, its candidates and 双拼 behave exactly as before — there is **no separate “mixed input” switch**, and
+  **MixedAutoSpacing** (spaces at Chinese/English boundaries) stays off unless you turn it on. **辅助筛选**
+  (`Auxiliary Filter`, same page) still defaults to 笔画: with a candidate list on screen press the auxiliary-filter key
+  (the backquote key, bound as “Auxiliary Filter Trigger”) and the band above the candidates says `[Stroke Filtering]`.
+  Set the option to **墨奇** and the same key says `[MoQi Filtering]`; then type the two letters of a character’s 墨奇
+  code — `nz` for 好, `rx` for 你 — and the list narrows to what that code names, with the first candidate committing.
+  Both the table and the English word list travel inside the package, so this works with no network. The two options
+  still appear in the settings page under their upstream names (笔画／墨奇 and the English-candidate switch) until the
+  next task gives them Chinese labels and grouping.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
