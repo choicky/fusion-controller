@@ -27,6 +27,11 @@ start; a failed uninstall keeps the "已安装的应用" entry so it can be retr
 directory a process holds, or touches `%APPDATA%\Fcitx5` unless removal was chosen. A version directory held by a running
 application stays until the next uninstall after sign-out (R28); both paths report the holders.
 
+The first real attempt (2026-10-23, `+c2a5ee1`) failed exactly this way: it stopped at exit 1 in `Add-Type` — NSIS had
+unpacked its own native `System.dll` into the working directory the installer gave PowerShell, and `Add-Type` resolved the
+default reference to that file — and, as the paragraph above says, nothing on the machine changed: no version directory, no
+entry, no registration. The build named in §7 is the fixed one; there is nothing to repair before running it.
+
 **The zip is the fallback, not the normal route.** Every version is also published as `fusion-<version>.zip` for the cases
 the EXE does not serve: a machine where an unsigned EXE may not run, a scripted or unattended install, and rolling back to
 an older version. Extract it and run `install.ps1` **elevated** (`-PackageDir <extracted folder>`, default is the script's
@@ -134,7 +139,7 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+c2a5ee1-setup.exe`) before checking any of it — the version installed on this machine,
+  (`fusion-0.0.0-winui3+3325514-setup.exe`) before checking any of it — the version installed on this machine,
   `0.0.0-winui3+43a832f`, predates R40's corrections — and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, and that a new word starts on
@@ -267,8 +272,9 @@ existing `FUSION_TSF_DIAGNOSTICS` opt-in for one process, so nothing is added to
    - **Identity:** the pid and start time of the window-owning process must be newer than the launch. Only that
      process maps the TIP; its content/renderer children do not.
    - **Loaded build:** compare the path with the **intended installed version** — currently
-     `C:\Program Files\Fcitx5 Fusion\0.0.0-wp7+d095a44\bin\FusionTsf.dll`, and after any later upgrade whatever
-     version directory `HKLM\SOFTWARE\Classes\CLSID\{8B7C4A90-5E2D-4B1F-9A31-6C0F42D1E7A4}\InprocServer32` names.
+     `C:\Program Files\Fcitx5 Fusion\0.0.0-winui3+43a832f\bin\FusionTsf.dll` (the running Host and tray are that build),
+     and after installing the package in §7 whatever version directory
+     `HKLM\SOFTWARE\Classes\CLSID\{8B7C4A90-5E2D-4B1F-9A31-6C0F42D1E7A4}\InprocServer32` names.
      A *different* version directory means that process still holds an older build: exit it and repeat from step 1.
      `-` only means no `FusionTsf.dll` was observed in that process — it does not establish an old build or a product
      failure. `<no access>` is inconclusive. Re-focus the field and check again before concluding anything.
