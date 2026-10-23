@@ -705,10 +705,10 @@ fcitx5-qt dbusaddons/widgetsaddons）以任务内 Qt 6.8.3/MSVC 构建链接；�
 跳过）、Debug 79/79（`FUSION_WITH_FCITX5=OFF`，`candidate_window_layout` 在 Debug 亦通过）、settings 540 项。
 **未执行**：任何应用内 TSF 检查；这套几何的所有者目视验收（本轮的四步清单在计划 R42 行与 PR 里）。
 
-**共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #43，head `30e744e`）。** Windows 此前在官方
+**共用中文运行时：墨奇辅助筛选与中英混输（R43，2026-10-23，实现 fusion-windows PR #43，head `30e744e`；混输槽位修正见本段末，PR #44，head `7c076e7`）。** Windows 此前在官方
 `61474bd` 上运行 fcitx5-chinese-addons，因此既没有墨奇辅助筛选、也没有中英混输，而 Android 早已在所有者维护的 fork 上——两个产品
 因此各有一套中文引擎。本轮把 Windows 的钉点移到 `choicky/fcitx5-chinese-addons` 的 `a04bcd4`——该 fork `fusion` 分支的 tip，同时包含 Android **发布**流程钉住的
-`0d0102b`（落后 66 个提交）与其 test-APK 流程跟随的 `feature/moqi-filter` tip `21eecda`（落后 64 个）：同一功能线、领先一代，而不是同一个提交——
+`0d0102b`（落后 67 个提交）与其 test-APK 流程跟随的 `feature/moqi-filter` tip `21eecda`（落后 65 个）：同一功能线、领先一代，而不是同一个提交（该钉点随后随混输槽位修正前移到 `2145c4b`，见本段末）——
 Fcitx 核心 `a7f2528` 与 LibIME `171edcf` **保持官方钉点不动**：不为与 Android 一致而降级，也不顺带升级。**一套实现，不是两套**：
 墨奇反查码表、混输的分段/排序/候选（`im/pinyin/mixed/*`）与英文词库都在这一处，Windows 不另写一份算法、不做第二套过滤。
 **MSVC 适配**只剩两处——拼音历史文件打开失败时的有效性保护，以及 `loadDict` 收 `std::filesystem::path`（窄字符串路径在
@@ -724,12 +724,12 @@ Windows 上会丢非 ASCII）；其余历史片段（含两处 EOF 空行）删�
 `AuxiliaryFilter` 默认仍是 Stroke，选 MoQi 才启用墨奇；`SpellEnabled`（默认 true）仍是英文候选的唯一开关，**没有**「启用混输」
 总开关；`MixedAutoSpacing` 默认 false；既有用户值不被覆盖。**验证**：真实引擎上的两项新检查——`mixed_runtime`（`hello` 得到
 词库里的英文候选并上屏、混输候选并列其后；`nihao` 仍以 你好 为首并上屏；辅助筛选触发键默认仍进 Stroke；**真正的混输**：
-`woxiangmaiiphone` 的第一候选即 `我想买iPhone` 并原样上屏，双拼（自然码）`woiphone` 的 `我iPhone` 落在引擎第 16 页、选中后同样整串上屏
-——两条都按候选文本定位、不要求排第一，也不以「出现拉丁字符」代替断言）与 `moqi_filter`
+`woxiangmaiiphone` 的第一候选即 `我想买iPhone` 并原样上屏，双拼（自然码）`woiphone` 的 `我iPhone` 同样在首屏、选中后整串上屏
+——各条都按候选文本定位、要求进首屏但不要求排第一，也不以「出现拉丁字符」代替断言）与 `moqi_filter`
 （一次性 `%TEMP%` profile 里写 `AuxiliaryFilter=MoQi`：`hao` + 触发键 → `[MoQi Filtering]`，码 `nz` 只剩 好 并上屏；随后
 `SpellEnabled=False` 时 `hello` 没有英文候选而 `nihao` 不受影响）。Release 92/92（2 项按自身设计跳过）、settings 540 项。构建脚本
 自身也跑到 `Native runtime ready`、退出码 0（码表缓存清空时按展开后的 URL 下载并得到钉住的哈希，暖缓存时直接复用）；装配段曾用缺
-`-ChildPath` 的 `Join-Path` 让 PowerShell 等待控制台输入而停住，已修。**未执行**：任何应用内 TSF 检查；这套候选与墨奇行为的应用内验收。
+`-ChildPath` 的 `Join-Path` 让 PowerShell 等待控制台输入而停住，已修。**后续修正（2026-10-23，`fcitx5-chinese-addons` PR #14，钉点 `2145c4b`）**：所有者报的自然码 `woxdmliphone`（预编辑 `wo xd ml ip ho ne`）首屏只有纯中文，`我想买iPhone` 在 **第 127 位**——不是没生成，而是放置规则只承认「raw 开头」的 Canonical 英文词（`openaimoxing` → [OpenAI][模型]），而自然码里偶数长度的英文尾部本来就等于一串合法双字母码（`ip ho ne` 强解成 蠢货呢），于是整条 raw 的中文读法把它挡在后面。该判定改为与位置无关：唯一一个 Canonical/CustomPhrase 英文弧、其余全是中文、弧无缝覆盖整条 raw，开头/结尾/中间同属一类；实测 `woxdmliphone` 127 → **1**、`woiphone` 111（第 16 页）→ **1**、全拼 `woxiangmaiiphone` 0 → 0。槽位仍是每输入一个、中文首候选仍在第 0 位、`Exact` 词仍走规则 (d)、Completion/Correction 仍不进入该类。**「能翻页找到」曾被当成可用**：本段原先把第 16 页写成放置策略的必然，那只是找得到，不是能用。**未执行**：任何应用内 TSF 检查；这套候选与墨奇行为的应用内验收。
 
 
 

@@ -149,9 +149,9 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+30e744e-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+bf74f1d`, predates the enhanced Chinese engine described in the next item — and note that
-  installing is not acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+7c076e7-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+bf74f1d`, predates the enhanced Chinese engine described in the next item *and* the mixed-slot
+  fix, so a 双拼 mixed candidate sits behind the Chinese list there — and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
@@ -159,10 +159,10 @@ rather than as done.
 - **English words and 墨奇 in the candidate list (new in this build).** The Chinese engine is now the same one the
   Android product runs, so a Latin word can be a candidate in its own right: type `hello` and the list offers `hello`
   beside the Chinese candidates, and selecting it commits it as typed. Typing one string that mixes both gives a
-  candidate carrying both — `woxiangmaiiphone` offers `我想买iPhone`, and in 双拼 `woiphone` offers `我iPhone`; either
-  one commits as the whole mixed string, but the fused candidate is **not** always first (in 双拼 an English tail is
-  also a run of valid two-letter codes, so it sits behind the Chinese list), so page through before concluding it is
-  missing. **显示英文候选** (`SpellEnabled`, in
+  candidate carrying both, and it commits as the whole mixed string: `woxiangmaiiphone` offers `我想买iPhone`, and in
+  双拼 both `woiphone` → `我iPhone` and `woxdmliphone` → `我想买iPhone` are on the first screen, right behind the
+  Chinese head. It is not required to be the first entry — the Chinese reading keeps row 0 — and other fused
+  readings can still sit behind the Chinese list, so page on if the one you meant is not there. **显示英文候选** (`SpellEnabled`, in
   候选与输入 → 候选) is the only switch and it is on by default; turn it off and no English candidate appears, while
   pinyin, its candidates and 双拼 behave exactly as before — there is **no separate “mixed input” switch**, and
   **MixedAutoSpacing** (spaces at Chinese/English boundaries) stays off unless you turn it on. **辅助筛选**
