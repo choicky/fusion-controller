@@ -150,8 +150,9 @@ rather than as done.
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
   (`fusion-0.0.0-winui3+7c076e7-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+bf74f1d`, predates the enhanced Chinese engine described in the next item *and* the mixed-slot
-  fix, so a 双拼 mixed candidate sits behind the Chinese list there — and note that installing is not acceptance. The 自动卷轴 pass is
+  `0.0.0-winui3+30e744e`, has the enhanced Chinese engine described in the next item but predates the mixed-slot
+  fix, so a 双拼 mixed candidate still sits behind the Chinese list there — and note that installing is not
+  acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
