@@ -62,7 +62,7 @@ It does not start a second engine, restart the Host, or register anything. If th
 stays usable; if it disconnects, times out or refuses the settings API version, the operation is reported as unsuccessful
 rather than as done.
 
-**The four pages.**
+**The five pages.**
 
 - **输入方式** — the ordered list of methods, with the first entry marked **当前** because that is the method a bound
   context follows. **上移 / 下移** reorder, **移除** leaves the group, and **添加** takes a method from the available list.
@@ -94,7 +94,7 @@ rather than as done.
   missing characters are filled in by the system font linking. When an
   input method asks for a particular direction for one list (quick phrase, Unicode and the input-method selector do), the
   input method's choice wins over this setting. The 外部工具 section lists the upstream tools this package does not ship,
-  with the reason.
+  with the reason — except **词库管理**, which is implemented in this window and opens its own page (see below).
 
   **自动卷轴** is the third arrangement, and it is about how much of the list is on screen at once rather than about a
   direction. A new word starts on **one line**, exactly like 横排. The first time you press the configured "next page" key
@@ -179,6 +179,20 @@ rather than as done.
   are verified on the real engine in isolation. **The owner reports the mixed-input fix passing the test it was given** —
   双拼 mixed candidates on the first screen — and that is the whole confirmed scope: it is not an acceptance of 墨奇 inside
   a running application, and it says nothing about the Android build.
+- **词库管理** — reached from 候选与输入 › 外部工具 › **词库管理**, and from the left navigation. The list is what the engine
+  itself can load: every `.dict` in your own data folder (**用户词库**) or in the package (**随包提供**), whether it is
+  enabled, and its file size — no word counts, because nothing on disk knows one without loading the dictionary.
+  **导入词库…** takes several files at once. A `.dict` is loaded first to prove it is a pinyin dictionary; a `.txt` is a
+  text dictionary in libime's own format — `汉字 拼音 [权重]` per line, e.g. `墨珂 mo'ke 1000` — and is converted before it is
+  placed. Either way the file is validated first and only then moved into your dictionary folder, so a file that fails
+  leaves the dictionaries you already had untouched. When the name is already taken the window asks **覆盖** or **跳过**;
+  nothing is replaced silently. **停用** writes the engine's own `<file>.dict.disable` marker and **启用** removes it — a
+  dictionary that came with the package can be disabled but not deleted, and **删除** (after a confirmation) removes only a
+  user dictionary and its marker, never `user.dict`, the learning history or the system dictionary. Each change reloads the
+  engine through its own dictionary-manager entry, so a new word appears without restarting anything; while a word is being
+  composed the change is refused and nothing is written — finish or cancel it and repeat. **重新加载** re-reads the folder,
+  which is also what to press after dropping a file there by hand. 搜狗 `.scel` cannot be imported: its converter is not
+  part of this Windows runtime. 拼音 and 双拼 share one set of dictionaries; there is no second copy to keep in step.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
