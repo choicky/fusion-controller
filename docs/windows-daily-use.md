@@ -76,9 +76,11 @@ rather than as done.
   cross-action binding is reported in a warning line and left alone: which one wins is the engine's business. The **，/。**
   preset edits the same `PrevPage`/`NextPage` lists and asks whether to replace or extend them. **系统快捷键** and
   **系统回退翻页** are separate sections: the first is the system's own shortcuts, the second is the core's fallback paging,
-  and neither is the Pinyin engine's paging keys.
-- **候选与输入** — the candidate window itself, then candidates, preedit, learning, 模糊音, the Shuangpin-only fields, and
-  系统输入行为. The **候选窗口** section at the top holds **候选排列方向** — **竖排** (one candidate per row), **横排** (this
+  and neither is the Pinyin engine's paging keys. **辅助筛选** holds **辅助筛选触发键** — the keys that start filtering a
+  candidate list with 辅助码; whether that filtering is 笔画 or 墨奇 is chosen on 候选与输入, so the key has one home and
+  the page states which one it is.
+- **候选与输入** — the candidate window itself, then candidates, **英文候选与混输**, **辅助筛选**, preedit, learning,
+  模糊音, the Shuangpin-only fields, and 系统输入行为. The **候选窗口** section at the top holds **候选排列方向** — **竖排** (one candidate per row), **横排** (this
   page's candidates on one row) or **自动卷轴** (below), shown in Chinese rather than as the stored
   `Vertical`/`Horizontal`/`AutoScroll` — plus **候选字体** and
   **字号（磅）** — 候选字体 is now a searchable list of the fonts this Windows session has, and any name it does not contain
@@ -149,10 +151,10 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+7c076e7-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+30e744e`, has the enhanced Chinese engine described in the next item but predates the mixed-slot
-  fix, so a 双拼 mixed candidate still sits behind the Chinese list there — and note that installing is not
-  acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+031f1ba-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+7c076e7`, has the enhanced Chinese engine and the mixed-slot fix but predates the Chinese names and groups
+  the next item describes, and a settings window opened before that upgrade keeps showing the build it was started from —
+  and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
@@ -163,19 +165,20 @@ rather than as done.
   candidate carrying both, and it commits as the whole mixed string: `woxiangmaiiphone` offers `我想买iPhone`, and in
   双拼 both `woiphone` → `我iPhone` and `woxdmliphone` → `我想买iPhone` are on the first screen, right behind the
   Chinese head. It is not required to be the first entry — the Chinese reading keeps row 0 — and other fused
-  readings can still sit behind the Chinese list, so page on if the one you meant is not there. **显示英文候选** (`SpellEnabled`, in
-  候选与输入 → 候选) is the only switch and it is on by default; turn it off and no English candidate appears, while
-  pinyin, its candidates and 双拼 behave exactly as before — there is **no separate “mixed input” switch**, and
-  **MixedAutoSpacing** (spaces at Chinese/English boundaries) stays off unless you turn it on. **辅助筛选**
-  (`Auxiliary Filter`, same page) still defaults to 笔画: with a candidate list on screen press the auxiliary-filter key
-  (the backquote key, bound as “Auxiliary Filter Trigger”) and the band above the candidates says `[Stroke Filtering]`.
-  Set the option to **墨奇** and the same key says `[MoQi Filtering]`; then type the two letters of a character’s 墨奇
-  code — `nz` for 好, `rx` for 你 — and the list narrows to what that code names, with the first candidate committing.
-  Both the table and the English word list travel inside the package, so this works with no network. The English, 墨奇
-  and mixed candidates above are verified on the real engine in isolation; **none of them has been accepted inside the
-  running application yet** — that is what the owner's own checks would establish. The two options
-  still appear in the settings page under their upstream names (笔画／墨奇 and the English-candidate switch) until the
-  next task gives them Chinese labels and grouping.
+  readings can still sit behind the Chinese list, so page on if the one you meant is not there. **显示英文候选**
+  (`SpellEnabled`, 候选与输入 → 英文候选与混输) is the only switch and it is on by default; turn it off and no English
+  candidate appears, while pinyin, its candidates and 双拼 behave exactly as before — there is **no separate “mixed
+  input” switch**, and **混输候选自动加空格** (`MixedAutoSpacing`, same group) stays off unless you turn it on: it puts one
+  space where one candidate's own Chinese and English segments meet, so the committed string carries it, and it does not
+  touch Chinese or English candidates or text already in the document. **辅助筛选方式** (`AuxiliaryFilter`, 候选与输入 →
+  辅助筛选) still defaults to 笔画: with a candidate list on screen press the auxiliary-filter key — **辅助筛选触发键**, bound
+  on the 按键 page in the same 辅助筛选 group — and the band above the candidates says `[Stroke Filtering]`. Set the option
+  to **墨奇** and the same key says `[MoQi Filtering]`; then type the two letters of a character’s 墨奇 code — `nz` for 好,
+  `rx` for 你 — and the list narrows to what that code names, with the first candidate committing. Both the table and the
+  English word list travel inside the package, so this works with no network. The English, 墨奇 and mixed candidates above
+  are verified on the real engine in isolation. **The owner reports the mixed-input fix passing the test it was given** —
+  双拼 mixed candidates on the first screen — and that is the whole confirmed scope: it is not an acceptance of 墨奇 inside
+  a running application, and it says nothing about the Android build.
 - **关于与诊断** — version, endpoint, connection state, the known limits, and a technical trace.
 
 **Saving.** Edits are held in a draft, one per underlying configuration: 拼音 and 双拼 share one because they are one
