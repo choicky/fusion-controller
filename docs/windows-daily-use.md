@@ -21,11 +21,14 @@ install, and reports what happened at the end.
 | uninstall, removing user data | the same uninstaller, answering 是 — it also deletes `%APPDATA%\Fcitx5` and `%LOCALAPPDATA%\Fcitx5` |
 
 The wizard runs the package's own `install.ps1` / `uninstall.ps1`; the progress page shows the same phase-by-phase output
-those scripts print, and both write a transcript to `%LOCALAPPDATA%\fusion-installer\`. A failed install aborts the wizard
-with the exit code and that path instead of finishing as if it had worked, and re-running the EXE retries it from the
-start; a failed uninstall keeps the "已安装的应用" entry so it can be retried. Neither path modifies `PATH`, force-deletes a
-directory a process holds, or touches `%APPDATA%\Fcitx5` unless removal was chosen. A version directory held by a running
-application stays until the next uninstall after sign-out (R28); both paths report the holders.
+those scripts print, and both write a transcript to `%LOCALAPPDATA%\fusion-installer\`. The progress page ends with
+`清理临时安装文件…`, which deletes the payload the wizard unpacked (about 285 MB in 658 files) **before** the 完成 page
+appears, so 完成 closes the wizard instead of leaving it deleting files behind a page that already says the install
+finished. A failed install aborts the wizard with the exit code and that path instead of finishing as if it had worked, and
+re-running the EXE retries it from the start; a failed uninstall keeps the "已安装的应用" entry so it can be retried.
+Neither path modifies `PATH`, force-deletes a directory a process holds, or touches `%APPDATA%\Fcitx5` unless removal was
+chosen. A version directory held by a running application stays until the next uninstall after sign-out (R28); both paths
+report the holders.
 
 The first real attempt (2026-10-23, `+c2a5ee1`) failed exactly this way: it stopped at exit 1 in `Add-Type` — NSIS had
 unpacked its own native `System.dll` into the working directory the installer gave PowerShell, and `Add-Type` resolved the
@@ -151,10 +154,9 @@ rather than as done.
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
   paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+031f1ba-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+7c076e7`, has the enhanced Chinese engine and the mixed-slot fix but predates the Chinese names and groups
-  the next item describes, and a settings window opened before that upgrade keeps showing the build it was started from —
-  and note that installing is not acceptance. The 自动卷轴 pass is
+  (`fusion-0.0.0-winui3+49638be-setup.exe`) before checking any of it — the version installed on this machine,
+  `0.0.0-winui3+e43ccad`, predates it, and a settings window opened before that upgrade keeps showing the build it was
+  started from — and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
