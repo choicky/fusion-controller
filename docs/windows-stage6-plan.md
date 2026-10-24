@@ -265,19 +265,40 @@ labelling every stored value, not only the selected one. Two defects had to be f
 never passed the table's value labels to the row builder, and the labels are keyed by the string the Host stores (the
 engine's own display name), not the C++ identifier.
 
-The second item — dictionary management — is **implemented in fusion-windows PR #46** (head `eee30e5`, package
-`0.0.0-winui3+eee30e5`): 候选与输入 › 外部工具 › 词库管理 (also in the navigation) lists what the engine can load, imports
-`.dict` and libime text dictionaries (validated and converted before placement, name conflicts answered 覆盖/跳过), enables
-and disables with the engine's own `<file>.dict.disable` marker, deletes user dictionaries only after a confirmation, and
-reloads through the addon's `dictmanager` sub-config so no restart is needed; a live composition refuses the change and
-writes nothing. **`.scel` is deferred with its reason recorded**, not skipped quietly: the only official converter is the
-addon's `scel2org5` tool, this runtime builds chinese-addons with `ENABLE_TOOLS=OFF` so it is not packaged, and the tool does
-not compile under MSVC (`<sys/endian.h>`); libime exposes no conversion for that format, and no second parser was written.
-Text and `.dict` do not depend on it. With the fork's MoQi filter and mixed English input inside the Windows
+The second item — dictionary management — is **implemented in fusion-windows PR #46**, still **OPEN and unmerged**, current head
+`b8a81aa` (the six repair items land on top of the reviewed `eee30e5`): 候选与输入 › 外部工具 › 词库管理 (also in the
+navigation) lists what the engine can load, imports `.dict` and libime text dictionaries (name conflicts answered 覆盖/跳过),
+enables and disables with the engine's own `<file>.dict.disable` marker, deletes user dictionaries only after a confirmation,
+and reloads through the addon's `dictmanager` sub-config so no restart is needed. `b8a81aa` is the pass that made those five
+operations honest about failure: an import is refused unless libime's own parse result holds at least one entry, so plain text
+and an empty file can no longer replace an installed dictionary; the converted file is staged in an exclusively created
+`fusion-import-<pid>-<tick>-<n>.tmp` that the engine's `*.dict` filter cannot discover and no dictionary can be named
+(the old `.<name>.import.dict` was both); names travel as UTF-8 and land as wide paths, which is what a Chinese name needs
+end to end; the composition check, the file placement (or marker change) and the engine reload are one event-loop callback,
+so a key that starts a composition can no longer land between a written file and a reloaded engine; and a delete or an
+enable whose file operation failed returns the failure instead of reporting success. **`.scel` is deferred with its reason
+recorded**, not skipped quietly: the only official converter is the addon's `scel2org5` tool, this runtime builds
+chinese-addons with `ENABLE_TOOLS=OFF` so it is not packaged, and the tool does not compile under MSVC
+(`<sys/endian.h>`); libime exposes no conversion for that format, and no second parser was written. Text and `.dict` do not
+depend on it. With the fork's MoQi filter and mixed English input inside the Windows
 runtime, the remaining Windows work is user-facing, in this order: (1) an online
 dictionary catalogue and download; (2) a custom-phrase / quick-phrase editor; (3) a 简繁 conversion and punctuation-mapping
 editor. Each keeps its own scope when it is authorized; none is an Accepted Decision here, and none is a prerequisite for
 the owner's acceptance of R43.
+
+**`b8a81aa` is implemented, compiled and tested on the 5700X; it is not packaged here.** What was measured on that machine:
+the Release native build of this head, `dictionary_manager` passing with its five new sections (the squatting
+`.collide.import.dict`, the refused plain-text and empty imports, the Chinese-name chain, the composition that starts after
+the conversion, the held-open delete and enable), the full Release suite at 91/93 with the two failures named and measured
+(`mixed_runtime` and `moqi_filter` both need the enhanced runtime — the pinned `runtime-wp3-20261018` on this machine has no
+English lexicon and its `AuxiliaryFilter` has no MoQi value, which the engine's own output shows), the published WinUI
+client, and the settings harness at 814 checks with that same single `AuxiliaryFilter` failure plus 3 after an orderly
+restart. Two steps could not run on this machine and were not pretended: `tools/package/build-package.ps1` stops because the
+package requires the enhanced addon fork's data notices (`third_party\moqima-tables.LICENSE`, `data-licenses\english\*`) and
+this machine's pinned `fcitx5-chinese-addons` is the pre-fork `61474bd` without them, and `tools/installer/build-installer.ps1`
+needs NSIS 3, which is not installed here and cannot be fetched (no HTTPS egress — the sourceforge and github endpoints both
+fail to connect). The package and the EXE for this head therefore belong to the machine that carries the enhanced runtime and
+NSIS; `+eee30e5` is superseded as the artifact to install, not completed by this pass.
 
 **Settings UI — consolidated current status (2026-10-21; D085/D086, presentation superseded by D087).** This is the single current record.
 **Direction change (2026-10-21, D087).** The owner has replaced the *presentation technology only*: the Windows settings surface is to be a
@@ -294,10 +315,14 @@ so the Qt client below is **not** in it. The Qt client's own record stays as the
 | designed | done — navigation, option coverage, shared-state model (`evidence/settings-winui3-2026-10-21/migration-inventory.md`) |
 | implemented | **core and views** — `FusionSettings.Core` (framing, codecs, endpoint naming, connection/handshake, draft/baseline, key model, input-method draft) and `FusionSettings.App` (five pages: 输入方式 · 按键 · 候选与输入 · 词库管理 · 关于与诊断) |
 | compiled | **yes** — .NET SDK 10.0.402, Windows App SDK 2.5.1, Windows SDK BuildTools 10.0.28000.2705, all restored and hash-verified against nuget.org |
-| tested | **yes** — 846 checks against an isolated Host with a writable throwaway profile (**575** of them need no Host), plus **3** after an orderly restart. The rounds below record what each part covers and which defects its assertions discriminate |
-| UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`) |
+| tested | **yes** — 846 checks against an isolated Host with a writable throwaway profile (**575** of them need no Host), plus **3** after an orderly restart. The same harness on the pinned `runtime-wp3-20261018` prints **814** and fails exactly one check — `the engine exposes AuxiliaryFilter`, an option that exists only in the enhanced runtime, so it is the runtime, not the client; re-measured at `b8a81aa` on the 5700X with the dictionary round's Chinese-name chain included. The rounds below record what each part covers and which defects its assertions discriminate |
+| UI verified | **yes, as a running window** — driven through UI Automation: an edit followed directly by closing (the dialog appears because the control was committed first), a close during an in-flight save (refused with the reason, edits kept), a reconnect with edits retained and saved, and key-tag reflow at three widths plus an add and a remove after a resize (`worktmp\fusion-windows\settings-winui3\r3\shots\`). The 词库管理 page was driven through the **window-level** 重新加载 in both directions at `b8a81aa`: the pre-fix client exits with `-1073741189` (`0xC000027B`, "element is already the child of another element") and the fixed one survives and shows the refreshed list — both against an isolated Host on a private throwaway profile |
 | packaged | **yes** — the installer round paragraph's *State by level* carries the current package and its identity; the round that first packaged the WinUI client recorded `fusion-0.0.0-winui3+ff3bd8f.zip`, 139 035 392 B, SHA-256 `D10D0CD69DB1A254EA15A00A7F200064FAAC198DCD08CC33FDEDE29C0E661DE1`, 652 per-file SHA-256 manifest entries re-verified against an independent extraction (0 mismatches, 0 missing, 0 unlisted), `sourceCommit` `ff3bd8f9b6ce54c947925cc39b0744b5d075c82f`, `sourceDirty` false, WinUI settings client only (no Qt client in this tree). The packaged `FusionTsf.dll`, `FusionHost.exe`, `FusionFcitxHost.dll` and `FusionTray.exe` are byte-identical to this pass's Release build outputs, and the packaged settings client is the previously verified publish tree, re-checked here: all **515** of its files match the `+00622f0` manifest entry for entry, and the settings source has not changed since `00622f0` (only its README). This pass also ran the packaged `FusionHost.exe` through the same 622-check harness and drove the packaged `FusionSettings.exe` once through UI Automation (window “Fusion 设置”, four pages, an edit, 保存, `pinyin.conf` changed in the throwaway profile) — both against an isolated Host on a unique pipe, with the throwaway profile removed and only the installed Host left running. `fusion-0.0.0-winui3+00622f0.zip` (139 034 048 B, SHA-256 `8F06984E…5490DE`), `+83f0cf4` (139 030 899 B) and the older `+4160e66` (139 015 158 B, which predates the release-admission guard and the protocol-version check) are superseded. Nothing was installed or registered by the `+ff3bd8f` pass. Which version is installed now, and which build is the one to install next, are stated once in the **installed** row below; this row records packaging only. `0.0.0-wp7+d095a44` is not on disk any more (the earlier `0.0.0-settings+fe65d08`, `+3ebf048` and `+502d5ec` directories are, as R28 expects for versions whose DLLs a process may still hold). |
-| installed | **yes — `0.0.0-winui3+7c076e7`**, which the owner installed after `0.0.0-winui3+30e744e` (installed by its EXE on 2026-10-23 19:31) and `+bf74f1d` before it: the running `FusionHost` and `FusionTray` come from that version directory and the Add/Remove entry reports `DisplayVersion=0.0.0-winui3+7c076e7` (`%LOCALAPPDATA%\fusion-installer\` holds the transcripts). `+30e744e` was the build the owner was running when the `woxdmliphone` case was reported — it carries the enhanced runtime but not the mixed-slot fix; `+7c076e7` carries both, and the owner reports the mixed-input test passing on it (that feedback is recorded in the R43 row and in `docs/windows-daily-use.md`, and it is not an acceptance of the candidates or of the settings page). **`+eee30e5` (PR #46) is not installed** and is what to install next: the same runtime as `+7c076e7`, the Chinese names, groups and value labels of `+031f1ba`, and the 词库管理 page. A settings window started from the `+30e744e` directory is still open on that machine — an upgrade does not restart a running window — so anything compared there shows the previous build. |
+| installed | **yes — `0.0.0-winui3+7c076e7`**, which the owner installed after `0.0.0-winui3+30e744e` (installed by its EXE on 2026-10-23 19:31) and `+bf74f1d` before it: the running `FusionHost` and `FusionTray` come from that version directory and the Add/Remove entry reports `DisplayVersion=0.0.0-winui3+7c076e7` (`%LOCALAPPDATA%\fusion-installer\` holds the transcripts). `+30e744e` was the build the owner was running when the `woxdmliphone` case was reported — it carries the enhanced runtime but not the mixed-slot fix; `+7c076e7` carries both, and the owner reports the mixed-input test passing on it (that feedback is recorded in the R43 row and in `docs/windows-daily-use.md`, and it is not an acceptance of the candidates or of the settings page). **Nothing from PR #46 is installed**, and `+eee30e5` is superseded rather than current: the dictionary work now stands at
+`b8a81aa` — the same runtime as `+7c076e7`, the Chinese names, groups and value labels of `+031f1ba`, the 词库管理 page and
+the six dictionary repairs — which is compiled and tested but **not packaged on this machine** (the dictionary pass above
+records why), so the version to install is the package built from `b8a81aa` where the enhanced runtime and NSIS 3 exist.
+A settings window started from the `+30e744e` directory is still open on that machine — an upgrade does not restart a running window — so anything compared there shows the previous build. |
 | owner-accepted | **the installer: yes** — the owner's five checks on 2026-10-23, recorded in the installer round paragraph below (install, Chinese input, the 已安装的应用 entry with the right version, uninstall keeping user data, reinstall keeping learning and settings). **The candidate window: no** — R42's own four checks are open. |
 
 The prerequisite is **resolved**, not worked around: nuget.org's own OData endpoint publishes each package's SHA-512, so a
@@ -546,9 +571,9 @@ status `failed` and produced no findings, so the review record for that pair is 
 real-install acceptance — not an automated review.
 
 **State by level.** *Implemented* (`tools/installer/fusion-installer.nsi`, `tools/installer/build-installer.ps1`).
-*Built and delivered:* `fusion-0.0.0-winui3+eee30e5-setup.exe`, 105 255 849 B, SHA-256
+*The build to supersede next:* `fusion-0.0.0-winui3+eee30e5-setup.exe`, 105 255 849 B, SHA-256
 `8E1EE98DAD47FBCA8BB1ED37010CE77A4E60F7330B59A708D5425C13E7AC6BAA`, from `sourceCommit`
-`eee30e5c763e2270ebc93463a31218b077ce2fb9` (`sourceDirty` false — the head of PR #46), carrying the owner-test
+`eee30e5c763e2270ebc93463a31218b077ce2fb9` (`sourceDirty` false), carrying the owner-test
 package `fusion-0.0.0-winui3+eee30e5.zip` (657 manifest entries; `Zip SHA-256` `32633960…4D41`) whose manifest the
 product's own `install.ps1 -VerifyOnly` checked before the payload was compressed — the identical check runs at
 install time on the files the EXE unpacks, so a corrupt embed cannot install silently. Those 657 are product files
@@ -574,10 +599,14 @@ process at `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` reporting
 script and disappears in an empty directory; the uninstall scan picks `0.0.0-winui3+3325514` on this machine. *Owner
 install: **accepted** with `+3325514`* — install, upgrade from the zip-installed `+43a832f`, uninstall keeping user data and
 reinstall were exercised for real; the only EXE that failed is `+c2a5ee1`, which cannot install and is superseded. *The
-current EXE (`+eee30e5`): not installed.* *Isolated install: NOT executed* — this machine has no Windows Sandbox and no clean VM, and
+current EXE (`+eee30e5`): not installed, and superseded as the artifact to install — the dictionary repairs moved PR #46 to
+`b8a81aa`, which has no package or EXE yet: the two steps that produce them cannot run on the 5700X (the package requires
+the enhanced addon fork's data notices, NSIS 3 is not installed there and has no egress to be fetched), so they belong to
+the machine that carries both — see the `b8a81aa` paragraph in the R43 work section above.* *Isolated install: NOT executed* — this machine has no Windows Sandbox and no clean VM, and
 installing or upgrading on the owner's own Windows is not authorized, so a same-version re-run, a cancel mid-install and
 failure reporting remain **reasoned from the reviewed code and the scripts' verified behaviour, not measured by me**.
-*Owner installation and acceptance: **the installer**: accepted for `+3325514`, and the owner has since installed `+bf74f1d`, `+30e744e` and then `+7c076e7` — that last one is what is installed now, and the owner reports the mixed-input fix passing its own test on it; **R42's geometry, R43's runtime and the dictionary page**: not accepted — installing `+eee30e5` is the owner's next step, and installing is not acceptance.*
+*Owner installation and acceptance: **the installer**: accepted for `+3325514`, and the owner has since installed `+bf74f1d`, `+30e744e` and then `+7c076e7` — that last one is what is installed now, and the owner reports the mixed-input fix passing its own test on it; **R42's geometry, R43's runtime and the dictionary page**: not accepted — the next step is the owner's install of the package
+built from `b8a81aa` (no such package exists yet), and installing is not acceptance.*
 
 The second round also corrected the inventory against a running Host rather than the source alone: a `List|Key` value is an
 indexed map (or the empty scalar), not a space-separated string; `NextPage`'s fourth default is `Next`, not `Page_Down` (one

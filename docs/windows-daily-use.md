@@ -184,7 +184,9 @@ rather than as done.
   enabled, and its file size — no word counts, because nothing on disk knows one without loading the dictionary.
   **导入词库…** takes several files at once. A `.dict` is loaded first to prove it is a pinyin dictionary; a `.txt` is a
   text dictionary in libime's own format — `汉字 拼音 [权重]` per line, e.g. `墨珂 mo'ke 1000` — and is converted before it is
-  placed. Either way the file is validated first and only then moved into your dictionary folder, so a file that fails
+  placed. Either way the file is validated first — and a file that holds no real entry at all is refused: an empty file, or
+  ordinary prose, is not an empty dictionary, so the window says why instead of placing it, while a line libime cannot read
+  beside valid ones still imports. The validated file is then moved into your dictionary folder, so a file that fails
   leaves the dictionaries you already had untouched. When the name is already taken the window asks **覆盖** or **跳过**;
   nothing is replaced silently. **停用** writes the engine's own `<file>.dict.disable` marker and **启用** removes it — a
   dictionary that came with the package can be disabled but not deleted, and **删除** (after a confirmation) removes only a
