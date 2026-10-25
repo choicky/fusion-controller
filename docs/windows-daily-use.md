@@ -49,6 +49,14 @@ install leaves that entry naming the version the EXE last installed — its unin
 **Rollback:** run the previous version's `install.ps1` elevated (it installs side by side and re-registers that version),
 or uninstall and install the earlier package. User data is kept either way.
 
+**After an upgrade, restart the applications that were already running.** The install replaces the input-method files
+and re-points the registration, but a process keeps the version it loaded, so an application started before the
+install — Explorer is the one that matters most, because it lives for days — keeps using the previous build. When
+that build is from a different protocol version, it cannot talk to the new Host at all: the input method simply does
+nothing in that process (no candidates, no composition, keys typed raw) until it is restarted, and Ctrl+Space does not
+help because nothing is listening for it. Signing out and back in, or restarting Explorer, is what loads the new one.
+This is the cause recorded as R48; it is not a defect in the installed build.
+
 **Installing registers and enables Fusion; it does not necessarily make it the selected input method.** After install (and
 after every upgrade), check the Windows input indicator in the taskbar. If Fusion is not the current input method, press
 **Win+Space** until it is, then type. Judge U6 only with Fusion already selected — otherwise "letters appear raw" means the
@@ -87,9 +95,12 @@ rather than as done.
   page's candidates on one row) or **自动卷轴** (below), shown in Chinese rather than as the stored
   `Vertical`/`Horizontal`/`AutoScroll` — plus **候选字体** and
   **字号（磅）** — 候选字体 is a searchable list of the fonts this Windows session has; opening it puts the font in
-  effect at the top **and marks that row with a background**, so the list starts at the current family instead of at
-  "A" and says which one it is — the mark follows what the box holds, an unsaved choice included — and opening the
-  list changes nothing. Any name it does not contain can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
+  effect at the top **and marks that row — a tinted background and a short accent bar at its left edge**, so the list
+  starts at the current family instead of at "A" and says which one it is. The same mark, in the same place, is what
+  every other selection list in this window uses for the value in effect: the closed-set dropdowns (候选排列方向,
+  上屏方式, 候选字号 …) and the 拼音/双拼 selector draw it the same way, and it moves when the selection changes. The
+  mark follows what the control holds — an unsaved choice included — it is a row style rather than part of the name,
+  and opening any of these lists changes nothing. Any name the font list does not contain can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
   Host schema's defaults — and it now rebuilds the page so the two editors show the reset values straight away, not only the preview. They save with the same **保存** button as everything else — there is no separate apply — and they
   take effect from the next candidate page, so the popup already on screen does not move under the pointer. A profile that
   never touched them keeps the vertical list and the Microsoft YaHei UI look this product has always drawn, so upgrading
