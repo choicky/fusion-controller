@@ -206,6 +206,18 @@ The experimental paired-punctuation extension is PAUSED and excluded from the
 first-release product scope by D066. Do not treat its historical experiment as
 a current product task.
 
+**Current pin state (recorded 2026-10-25; this is not a new decision).** The
+addon `fusion` line re-introduced a narrowed two-line extension after the D068
+baseline: `modules/punctuation/punc.mb.zh_CN` gains `« « »` and `‹ ‹ ›`
+(addons PR #9, `d04a4ac` + `2ede2f2`), 43 lines in total. That commit is an
+ancestor of every Android release pin from `v0.1.3-fusion.10` (`c42ab54`)
+through the current `2145c4b`, and of the current Windows pin, so both products
+already ship it. The `first-release-baseline.md` row's "41-line upstream
+baseline" describes the frozen D068 first-release artifact (`47401b04`), not
+the current pin; D060 keeps that row unchanged. Whether to accept the narrowed
+extension or revert it is undecided here. Reverting would change the shared
+engine for both products, so it is not part of the fusion.14 ASR/release batch.
+
 ### D052–D053 — MoQi downstream boundary
 MoQi remains downstream-only. Upstream contribution work is closed/non-blocking;
 the product table and Auxiliary Filter semantics remain.
