@@ -294,6 +294,15 @@ identity (certificate SHA-256
 `DC:49:71:82:C5:48:66:34:FD:68:E5:71:B8:78:A3:3E:CE:A6:8B:DA:D2:05:C3:D6:1A:ED:09:B9:83:92:A5:6A`),
 shared by local and CI Debug/Test builds and never used for Release/Signed RC.
 
+**Release-specific owner authorization (2026-10-25).** The owner authorized
+publishing `v0.1.3-fusion.14` from the existing draft without waiting for
+device acceptance. The published asset is the same locally built, D058-signed
+APK (SHA-256 `878c2930…`); publication did not rebuild, re-sign or regenerate
+it through CI. Device acceptance remains pending and is recorded as pending in
+`ROADMAP.md` and `asr-productization-acceptance.md`. This is a one-release
+exception: the exact-artifact promotion rule and the device gate remain in
+force for later releases.
+
 ### D068 — first release
 RC.2 was exactly promoted and the first Fusion Enhanced release was published.
 Release evidence is historical; post-release development state is tracked by
