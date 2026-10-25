@@ -87,8 +87,9 @@ rather than as done.
   page's candidates on one row) or **自动卷轴** (below), shown in Chinese rather than as the stored
   `Vertical`/`Horizontal`/`AutoScroll` — plus **候选字体** and
   **字号（磅）** — 候选字体 is a searchable list of the fonts this Windows session has; opening it puts the font in
-  effect at the top, so the list starts at the current family instead of at "A", and opening it changes nothing. Any
-  name it does not contain can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
+  effect at the top **and marks that row with a background**, so the list starts at the current family instead of at
+  "A" and says which one it is — the mark follows what the box holds, an unsaved choice included — and opening the
+  list changes nothing. Any name it does not contain can still be typed — with a small preview of the candidate window's own typography and **恢复默认字体** to put both back to the
   Host schema's defaults — and it now rebuilds the page so the two editors show the reset values straight away, not only the preview. They save with the same **保存** button as everything else — there is no separate apply — and they
   take effect from the next candidate page, so the popup already on screen does not move under the pointer. A profile that
   never touched them keeps the vertical list and the Microsoft YaHei UI look this product has always drawn, so upgrading
@@ -114,8 +115,10 @@ rather than as done.
   to row, and the widths are taken from every row of the scroll window so the grid does not shift while you move.
   The **numbers** are drawn only on the row the keys act on — that row is the engine's current page — so pressing `3`
   selects the candidate labelled 3 on that row and nothing else — and with no candidate list on screen a number key is
-  just a number, on the top row and on the keypad alike, instead of being claimed and dropped; the **mouse** can click
-  any visible row, and that candidate is what gets committed. **Left and right arrows** move the highlight between candidates in this window — the highlight is
+  just a number, on the top row and on the keypad alike, instead of being claimed and dropped; the same holds for the
+  **symbols** — `/`, `-`, `+`, `=`, `@` and the keypad operators type through when the input method has nothing to do
+  with them, while the punctuation it does convert (`,`, `.`, `?` …) still comes out as `，` `。` `？`; the **mouse**
+  can click any visible row, and that candidate is what gets committed. **Left and right arrows** move the highlight between candidates in this window — the highlight is
   the engine's own cursor — **space** commits the one it is on, and up/down keep the row navigation described above. At the
   first or the last candidate the arrows stop instead of wrapping, and there the key goes back to the input method, which is
   how the caret inside the pinyin string is moved; so editing what has been typed stays possible, and 竖排 and 横排 keep the
