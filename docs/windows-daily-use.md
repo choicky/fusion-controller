@@ -155,10 +155,10 @@ rather than as done.
   real application**: 竖排 and 横排 are D088 (PR #33, documented in PR #56), the geometry, font, DPI and full-text work is
   R39 (PR #36), and 自动卷轴 is R40 (PR #37: real-engine one-line → expansion, row and scroll-page steps with the column
   kept, a click on another row committing that candidate). The check counts for each round are in the plan's round
-  paragraphs rather than repeated here. **Install the build this batch packages**
-  (`fusion-0.0.0-winui3+49638be-setup.exe`) before checking any of it — the version installed on this machine,
-  `0.0.0-winui3+e43ccad`, predates it, and a settings window opened before that upgrade keeps showing the build it was
-  started from — and note that installing is not acceptance. The 自动卷轴 pass is
+  paragraphs rather than repeated here. **Install the build this batch packages** — the package and single EXE named in
+  the plan's *State by level* table, not repeated here — before checking any of it: the version installed on this
+  machine predates it, and a settings window opened before that upgrade keeps showing the build it was started from —
+  and note that installing is not acceptance. The 自动卷轴 pass is
   yours to make: select it, type a syllable, press the configured next-page once and check the panel grows, that the
   numbers sit on the row the keys act on, that clicking another row commits that candidate, that a page with one long
   candidate beside single characters draws one wide column instead of widening all of them (R42), and that a new word
