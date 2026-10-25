@@ -55,7 +55,7 @@ install — Explorer is the one that matters most, because it lives for days —
 that build is from a different protocol version, it cannot talk to the new Host at all: the input method simply does
 nothing in that process (no candidates, no composition, keys typed raw) until it is restarted, and Ctrl+Space does not
 help because nothing is listening for it. Signing out and back in, or restarting Explorer, is what loads the new one.
-This is the cause recorded as R48; it is not a defect in the installed build.
+R48 records the measurement behind that: the mismatch is confirmed, whether input comes back once the application is restarted has **not** been verified yet, and the occasional stalls were not reproduced, so their cause is still undetermined.
 
 **Installing registers and enables Fusion; it does not necessarily make it the selected input method.** After install (and
 after every upgrade), check the Windows input indicator in the taskbar. If Fusion is not the current input method, press
