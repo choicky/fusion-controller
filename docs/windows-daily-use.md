@@ -497,15 +497,17 @@ No daily report is required, and no feedback is needed for a day without problem
   for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
   `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
   package.
-- **The taskbar search box cannot use Fusion — a reported limitation, being located (R49).** The box's text field
+- **The taskbar search box cannot use Fusion — a reported limitation, located (R49).** The box's text field
   belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows offers a text service to such a process only
   when the service declares that it runs in one. Fusion does not declare it, so the box does not load the input method
-  at all. Measured on 2026-10-26: declaring the capability for the installed build does make the box activate Fusion,
-  but Fusion then cannot reach `FusionHost` from inside that process and passes every key through, so no Chinese is
-  typed. The step that fails is now known: opening the Host's pipe from inside that process is refused with
-  `ERROR_ACCESS_DENIED`, so the input method has no session and passes every key through (R49). What to do about
-  it is a decision about what a packaged app may reach, not a code detail, so it is still open. Win+R, the editors
-  and the browsers are unaffected. Until R49 is closed, type in an application window rather than in the search box.
+  at all. Measured on 2026-10-26: declaring the capability makes the box activate Fusion, and the first barrier is the
+  Host's pipe, whose access check refused that process with `ERROR_ACCESS_DENIED`. A grant naming that package's
+  AppContainer SID — tried on a branch, not shipped — opens the pipe, and the input method then stops one step
+  later: it may not open the Host process to check who the server is, so the identity check fails with the same code
+  and every key is still passed through. Both remaining choices — letting that package query the Host process, or
+  verifying something else — change what the connection is allowed to assume, so this is a decision, not a code
+  detail, and R49 stays open. Win+R, the editors and the browsers are unaffected. Until R49 is closed, type in an
+  application window rather than in the search box.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
