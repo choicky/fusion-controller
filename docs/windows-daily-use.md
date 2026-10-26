@@ -55,7 +55,7 @@ install — Explorer is the one that matters most, because it lives for days —
 that build is from a different protocol version, it cannot talk to the new Host at all: the input method simply does
 nothing in that process (no candidates, no composition, keys typed raw) until it is restarted, and Ctrl+Space does not
 help because nothing is listening for it. Signing out and back in, or restarting Explorer, is what loads the new one.
-R48 records the measurement behind that: the mismatch is confirmed, whether input comes back once the application is restarted has **not** been verified yet, and the occasional stalls were not reproduced, so their cause is still undetermined.
+R48 records the measurement behind that: the mismatch is confirmed, and the owner restarted Explorer on 2026-10-26 and reports 双拼 working again and the machine usable overall. The occasional stalls were not reproduced and the restart is not evidence about them — their cause is still undetermined.
 
 **Installing registers and enables Fusion; it does not necessarily make it the selected input method.** After install (and
 after every upgrade), check the Windows input indicator in the taskbar. If Fusion is not the current input method, press
@@ -497,13 +497,15 @@ No daily report is required, and no feedback is needed for a day without problem
   for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
   `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
   package.
-- **The taskbar search box cannot use Fusion (R49).** The box's text field belongs to `SearchHost.exe`, which runs in an
-  AppContainer, and Windows only offers a text service to such a process when the service declares that it runs in one.
-  Fusion declares no such capability, so the search box never activates it: Ctrl+Space and Win+Space cannot reach it
-  there, and no Chinese can be typed. This is **not** a stale-DLL case — `FusionTsf.dll` is never loaded into that
-  process at all, so restarting anything does not change it. Win+R, the editors and the browsers are unaffected. R49
-  records the two measured barriers and what closing them would take; until then, type in an application window
-  rather than in the search box.
+- **The taskbar search box cannot use Fusion — a reported limitation, being located (R49).** The box's text field
+  belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows offers a text service to such a process only
+  when the service declares that it runs in one. Fusion does not declare it, so the box does not load the input method
+  at all. Measured on 2026-10-26: declaring the capability for the installed build does make the box activate Fusion,
+  but Fusion then cannot reach `FusionHost` from inside that process and passes every key through, so no Chinese is
+  typed. That is why this is a limitation today rather than a fix waiting for an install — what remains is the
+  transport between a packaged process and the Host, which also carries the settings messages and is therefore not
+  changed on the way past. Win+R, the editors and the browsers are unaffected. Until R49 is closed, type in an
+  application window rather than in the search box.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
