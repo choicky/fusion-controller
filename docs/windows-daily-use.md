@@ -502,9 +502,10 @@ No daily report is required, and no feedback is needed for a day without problem
   when the service declares that it runs in one. Fusion does not declare it, so the box does not load the input method
   at all. Measured on 2026-10-26: declaring the capability for the installed build does make the box activate Fusion,
   but Fusion then cannot reach `FusionHost` from inside that process and passes every key through, so no Chinese is
-  typed. So this is a limitation today rather than a fix waiting for an install: what fails is the link between a
-  packaged process and the Host, and which step of it fails is still being measured (R49). Win+R, the editors and
-  the browsers are unaffected. Until R49 is closed, type in an application window rather than in the search box.
+  typed. The step that fails is now known: opening the Host's pipe from inside that process is refused with
+  `ERROR_ACCESS_DENIED`, so the input method has no session and passes every key through (R49). What to do about
+  it is a decision about what a packaged app may reach, not a code detail, so it is still open. Win+R, the editors
+  and the browsers are unaffected. Until R49 is closed, type in an application window rather than in the search box.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
