@@ -497,6 +497,13 @@ No daily report is required, and no feedback is needed for a day without problem
   for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
   `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
   package.
+- **The taskbar search box cannot use Fusion (R49).** The box's text field belongs to `SearchHost.exe`, which runs in an
+  AppContainer, and Windows only offers a text service to such a process when the service declares that it runs in one.
+  Fusion declares no such capability, so the search box never activates it: Ctrl+Space and Win+Space cannot reach it
+  there, and no Chinese can be typed. This is **not** a stale-DLL case — `FusionTsf.dll` is never loaded into that
+  process at all, so restarting anything does not change it. Win+R, the editors and the browsers are unaffected. R49
+  records the two measured barriers and what closing them would take; until then, type in an application window
+  rather than in the search box.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
