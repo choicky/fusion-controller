@@ -386,8 +386,8 @@ URLs or page content. The lines that decide the next step:
 | `ANCHOR_PROBE stage=ok source=last-good hr=0x80040206 anchor=x,y` | this keystroke had no layout, so the page is kept at the last anchor that resolved **for this context** instead of being hidden (R46's fix, PR #56) |
 | `ANCHOR_PROBE stage=ok source=layout-change range=… rect=…` | the application finished laying this text out, the layout notification came back, and the page moved to the new rectangle. The re-probe ran in a read-only session and wrote no text (PR #56) |
 | `ANCHOR_PROBE stage=no-active-view` / `stage=no-range` | the context had no active view, or the selection returned no range — the anchor was not even attempted |
-| `CANDIDATE_VIEW shown owner=0x… owner-source=view\|focus rect=l,t,r,b topmost=1 immersive=0\|1\|-1` | one line per show, from PR #56 on: the window the popup is owned by, whether that came from the context's view or from the focus, the rectangle it was placed at, and the immersive flag — which **no behaviour depends on** and which `-1` when there was no thread manager to ask. If this line is present, its rect matches where the anchor resolved, and the window still cannot be seen, what is left is the z-order band, not the anchor: that is R49's open question and it goes back as a decision, not a hack (`immersive` is why the line carries the flag at all) |
-| `CANDIDATE_VIEW hidden reason=no-anchor` / `no-page` / `no-owner` | nothing to anchor to (R46's symptom on the build before PR #56 — the failing probe is above it) / no candidate page to show / neither the context view nor the focus gave a window to own the popup to, so no unowned window was created (PR #56) |
+| `CANDIDATE_VIEW shown owner=0x… owner-source=view\|focus\|none rect=l,t,r,b topmost=1 immersive=0\|1\|-1` | one line per show, from PR #56 on: the window the popup is owned by, whether that came from the context's view, from the focus, or from neither (`none` — the page is then shown unowned and still topmost), the rectangle it was placed at, and the immersive flag — which **no behaviour depends on** and which `-1` when there was no thread manager to ask. If this line is present, its rect matches where the anchor resolved, and the window still cannot be seen, what is left is the z-order band, not the anchor: that is R49's open question and it goes back as a decision, not a hack (`immersive` is why the line carries the flag at all) |
+| `CANDIDATE_VIEW hidden reason=no-anchor deferred=1` / `no-page` | nothing to anchor to yet (R46's symptom on the build before PR #56 — the failing probe is above it) / no candidate page to show. `deferred=1` means the page is waiting for the layout notification that can still place it: the popup was created hidden for that message, and a `shown` line follows once the anchor resolves |
 | `LAYOUT_SINK advise-failed hr=…` | the context would not accept the layout notification, so the page will only move on the next keystroke. Placement and input keep working; nothing else changes (PR #56) |
 | `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility. R49's step 4 measured exactly this in the taskbar search box (`stage=ok source=composition rect=1024,2101,1039,2132 clipped=0` with nothing visible): the popup had no owner window and was not topmost, so the flyout covered it. PR #56 owns it to the document's window and tops it (D090); on that build the `shown` line above is the one to read |
 
@@ -502,8 +502,11 @@ No daily report is required, and no feedback is needed for a day without problem
     gap: measured 2026-10-28 on the installed `+51467cf`, it happened 151 times in one browser process's log. The fix
     keeps the popup at the last position that did resolve (`ANCHOR_PROBE stage=ok source=last-good`) and re-places it as
     soon as the application lays the text out (`source=layout-change`, in a read-only session that writes no text) —
-    fusion-windows PR #56, packaged as `fusion-0.0.0-winui3+5f103bc-setup.exe`. **On the build you have installed now,
-    the workaround is unchanged: one more keystroke brings the window back.**
+    fusion-windows PR #56, packaged as `fusion-0.0.0-winui3+407a0ce-setup.exe`. That build also places the page that
+    has **no** anchor yet: it is deferred (`hidden reason=no-anchor deferred=1`), its window is created hidden so the
+    layout notification has something to place, and it appears as soon as the layout arrives instead of waiting for the
+    next key. **On the build you have installed now, the workaround is unchanged: one more keystroke brings the window
+    back.**
   - **If a field ever shows no popup again:** restart the browser first (see the next bullet) and then, if you want to
     report it, run the optional capture in §5 "R25 browser capture" — it gives the exact steps, the log location and
     what to report.
@@ -536,8 +539,11 @@ No daily report is required, and no feedback is needed for a day without problem
   answers it — the popup is owned by the document's own window (`GetActiveView` → `GetWnd`, falling back to the focus
   window) and kept topmost, as Microsoft's SampleIME and CorvusSKK do, in **every** application rather than only in the
   immersive box. It is implemented, unit-tested and packaged in fusion-windows PR #56 as
-  `fusion-0.0.0-winui3+5f103bc-setup.exe` (105 265 998 B, SHA-256
-  `F4684BC2D82EBC259FFBFB32FB25E0888F19B5467C07E5FA7944BA60B1BFD919`, unsigned), **not yet installed or owner-checked**.
+  `fusion-0.0.0-winui3+407a0ce-setup.exe` (105 292 985 B, SHA-256
+  `6F3D55974067CDCEE19B4040E4D52A3B27C00020DC34FC3AD910F9F24913BDF2`, unsigned), **not yet installed or owner-checked**.
+  One thing that build no longer does is hide the page when the application reports no window at all: it is shown
+  unowned and still topmost, and the diagnostic line says `owner-source=none`. Hiding it was a regression against the
+  build before the owner work, which displayed the popup in that case.
   Until that build is installed and the box checked on it, use the box only where the first candidate is the one you
   want, or type in an application window where the popup is visible. Win+R, the editors and the browsers are unaffected
   either way — but ownership is also what makes the popup stop floating over a different application, so after
@@ -552,7 +558,7 @@ No daily report is required, and no feedback is needed for a day without problem
   point at its own start before handing it to `StartComposition`, and a zero-length range cannot be replaced. **Fixed in
   fusion-windows PR #56**: the composition now starts on the range exactly as TSF returned it, so the first write
   replaces the selection; an empty selection is the same range either way, so ordinary typing is unchanged. The fix is
-  built and packaged (`fusion-0.0.0-winui3+5f103bc-setup.exe`) and has **not** been executed against a real document —
+  built and packaged (`fusion-0.0.0-winui3+407a0ce-setup.exe`) and has **not** been executed against a real document —
   no test on this machine drives a non-empty selection, and registering the TIP here is not allowed. Until that build is
   installed: select, then press Delete or type the word without a selection.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s

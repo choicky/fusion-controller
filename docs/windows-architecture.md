@@ -574,19 +574,25 @@ fusion-windows PR #11（已合并，`main` `3e7fc35`）实现了首个最小 in-
 它们都只关于**窗口对象**，不涉及输入语义，因此不改变上面 renderer 进程/位置的 UNFROZEN 状态：
 
 - **归属与置顶。** 候选 popup 的 owner 是**该 context 自己的窗口**：每次锚点探测解析
-  `ITfContext::GetActiveView` → `ITfContextView::GetWnd`，view 不给窗口时退到本线程焦点（`ITfThreadMgr::GetFocus`），结果按
+  `ITfContext::GetActiveView` → `ITfContextView::GetWnd`，view 不给窗口时退到本线程焦点（Win32 `GetFocus()`，即该线程的
+  focus 窗口；**不是** `ITfThreadMgr::GetFocus`，后者返回的是 document manager 而不是 HWND），结果按
   `ContextEntry` 逐 context 保存（不是逐进程）。该 HWND 作为 `WS_POPUP` 的 owner 传入 `CreateWindowExW`，窗口带
   `WS_EX_TOPMOST`，之后**每一次** `SetWindowPos` 都以 `HWND_TOPMOST` 提升。owner 改变或 owner 关闭窗口都会被察觉：
-  owned 窗口随 owner 一起被销毁（因此用 `WM_NCDESTROY` 清句柄），下一次显示在新 owner 下重建；既没有 view 也没有焦点
-  窗口时页面隐藏（`hidden reason=no-owner`），**绝不创建无 owner 的 popup，也绝不使用已死窗口的句柄**。这一条适用于
+  owned 窗口随 owner 一起被销毁（因此用 `WM_NCDESTROY` 清句柄，并把该消息交给 `DefWindowProcW`），下一次显示在新 owner 下
+  重建；**既没有 view 窗口也没有焦点窗口时，页面照样显示**——只是没有 owner，仍带 `WS_EX_TOPMOST` 并以 `HWND_TOPMOST`
+  提升，诊断行写 `owner-source=none`。没有 owner 不是丢失候选的理由：这条路径在 D090 之前一直是显示的，把它改成隐藏只会
+  少显示。**绝不使用已死窗口的句柄**。这一条适用于
   **每一个**应用，没有任何行为以 immersive/AppContainer 标志为条件——该标志只被读出来写进诊断行
   （`CANDIDATE_VIEW shown … topmost=1 immersive=…`）供定位用。`SetWindowBand`、未公开 API、UILess-mode 呈现仍然排除；
   若一个 owned + topmost 的窗口在所有者机器上仍被搜索面板盖住，那才是重新打开这一面（作为单独决定）的事实。
 - **锚点：没有 layout 不等于没有锚点。** `ITfContextView::GetTextExt` 对尚未排版的 range 返回 `TS_E_NOLAYOUT`
   （R46）。此时页面**留在这个 context 上一次成功解析的锚点**（`ANCHOR_PROBE stage=ok source=last-good`），只有完全没有
-  锚点的 context 才继续延迟显示；其他 HRESULT 行为不变。每个 push 的 context 另外 advise `ITfTextLayoutSink`（pop 与
-  teardown 时 unadvise）：应用完成排版后，在**一个只读、异步**的 edit session（`TF_ES_ASYNC | TF_ES_READ`，一次突发只
-  请求一次）里重探锚点并把窗口重定位（`source=layout-change`），该路径不写任何文本。
+  锚点的 context 才继续延迟显示（`hidden reason=no-anchor deferred=1`）；其他 HRESULT 行为不变。每个 push 的 context 另外
+  advise `ITfTextLayoutSink`（pop 与 teardown 时 unadvise）：应用完成排版后，在**一个只读、异步**的 edit session
+  （`TF_ES_ASYNC | TF_ES_READ`，一次突发只请求一次）里重探锚点并把窗口重定位（`source=layout-change`），该路径不写任何
+  文本。**被延迟的页面也走这条路**：延迟时按已解析的 owner 建出隐藏窗口（重定位消息需要一个目标），entry 上记一个
+  "等待锚点"标记，layout 通知对可见页面和这种页面都重探；锚点一旦解析就把该页面按上面的归属规则显示出来，标记在任何
+  显示、隐藏、空页与 teardown 时清除。所以一次组合的第一个字不必等到下一次按键才出现候选窗。
 - **组合起点 = 选区本身。** 有非空选区时，`StartComposition` 收到的是 `GetSelection` 返回的**原样** range（不再先
   `Collapse(TF_ANCHOR_START)`），因此第一次 `SetText` 替换选中文字（R50）。空选区行为与之前完全一致。caret 移动
   （`move_caret`）与显示属性（`display_attribute.cpp` 的 `sub_range`）仍在自己的**克隆**上 Collapse，与本条无关。
