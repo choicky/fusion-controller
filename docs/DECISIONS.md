@@ -730,11 +730,12 @@ pipe that a package did create — an AppContainer-created object carries a Low 
 same user.
 
 **Rejected: grant the package query access to the Host process.** Adding `PROCESS_QUERY_LIMITED_INFORMATION` for the
-package SID on the Host's process object would have kept the existing check working, and it was measured to be
-sufficient. It is rejected because it widens a *process* ACL for every future package that can name it, and because
-the fact it would then assert — "the server runs as the same user" — is one the package already satisfies trivially;
-it is not what separates the Host from another package. It also leaves the Host's process object as a shared
-surface for no gain over reading the object the client already holds.
+package SID on the Host's process object is the alternative that keeps the existing check unchanged. **It is
+untested** — no pass changed that ACL, so nothing here claims it would have been sufficient, and it is rejected on
+its shape rather than on a measurement. It widens a *process* ACL for every future package that can name it, and the
+fact it would then assert — "the server runs as the same user" — is one the package already satisfies trivially; it
+is not what separates the Host from another package. It also leaves the Host's process object as a shared surface for
+no gain over reading the object the client already holds.
 
 **Rejected: Host-side client admission.** Having the Host verify which client connected would move the check to the
 server and require new admission state, a new failure path and a new policy for every client type. That is new

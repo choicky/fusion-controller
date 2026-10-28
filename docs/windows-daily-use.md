@@ -507,7 +507,9 @@ No daily report is required, and no feedback is needed for a day without problem
   verifies the pipe object (its session, its owner, and that it is not a low-integrity object) instead of the Host
   process. The claim and stop events stay user-only, and no other AppContainer or LPAC application is supported. **This
   is implemented, built, tested and packaged, not yet accepted:** the build that carries it is
-  `0.0.0-winui3+51467cf`, it is **not installed**, and the box has not been tested with it. Until the owner runs the
+  `0.0.0-winui3+51467cf`, shipped as **`fusion-0.0.0-winui3+51467cf-setup.exe`** (105 279 868 B, SHA-256
+  `E94DE186A041F4C32EA152D4EED25433442CCCF9A1DF48C5D0DB46BD4871484A`, unsigned, so Windows may show SmartScreen first).
+  It is **not installed**, and the box has not been tested with it. Until the owner installs that EXE, runs the
   R49 checklist and reports back, type in an application window rather than in the search box. Win+R, the editors and
   the browsers are unaffected either way.
   **One known risk:** the candidate window may be drawn behind the search flyout. If the test shows that, it is a
