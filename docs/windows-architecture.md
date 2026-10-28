@@ -489,6 +489,20 @@ interactive sessions；RDP；Fast User Switching；runas/elevation transition。
 identity verification、pipe squatting protection、AppContainer compatibility）。Supervisor/broker/multiple trust-class
 Hosts 仍为 experiment，仅在具体场景证明简单 topology 不足时引入。
 
+**D089 的窄例外（2026-10-28，所有者决定）。** 任务栏搜索框（`SearchHost.exe`，包族
+`MicrosoftWindows.Client.CBS_cw5n1h2txyewy`）是**唯一**受支持的 AppContainer 客户端；其余 AppContainer/LPAC、High
+IL、x86、多会话、RDP、FUS、runas 仍按排除项处理，各自需要自己的证据。数据 pipe 的 DACL 在该对象上多一条 ACE：包族的
+AppContainer SID（`DeriveAppContainerSidFromAppContainerName` 推导，且必须等于本构建固定的常量，否则描述符不构建、管道不创建），
+权限恰好为 `FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | READ_CONTROL |
+SYNCHRONIZE`——**不含** `FILE_CREATE_PIPE_INSTANCE`（对命名管道即 `FILE_APPEND_DATA`：授予它等于允许对方创建同名第二个
+实例并冒充 Host），也不含 `WRITE_DAC`、`WRITE_OWNER`、`DELETE`、EA 权限或任何 generic 权限；owner 显式设为本进程
+`TokenUser`，而不是留给 token 默认值。`HostClaim` 与停止事件**不变**，仍为 user-only，TIP 也从不打开它们。身份校验分两路：
+普通客户端沿用进程校验（同一用户 + 同一会话）；`TokenIsAppContainer=1` 的客户端改为校验 pipe **对象**——会话
+（`GetNamedPipeServerSessionId` 对自身 `TokenSessionId`）、owner（`GetSecurityInfo(OWNER)` 对自身 `TokenUser`）、强制完整性
+标签（无标签视为 Medium，低于 Medium 拒绝），该路径不做 `OpenProcess`/`ProcessIdToSessionId`。两半互为前提：授权阻止其他包
+创建同名管道，完整性检查拒绝由包自己创建的低完整性对象。实现与验证状态见 Stage 6 计划 R49 与 D089；**这不构成通用
+UWP/AppContainer 支持**。
+
 **已核查的注册/提权观察（0.5B/0.5D，scoped）：** 非管理员 token 下 HKLM `CTF\TIP` create access 为
 `0x80070005`，默认作用域/持久 `RegisterProfile` 与 legacy `Register` 返回 `E_FAIL`（`0x80004005`）；HKCU COM +
 process-local `RegisterProfile(TF_RP_LOCALPROCESS)` / `TF_IPPMF_FORPROCESS` 只在自身进程内可用，不会让 Notepad 等其他
@@ -501,7 +515,7 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 启动者；DLL 仍然从不启动 Host（P0-D 的该子问题不变）。打包 Host 无控制台（Windows 子系统），因此登录/注销/关机的
 保存由隐藏的**顶层**窗口的 `WM_QUERYENDSESSION`/`WM_ENDSESSION` 触发（message-only 窗口收不到会话结束广播），
 在 4 s 界限内等待既有的有序关闭（request stop → stop → shutdown_backend → Fcitx save）；安装/升级/卸载通过
-`Local\FusionHost-stop-<user SID>-<session id>` 命名停止事件（与 pipe、HostClaim 相同的 user-only DACL）请求同一
+`Local\FusionHost-stop-<user SID>-<session id>` 命名停止事件（与 HostClaim 相同的 user-only DACL；数据 pipe 是唯一另外命名搜索包的对象，D089）请求同一
 有序停止，而不是终止进程；`WM_QUERYENDSESSION` 只回答 TRUE 而不停止任何东西（注销仍可能被取消），只有
 `WM_ENDSESSION(TRUE)` 才请求停止。三条路径都只**请求**停止，`main()` 仍是唯一执行有序关闭的线程，`HostClaim` 持有到进程
 退出；`one Host per user × session` 的权威仍是 `HostClaim`，不是任务设置。开发/测试用的控制台模式（`--console`，
@@ -518,7 +532,7 @@ HKLM/HKCU COM 使跨进程加载生效。这是安装/拓扑输入，**不是**�
 （重启后检查新 pid 的日志文件），产品默认仍为关闭。日常使用说明见 `docs/windows-daily-use.md`。
 
 **P0-D 仍然 OPEN 的部分：** 上述只是 §3 目标场景内的已实现基线，不是 Host topology 的冻结。High IL、x86/x64 混合、
-AppContainer/LPAC、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
+AppContainer/LPAC（除 D089 已解除的任务栏搜索框）、RDP、多会话、Fast User Switching、runas/提权转换、崩溃重启与 alive-but-unhealthy 恢复（R7/WP5）
 都仍未取证；每个被解除的排除项都需要自己的证据。计划任务/停止事件/pipe 的“单用户 × 单会话”范围意味着多交互用户
 机器**当前不受支持**：任务名 `FusionHost` 是全局的，第二个账户安装会覆盖第一个账户的任务（R32，Hypothesis，
 CONDITIONAL；候选修法是按 SID 的每用户任务名）。以*另一个*管理员账户提权的安装器也打不开属主的停止事件——它如实

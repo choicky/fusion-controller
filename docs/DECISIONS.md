@@ -692,6 +692,72 @@ preserving existing behaviour outranks copying upstream's default.
 **Status.** Accepted. Implementation, compilation, isolated validation and packaging are tracked in the Stage 6 plan and
 the product PRs, not here. The option-coverage record is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
 
+## D089 — The taskbar search box is the one supported AppContainer client (narrow lifting of P0-D for that surface)
+
+Accepted by the owner on 2026-10-28 through the R49 instruction, with the identity rule fixed as **option 甲**: the
+AppContainer client verifies the **pipe object**, not the server process.
+
+**The decision.** The taskbar search box — `SearchHost.exe`, package family
+`MicrosoftWindows.Client.CBS_cw5n1h2txyewy` — is lifted out of **P0-D** and supported. **Every other
+AppContainer/LPAC application stays excluded.** This is not general UWP or AppContainer support: it is one package
+family, one object, one grant, and one client-side check.
+
+**Why the surface, and not a new mechanism.** R49's measurements had already established that activation is not the
+problem: with `GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT` registered, the box activates the TIP, and the TIP then fails at
+`CreateFileW` with `ERROR_ACCESS_DENIED` because the pipe's DACL named only the user's SID. Adding one allow ACE for
+the package made the open succeed and the next barrier appeared at `verify_server_identity`, which opens the server
+*process* — something an AppContainer token may not do. So the two changes are the minimum that matches the measured
+failures, and neither invents a new endpoint, a new protocol or a new admission path.
+
+**The grant.** Exactly one further ACE on the **data pipe**: the package's AppContainer SID, with exactly
+`FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE`.
+`FILE_WRITE_ATTRIBUTES` is `SetNamedPipeHandleState`; `READ_CONTROL` is what makes the client-side object check
+possible. **`FILE_APPEND_DATA` is excluded deliberately**: for a named pipe it *is* `FILE_CREATE_PIPE_INSTANCE`, so
+granting it would let the package create a second instance of the Host's pipe name and pose as the Host — the reason
+#54 was withdrawn. `WRITE_DAC`, `WRITE_OWNER`, `DELETE`, the extended-attribute rights and every generic right are
+excluded for the same class of reason. The user's own ACE keeps the rights it always had, and clients now open the
+pipe with the same explicit mask instead of `GENERIC_READ | GENERIC_WRITE`. The descriptor's owner is set explicitly
+to the Host's `TokenUser` SID rather than left to the token default. **The Host claim event and the Host stop event
+are not touched**: a packaged client that could signal the stop event could end the Host.
+
+**The identity check.** A client whose own token has `TokenIsAppContainer` set verifies three facts about the pipe
+object and refuses if any fails: the server session (`GetNamedPipeServerSessionId` vs the client's `TokenSessionId`),
+the object owner (`GetSecurityInfo(OWNER)` vs the client's `TokenUser`), and the mandatory label (absent reads as
+Medium; below Medium is refused). It performs no `OpenProcess` and no `ProcessIdToSessionId` on the server PID.
+Non-AppContainer clients keep the existing process-based check unchanged. The two halves of this decision hold each
+other up: the grant is what stops another package from creating the name, and the integrity check is what refuses a
+pipe that a package did create — an AppContainer-created object carries a Low label even though its owner SID is the
+same user.
+
+**Rejected: grant the package query access to the Host process.** Adding `PROCESS_QUERY_LIMITED_INFORMATION` for the
+package SID on the Host's process object is the alternative that keeps the existing check unchanged. **It is
+untested** — no pass changed that ACL, so nothing here claims it would have been sufficient, and it is rejected on
+its shape rather than on a measurement. It widens a *process* ACL for every future package that can name it, and the
+fact it would then assert — "the server runs as the same user" — is one the package already satisfies trivially; it
+is not what separates the Host from another package. It also leaves the Host's process object as a shared surface for
+no gain over reading the object the client already holds.
+
+**Rejected: Host-side client admission.** Having the Host verify which client connected would move the check to the
+server and require new admission state, a new failure path and a new policy for every client type. That is new
+infrastructure for one surface, and it inverts the existing direction (the client verifies the server, because the
+server is the thing that can be impersonated).
+
+**What stays out of scope.** No general AppContainer or LPAC support; no change to the claim or stop events; no new
+endpoint or protocol message; no weakening of the normal client's check; and no UI work for the candidate popup's
+z-order against the immersive flyout — that was left to a separate decision, and the owner's run of 2026-10-28 showed
+the popup behind the flyout, which is the fact that separate decision now has to answer. `SetWindowBand`, undocumented
+APIs and similar hacks stay excluded here and there.
+
+**Status.** Accepted. Implementation, validation and packaging are tracked in the Stage 6 plan's R49 row and in the
+product PRs (#53 for the diagnostic, #55 for this decision), not here. **The owner ran the R49 checklist on the
+installed package on 2026-10-28 (the 5700X, `0.0.0-winui3+51467cf`): this decision's own scope is verified against a
+real AppContainer client — the box activates 双拼, the pipe is opened by `SearchHost`, the object-based identity check
+passes and a commit lands in the box.** What the same run found is that no candidate window is visible there; that is
+outside what D089 decides, and the owner's decision of 2026-10-28 (candidate popup owned by the document's own window
+and topmost, implemented in fusion-windows `fix/candidate-owner-layout`) is to be recorded as D090. The TIP inside the
+search box is therefore not yet accepted as a usable surface: the connection half is measured, the visible-candidates
+half is not.
+
 ## Current authority rule
 
 For current post-release product state, use the compact current-state/current-
