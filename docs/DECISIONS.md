@@ -753,10 +753,62 @@ product PRs (#53 for the diagnostic, #55 for this decision), not here. **The own
 installed package on 2026-10-28 (the 5700X, `0.0.0-winui3+51467cf`): this decision's own scope is verified against a
 real AppContainer client — the box activates 双拼, the pipe is opened by `SearchHost`, the object-based identity check
 passes and a commit lands in the box.** What the same run found is that no candidate window is visible there; that is
-outside what D089 decides, and the owner's decision of 2026-10-28 (candidate popup owned by the document's own window
-and topmost, implemented in fusion-windows `fix/candidate-owner-layout`) is to be recorded as D090. The TIP inside the
-search box is therefore not yet accepted as a usable surface: the connection half is measured, the visible-candidates
-half is not.
+outside what D089 decides, and **D090** is the decision that answers it (candidate popup owned by the document's own
+window and topmost, implemented in fusion-windows PR #56). The TIP inside the search box is therefore not yet accepted
+as a usable surface: the connection half is measured, the visible-candidates half is not.
+
+## D090 — The candidate window is owned by the application it types into and kept topmost, in every application
+
+Accepted by the owner on 2026-10-28 through the R49 part-B instruction, as option **乙 + 置顶** (owned, and topmost) —
+the choice between the options the R49 record left open once D089's connection half was verified.
+
+**The decision.** For **every** application, the candidate popup is created with the window that owns the text being
+composed as its **owner** and with `WS_EX_TOPMOST`, and every raise uses `HWND_TOPMOST`. The owner window is resolved
+on each anchor probe from the context itself — `ITfContext::GetActiveView` → `ITfContextView::GetWnd`, falling back to
+the thread focus (the service's `GetFocus()`, i.e. `ITfThreadMgr::GetFocus`) when no view reports a window — and is
+stored per `ContextEntry`, so it is a fact about the document, not about the process. `EVENT_OBJECT_IME_SHOW` / `_CHANGE` / `_HIDE` are raised so a client that tracks the
+candidate surface by accessibility events sees it. One content-free line is logged per show
+(`CANDIDATE_VIEW shown owner=… owner-source=view|focus rect=… topmost=1 immersive=…`).
+
+**Why ownership, and why topmost — the two answer different facts.** The R49 measurement said the window was created
+and placed where the anchor resolved, and the owner could not see it: the popup had no owner, no `WS_EX_TOPMOST`, and
+every raise was `HWND_TOP`. `HWND_TOP` re-orders only within one thread's window list, so another process's window —
+the search flyout — stays above it. Topmost is what makes the popup win that particular contest. Ownership is what
+makes the popup *belong*: it rises with the application, is not left floating over another application, minimises with
+its owner and is destroyed with it, which is also what the daily-use record has always claimed a candidate window does.
+The owner cites Microsoft's own SampleIME and CorvusSKK as the precedent for the combination — a topmost popup owned
+by the document window. That citation is the owner's, not a survey run in this pass; nothing here claims to have read
+those sources' current code.
+
+**Rejected: applying it only in immersive mode.** The variant would own and top the popup only when the thread reports
+`TF_TMF_IMMERSIVEMODE`, leaving the desktop path as it is. It is rejected for two reasons. (1) No surveyed IME gates
+the behaviour that way — per the owner's precedent above, so the difference would be Fusion-specific and unevidenced.
+(2) It would leave **two code paths** for one window: the same presentation would have to be reasoned about, tested
+and debugged twice, and a future report of "the popup is behind something" would first need the mode that produced it.
+The immersive flag is therefore still read and logged — for diagnosis — and **no behaviour depends on it**.
+
+**Rejected, and still excluded: `SetWindowBand`, undocumented APIs, and a UILess-mode implementation.** A band change
+would put the popup into the flyout's own z-order band, which is a per-surface hack requiring an undocumented call;
+UILess replaces the whole presentation model. Neither is authorized by this decision, and this decision is what makes
+the question sharp rather than postponing it: if an owned, topmost popup still loses to the flyout on the owner's
+machine, the `shown` line already carries the rect, the owner and the flag, and a UILess-mode presentation becomes a
+**separate later owner decision** on that evidence.
+
+**What this decision does not touch.** The renderer's process and location stay UNFROZEN (architecture §16): this
+fixes who owns the window and how it is raised, not who draws it. The candidate content, page order, partial selection
+and commit semantics are unchanged — no semantic channel is added. The anchor rule that came with the same product PR
+(`TS_E_NOLAYOUT` keeps the last-good anchor; a layout notification re-probes in a read-only session) and the
+selection-replacement rule are recorded in §16 as presentation boundaries, not as decisions here.
+
+**Status.** Accepted. By layer, for fusion-windows PR #56 (branch `fix/candidate-owner-layout`, head `5f103bc`, base
+`main`, containing #53 and #55 until they merge):
+**implemented** — owner resolution, `WS_EX_TOPMOST`, `HWND_TOPMOST` on every raise, owner-change and owner-death
+handling, the three WinEvents, the `shown` line; **tested** — `candidate_window_layout` section 34 reads `GW_OWNER`,
+`WS_EX_TOPMOST` before and after show, the re-create on a changed owner and the null handle after the owner is
+destroyed back from the real window, and the full native suite prints **97 registered, 95 passed, 2 skipped by design,
+0 failed**; **packaged** — `fusion-0.0.0-winui3+5f103bc-setup.exe`, identity in the Stage 6 plan's packaged row;
+**owner-tested — not yet.** D089's status keeps the same split: the search box's connection half is measured, its
+visible-candidates half is what #56's checklist step 3 answers for the first time.
 
 ## Current authority rule
 
