@@ -497,17 +497,21 @@ No daily report is required, and no feedback is needed for a day without problem
   for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
   `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
   package.
-- **The taskbar search box cannot use Fusion — a reported limitation, located (R49).** The box's text field
-  belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows offers a text service to such a process only
-  when the service declares that it runs in one. Fusion does not declare it, so the box does not load the input method
-  at all. Measured on 2026-10-26: declaring the capability makes the box activate Fusion, and the first barrier is the
-  Host's pipe, whose access check refused that process with `ERROR_ACCESS_DENIED`. A grant naming that package's
-  AppContainer SID — tried on a branch, not shipped — opens the pipe, and the input method then stops one step
-  later: it may not open the Host process to check who the server is, so the identity check fails with the same code
-  and every key is still passed through. Both remaining choices — letting that package query the Host process, or
-  verifying something else — change what the connection is allowed to assume, so this is a decision, not a code
-  detail, and R49 stays open. Win+R, the editors and the browsers are unaffected. Until R49 is closed, type in an
-  application window rather than in the search box.
+- **The taskbar search box: supported as of `0.0.0-winui3+51467cf`, waiting for the owner's test (R49).** The box's
+  text field belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows offers a text service to such a
+  process only when the service declares that it runs in one. Measured on 2026-10-26: declaring the capability made the
+  box activate Fusion, and two barriers then stood in order — the Host's pipe refused that process with
+  `ERROR_ACCESS_DENIED`, and with a grant in place the identity check failed because it opens the Host *process*, which
+  an AppContainer may not. **Both are fixed in fusion-windows PR #55** (D089): the data pipe names that one package with
+  client-only rights — no right to create a second pipe instance, no administrative right — and an AppContainer client
+  verifies the pipe object (its session, its owner, and that it is not a low-integrity object) instead of the Host
+  process. The claim and stop events stay user-only, and no other AppContainer or LPAC application is supported. **This
+  is implemented, built, tested and packaged, not yet accepted:** the build that carries it is
+  `0.0.0-winui3+51467cf`, it is **not installed**, and the box has not been tested with it. Until the owner runs the
+  R49 checklist and reports back, type in an application window rather than in the search box. Win+R, the editors and
+  the browsers are unaffected either way.
+  **One known risk:** the candidate window may be drawn behind the search flyout. If the test shows that, it is a
+  separate UI decision — nothing in #55 tries to force the z-order.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash

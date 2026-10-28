@@ -88,7 +88,7 @@ contains `Save before exiting...` followed by the addon unloads and `shutting do
 | mechanism | what it does |
 |---|---|
 | hidden top-level window (`WS_POPUP`, `WS_EX_TOOLWINDOW`, not `HWND_MESSAGE`) | `WM_QUERYENDSESSION` answers TRUE and stops nothing; `WM_ENDSESSION` with `wParam` TRUE requests the stop and waits, bounded at 4 s (the console path's bound), for the ordered shutdown; `WM_ENDSESSION` with `wParam` FALSE does nothing |
-| named stop event `Local\FusionHost-stop-<user SID>-<session id>` | created by the Host before the backend exists, with the pipe's own user-only DACL; `install.ps1` / `uninstall.ps1` open and signal it instead of terminating the process |
+| named stop event `Local\FusionHost-stop-<user SID>-<session id>` | created by the Host before the backend exists, with the claim's user-only DACL (the data pipe is the one object that also names the search package, D089/R49); `install.ps1` / `uninstall.ps1` open and signal it instead of terminating the process |
 | console control handler | unchanged, console mode only |
 
 All three paths only *request* the stop. `main()` remains the single thread that runs `stop()` →
