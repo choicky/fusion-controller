@@ -375,10 +375,10 @@ URLs or page content. The lines that decide the next step:
 |---|---|
 | `ANCHOR_PROBE stage=ok source=composition` | the composition range had layout and supplied the anchor |
 | `ANCHOR_PROBE stage=ok source=composition-caret` | the composition range had no layout; the caret supplied the anchor (PR #25) |
-| `ANCHOR_PROBE stage=text-ext source=composition hr=0x80040206` | `TS_E_NOLAYOUT` — no range had layout for that keystroke, so the page stays hidden |
+| `ANCHOR_PROBE stage=text-ext source=composition hr=0x80040206` | `TS_E_NOLAYOUT` — neither the composition range nor the caret fallback had layout for that keystroke, so the page is hidden and stays hidden until the next key re-probes it (R46). Measured 2026-10-28 in the owner's browser log: every `hidden reason=no-anchor` sits directly after one of these, 142 of 151 right after `COMPOSITION_START` and 9 after a mid-composition batch |
 | `ANCHOR_PROBE stage=no-active-view` / `stage=no-range` | the context had no active view, or the selection returned no range — the anchor was not even attempted |
-| `CANDIDATE_VIEW hidden reason=no-anchor` / `no-page` | nothing to anchor to / no candidate page to show |
-| `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility |
+| `CANDIDATE_VIEW hidden reason=no-anchor` / `no-page` | nothing to anchor to (R46's symptom — the failing probe is above it) / no candidate page to show |
+| `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility. R49's step 4 measured exactly this in the taskbar search box (`stage=ok source=composition rect=1024,2101,1039,2132 clipped=0` with nothing visible): the popup has no owner window and is not topmost, so the flyout covers it; the fix is to own the popup to the document's window and make it topmost (the owner's decision of 2026-10-28, to be recorded as D090) |
 
 **Cleanup:** exit every process of the diagnostic browser (including a background instance it leaves behind) **and**
 close the Command Prompt window that set the variable. Exiting the browser does **not** clear `FUSION_TSF_DIAGNOSTICS`
@@ -484,9 +484,13 @@ No daily report is required, and no feedback is needed for a day without problem
     candidate-window code at all — and is kept as a measurement of those builds, not of this package. The individual
     fields of that table were **not** re-checked one by one; the recovery rests on the owner's report for normal Firefox
     and Edge use.
-  - **Remaining limit:** in web content the first keystroke of a composition has no layout in any range, so the popup
-    appears from the second keystroke there; the address bars anchor from the first. That is a one-key gap, not an
-    explanation for a popup that never appears.
+  - **Remaining limit (R46 — cause now measured, fix in progress):** in web content there are two moments when neither
+    the composition range nor the caret has layout yet — the **first keystroke of a composition**, and the **first
+    keystroke after you pick a candidate mid-word** — and at those moments the popup disappears for the rest of that
+    word until you type one more key, which brings it back. It is not only a one-key gap: measured 2026-10-28 on the
+    installed `+51467cf`, it happened 151 times in one browser process's log. The fix keeps the popup at the last
+    position that did resolve and re-places it as soon as the page lays out — the same PR that owns the popup to the
+    document's window. Meanwhile: one more keystroke brings the window back.
   - **If a field ever shows no popup again:** restart the browser first (see the next bullet) and then, if you want to
     report it, run the optional capture in §5 "R25 browser capture" — it gives the exact steps, the log location and
     what to report.
@@ -497,23 +501,32 @@ No daily report is required, and no feedback is needed for a day without problem
   for that day's report held one built from source that has no candidate-window code at all (`stage3c1`, base commit
   `5794a36`), so its "no popup in the address bar either" result described that old build rather than the installed
   package.
-- **The taskbar search box: supported as of `0.0.0-winui3+51467cf`, waiting for the owner's test (R49).** The box's
-  text field belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows offers a text service to such a
-  process only when the service declares that it runs in one. Measured on 2026-10-26: declaring the capability made the
-  box activate Fusion, and two barriers then stood in order — the Host's pipe refused that process with
-  `ERROR_ACCESS_DENIED`, and with a grant in place the identity check failed because it opens the Host *process*, which
-  an AppContainer may not. **Both are fixed in fusion-windows PR #55** (D089): the data pipe names that one package with
-  client-only rights — no right to create a second pipe instance, no administrative right — and an AppContainer client
-  verifies the pipe object (its session, its owner, and that it is not a low-integrity object) instead of the Host
-  process. The claim and stop events stay user-only, and no other AppContainer or LPAC application is supported. **This
-  is implemented, built, tested and packaged, not yet accepted:** the build that carries it is
-  `0.0.0-winui3+51467cf`, shipped as **`fusion-0.0.0-winui3+51467cf-setup.exe`** (105 279 868 B, SHA-256
-  `E94DE186A041F4C32EA152D4EED25433442CCCF9A1DF48C5D0DB46BD4871484A`, unsigned, so Windows may show SmartScreen first).
-  It is **not installed**, and the box has not been tested with it. Until the owner installs that EXE, runs the
-  R49 checklist and reports back, type in an application window rather than in the search box. Win+R, the editors and
-  the browsers are unaffected either way.
-  **One known risk:** the candidate window may be drawn behind the search flyout. If the test shows that, it is a
-  separate UI decision — nothing in #55 tries to force the z-order.
+- **The taskbar search box: 双拼 activates and composes there on `0.0.0-winui3+51467cf`, but the candidate window is
+  not visible (R49).** The box's text field belongs to `SearchHost.exe`, which runs in an AppContainer, and Windows
+  offers a text service to such a process only when the service declares that it runs in one. Measured on 2026-10-26:
+  declaring the capability made the box activate Fusion, and two barriers then stood in order — the Host's pipe refused
+  that process with `ERROR_ACCESS_DENIED`, and with a grant in place the identity check failed because it opens the
+  Host *process*, which an AppContainer may not. **Both are fixed in fusion-windows PR #55** (D089): the data pipe
+  names that one package with client-only rights — no right to create a second pipe instance, no administrative
+  right — and an AppContainer client verifies the pipe object (its session, its owner, and that it is not a
+  low-integrity object) instead of the Host process. The claim and stop events stay user-only, and no other
+  AppContainer or LPAC application is supported.
+  **The owner ran the checklist on the installed build on 2026-10-28 (the 5700X,
+  `fusion-0.0.0-winui3+51467cf-setup.exe`, 105 279 868 B, SHA-256
+  `E94DE186A041F4C32EA152D4EED25433442CCCF9A1DF48C5D0DB46BD4871484A`, unsigned, so Windows may show SmartScreen
+  first):** the box activates 双拼, shows an underlined preedit, and Space commits the first candidate into it — the
+  box's own log records the link succeeding and the anchor resolving. **What does not work is the candidate window:
+  nothing appears**, so a search whose answer is not the first candidate cannot be finished in the box yet. The log
+  says the window was created and placed, so the popup exists where the flyout is drawn and the owner sees only the
+  flyout: Fusion's popup has
+  no owner window, is not topmost, and every raise uses `HWND_TOP`. **The owner's decision of 2026-10-28 fixes it** —
+  the popup is owned by the document's own window and kept topmost, as Microsoft's SampleIME and CorvusSKK do —
+  implemented in fusion-windows `fix/candidate-owner-layout`, to be recorded as D090. Until that build is installed and
+  the box checked on it, use the box only where the first candidate is the one you want, or type in an application
+  window where the popup is visible. Win+R, the editors and the browsers are unaffected either way.
+  **One session is reported where the box went quiet while typing.** No cause is established for it, and the log named
+  with that report belongs to a non-AppContainer process rather than to `SearchHost`; the R49 row of
+  `docs/windows-stage6-plan.md` keeps the measurements.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash

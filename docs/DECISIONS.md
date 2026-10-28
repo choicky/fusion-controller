@@ -744,12 +744,19 @@ server is the thing that can be impersonated).
 
 **What stays out of scope.** No general AppContainer or LPAC support; no change to the claim or stop events; no new
 endpoint or protocol message; no weakening of the normal client's check; and no UI work for the candidate popup's
-z-order against the immersive flyout — if the owner test shows the popup behind it, that is a separate decision, and
-`SetWindowBand`, undocumented APIs and similar hacks are excluded.
+z-order against the immersive flyout — that was left to a separate decision, and the owner's run of 2026-10-28 showed
+the popup behind the flyout, which is the fact that separate decision now has to answer. `SetWindowBand`, undocumented
+APIs and similar hacks stay excluded here and there.
 
 **Status.** Accepted. Implementation, validation and packaging are tracked in the Stage 6 plan's R49 row and in the
-product PRs (#53 for the diagnostic, #55 for this decision), not here. The TIP inside the search box is not accepted
-until the owner runs the R49 checklist on an installed package.
+product PRs (#53 for the diagnostic, #55 for this decision), not here. **The owner ran the R49 checklist on the
+installed package on 2026-10-28 (the 5700X, `0.0.0-winui3+51467cf`): this decision's own scope is verified against a
+real AppContainer client — the box activates 双拼, the pipe is opened by `SearchHost`, the object-based identity check
+passes and a commit lands in the box.** What the same run found is that no candidate window is visible there; that is
+outside what D089 decides, and the owner's decision of 2026-10-28 (candidate popup owned by the document's own window
+and topmost, implemented in fusion-windows `fix/candidate-owner-layout`) is to be recorded as D090. The TIP inside the
+search box is therefore not yet accepted as a usable surface: the connection half is measured, the visible-candidates
+half is not.
 
 ## Current authority rule
 
