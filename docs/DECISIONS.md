@@ -777,6 +777,20 @@ first draft of this decision hid the page in that case (`hidden reason=no-owner`
 before the owner work displayed the popup there, so hiding it could only lose candidates — and it is removed. An
 unowned topmost window is the fallback, not a failure.
 
+**A page that was hidden on purpose stays hidden.** Ownership and topmost-ness are what make a *re-show that nobody asked
+for* land above the wrong application, so the same PR fixes when a page may come back. A layout re-probe, and the
+reposition message that session posts, are statements about the page as it was **when the request was made**; between
+that moment and delivery the application can hide the page for reasons that have nothing to do with layout — the thread
+lost the foreground, focus moved to another document, the context was torn down, the composition ended, the projection
+emptied. Every product-path hide therefore goes through one door (`TextService::hide_candidate_page`), which clears the
+deferred flag the re-probe path waits on, and each of the three requests (`note_layout_change`, the read-only session,
+the delivered message) asks the same question through one predicate — `popup_may_be_placed(visible, deferred)`: a page is
+re-placed only while it is on screen (the anchor moved) or off screen *because* this context had no anchor for it yet
+(R46's deferred page). A refusal is one content-free line, `FENCE kind=reposition hidden cid=…`, so a log distinguishes
+"nothing happened" from "something refused". `layout_reprobe_pending` is deliberately not part of that door: it records
+an async session TSF still owes the context, and clearing it on a hide would only let a notification burst queue a
+second session behind the first.
+
 **Why ownership, and why topmost — the two answer different facts.** The R49 measurement said the window was created
 and placed where the anchor resolved, and the owner could not see it: the popup had no owner, no `WS_EX_TOPMOST`, and
 every raise was `HWND_TOP`. `HWND_TOP` re-orders only within one thread's window list, so another process's window —
@@ -831,16 +845,22 @@ and commit semantics are unchanged — no semantic channel is added. The anchor 
 (`TS_E_NOLAYOUT` keeps the last-good anchor; a layout notification re-probes in a read-only session) and the
 selection-replacement rule are recorded in §16 as presentation boundaries, not as decisions here.
 
-**Status.** Accepted. By layer, for fusion-windows PR #56 (branch `fix/candidate-owner-layout`, head `407a0ce`, on
-`main` at `286d861` — #53 and #55 are merged and were merged into the branch before this round's work):
+**Status.** Accepted. By layer, for fusion-windows PR #56 (branch `fix/candidate-owner-layout`, head `5565972`, on
+`main` at `286d861` — #53 and #55 are merged and were merged into the branch before this round's work; the review round's
+`407a0ce` is accepted apart from the one defect its follow-up fixes):
 **implemented** — owner resolution, `WS_EX_TOPMOST`, `HWND_TOPMOST` on every raise, owner-change and owner-death
 handling (`WM_NCDESTROY` clears the handle and then passes the message to `DefWindowProcW`), the three WinEvents, the
-`shown` line with `owner-source=view|focus|none`, the unowned-topmost fallback, and the deferred page that a layout
-change now places; **tested** — `candidate_window_layout` sections 34 and 34b read `GW_OWNER`, `WS_EX_TOPMOST` before
-and after show, the re-create on a changed owner, the null handle after the owner is destroyed, and the unowned case
-(window exists, `GW_OWNER` null, topmost set); `tsf_anchor_probe` adds the deferred-then-placed case; the full native
-suite prints **97 registered, 95 passed, 2 skipped by design, 0 failed**; **packaged** —
-`fusion-0.0.0-winui3+407a0ce-setup.exe`, identity in the Stage 6 plan's packaged row; **owner-tested — not yet.**
+`shown` line with `owner-source=view|focus|none`, the unowned-topmost fallback, the deferred page that a layout change
+now places, the one hide door and the delivery fence; **tested** — `candidate_window_layout` sections 34 and 34b read
+`GW_OWNER`, `WS_EX_TOPMOST` before and after show, the re-create on a changed owner, the null handle after the owner is
+destroyed, and the unowned case (window exists, `GW_OWNER` null, topmost set); section **35a–35e** delivers a real posted
+reposition into a real owned, topmost window and reads the product's own decision back — a visible page re-placed, a page
+hidden between the post and the delivery left hidden with its `FENCE kind=reposition hidden cid=…` line, a deferred page
+placed for the first time, a deferred page then hidden refused, and the no-anchor and no-page branches;
+`tsf_anchor_probe` adds the deferred-then-placed case and the four `popup_may_be_placed` combinations; the full native
+suite, built and run on the **5700X** from the head above, prints **97 registered, 95 passed, 2 skipped by design, 0
+failed**; **packaged** — `fusion-0.0.0-winui3+5565972-setup.exe`, identity in the Stage 6 plan's packaged row
+(`+407a0ce` is superseded and is not the build to test); **owner-tested — not yet.**
 D089's status keeps the same split: the search box's connection half is measured, its visible-candidates half is what
 #56's checklist step 3 answers for the first time.
 

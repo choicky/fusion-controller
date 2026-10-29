@@ -591,8 +591,15 @@ fusion-windows PR #11（已合并，`main` `3e7fc35`）实现了首个最小 in-
   advise `ITfTextLayoutSink`（pop 与 teardown 时 unadvise）：应用完成排版后，在**一个只读、异步**的 edit session
   （`TF_ES_ASYNC | TF_ES_READ`，一次突发只请求一次）里重探锚点并把窗口重定位（`source=layout-change`），该路径不写任何
   文本。**被延迟的页面也走这条路**：延迟时按已解析的 owner 建出隐藏窗口（重定位消息需要一个目标），entry 上记一个
-  "等待锚点"标记，layout 通知对可见页面和这种页面都重探；锚点一旦解析就把该页面按上面的归属规则显示出来，标记在任何
-  显示、隐藏、空页与 teardown 时清除。所以一次组合的第一个字不必等到下一次按键才出现候选窗。
+  "等待锚点"标记，layout 通知对可见页面和这种页面都重探；锚点一旦解析就把该页面按上面的归属规则显示出来。标记在任何
+  显示、隐藏、空页与 teardown 时清除，**而隐藏只有一个门**（`TextService::hide_candidate_page`：隐藏 popup 并清掉该标记），
+  所以**因为焦点改变、context teardown、组合结束或投影变空而被隐藏的页面，永远不会被一条排队的重定位消息或之后的 layout
+  通知重新显示**——请求是发出那一刻页面状态的陈述，送达时必须重新读窗口和标记；能重放的只有两种：仍在屏幕上的页面（锚点
+  移动了）和只因没有锚点而离屏的页面（上一条的延迟页）。通知、session、消息三处问同一个问题并共用一个判断
+  （`popup_may_be_placed`），不允许给出不同答案；拒绝时写一行 `FENCE kind=reposition hidden cid=…`，让日志能区分"什么都没
+  发生"与"有东西拒绝了"。这一条与上面那条是一体的：R49 之后一个自己回来的窗口是 owned + topmost 的，它会盖在用户当前
+  使用的应用之上并且可以点击，那不是候选窗而是残留物。所以一次组合的第一个字不必等到下一次按键才出现候选窗，而被有意
+  收起的候选窗不会再自己出现。
 - **组合起点 = 选区本身。** 有非空选区时，`StartComposition` 收到的是 `GetSelection` 返回的**原样** range（不再先
   `Collapse(TF_ANCHOR_START)`），因此第一次 `SetText` 替换选中文字（R50）。空选区行为与之前完全一致。caret 移动
   （`move_caret`）与显示属性（`display_attribute.cpp` 的 `sub_range`）仍在自己的**克隆**上 Collapse，与本条无关。
