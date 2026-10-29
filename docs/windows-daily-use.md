@@ -233,12 +233,23 @@ context uses — so the Host refuses that save and says it wrote nothing. The wi
 finished. 停止等待 stops that; the edit then stays unsaved until you save again. Only a refusal is retried — a timeout, a
 dropped connection or an uncertain write is reported and left to you, and a page that already saved is not sent again.
 
-**Who the wait is waiting for (R51).** The build the owner ran could say it was waiting and nothing more, which left no
-window to go back and finish. From fusion-windows PR #56 the same bar also names the process:
-`等待：SearchHost.exe (pid 16772) 还有未完成的输入` when that application still holds a composition, and
+**Who the wait is waiting for, and why it no longer has to wait forever (R51).** The build the owner first ran could say it
+was waiting and nothing more, which left no window to go back and finish. From fusion-windows PR #56 the same bar also names
+the process: `等待：SearchHost.exe (pid 16772) 还有未完成的输入` when that application still holds a composition, and
 `… 还有未处理完的按键` when the Host is still working through its keystrokes; a process the Host cannot name is shown by
 pid alone. The identity comes from the pipe connection that bound that context, and nothing about what was typed travels
-with it — no preedit, no keys, no candidates. On the build installed now the bar still stops at the first sentence.
+with it — no preedit, no keys, no candidates. The **other half** of the report was that the wait had no end at all: on the
+owner's 2026-10-29 run the bar named Firefox for a composition the browser had already finished, and only closing Firefox
+released it. The reason is in the TIP — when the application ends a composition, the TIP recorded "the Host context must be
+reset" and the only thing that ever ran that note was the **next key in that document**; leave the field first and no such
+key ever arrives. From PR #57 the TIP performs that reset as soon as it is allowed to (the ending callback holds the
+document, so it only leaves the note and wakes its own message-only window), and the four doors a context leaves through —
+focus out, pop, teardown, deactivate — each run a note that is still armed, so **no context is left with a pending reset**,
+and each reset writes `BACKEND_RESET reason=… cid=… ok=…` in that process's TIP log. What still waits is a composition you
+are genuinely in the middle of: nothing here takes an application's composition away from it, so the bar keeps naming that
+process until you commit or cancel in that field — and pressing Esc there makes the pending save go through by itself.
+On the build installed now (`+51467cf`) both halves are missing: the bar stops at the first sentence and the wait can be
+endless. `+8c37702` is the build that carries the name and the end.
 
 If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
 so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
@@ -303,8 +314,16 @@ received it** (the new pid's log file must exist; a launcher with a cached envir
 `-Disable`; show the state with `-Status`.
 
 - Log: `%LOCALAPPDATA%\fusion-host\fusion-host-<pid>.log`; five files retained, 2 MiB cap.
-- Content is technical only: no key codes, pinyin, preedit, candidate, document or password text.
-- The TSF log (`%LOCALAPPDATA%\fusion-tsf\`) stays a separate developer opt-in (`FUSION_TSF_DIAGNOSTICS=1`).
+- Content is technical only: no pinyin, preedit, candidate, document or password text. From fusion-windows PR #57 it also
+  carries one `ENGINE_STATE` line per actual engine move — which input-method slot is active for which context
+  (`im=pinyin`, `im=shuangpin`, `im=fusion-off`), that context's client id and its owner pid, and what moved it. Those are
+  names of settings, not of anything typed.
+- The TSF log (`%LOCALAPPDATA%\fusion-tsf\`) stays a separate developer opt-in (`FUSION_TSF_DIAGNOSTICS=1`). From PR #57 it
+  names **which of the eight modifier positions** a keystroke was and whether it reached the backend and with what result
+  (`BACKEND mod=lctrl down=1 sent=1 result=forward`), every change of the OpenClose compartment and who wrote it
+  (`OPENCLOSE old=… new=… source=self|other`), and every Host reset that actually ran (`BACKEND_RESET reason=… cid=… ok=…`).
+  **Every other key keeps the redaction it has always had** — the new lines name a key's role, never a character, and the
+  privacy test asserts both halves of that sentence.
 - Fcitx's own log is **not** part of this; at debug level it can contain key events.
 
 ### R25 browser capture (optional troubleshooting, one-off per process)
@@ -391,6 +410,10 @@ URLs or page content. The lines that decide the next step:
 | `FENCE kind=reposition hidden cid=…` | a re-place request (the layout notification's re-probe, or the `WM_APP` reposition it posts) reached a page that is off screen and **not** waiting for an anchor, so it was refused and nothing moved (PR #56 at `5565972`). One line per refusal, and the normal thing to see after a focus change: a queued message must not re-show a candidate window the user already dismissed, least of all an owned, topmost one landing over the application now in front. It is not a fault and does not mean a candidate was lost: the next key that projects a page shows it again through the normal path. Seeing it while a window **does** reappear on its own — with no new key — is the thing to report |
 | `LAYOUT_SINK advise-failed hr=…` | the context would not accept the layout notification, so the page will only move on the next keystroke. Placement and input keep working; nothing else changes (PR #56) |
 | `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility. R49's step 4 measured exactly this in the taskbar search box (`stage=ok source=composition rect=1024,2101,1039,2132 clipped=0` with nothing visible): the popup had no owner window and was not topmost, so the flyout covered it. PR #56 owns it to the document's window and tops it (D090); on that build the `shown` line above is the one to read |
+| `COMPOSITION_TERMINATED … owned=0 … remaining=0` followed by `BACKEND_RESET reason=terminated\|focus-out\|pop\|deactivate cid=… ok=0\|1` | the application ended the composition — not you pressing Esc — and from PR #57 the Host context is put back without waiting for another keystroke. `reason=` says which door ran it: `terminated` the deferred wake-up, `focus-out` the document losing focus, `pop` the context popped or torn down, `deactivate` the thread stopping the TIP. `ok=0` means the reset was issued and the Host refused it (the link is gone or the context already closed); the note is spent rather than re-armed. This is the line that explains a settings wait that ended by itself. **A `COMPOSITION_TERMINATED` with no `BACKEND_RESET` after it is R51's defect on every build before #57** — that Host context keeps its preedit until the next key in that document, and a save blocked on it names that process |
+| `TEST_KEY mod=lctrl down=1` · `TEST_KEY_UP mod=lctrl down=0` · `BACKEND mod=lctrl down=1 sent=1 result=eaten\|forward\|pass route=…` (PR #57, R52) | which **modifier** was in play — one of the eight positions `lshift rshift lctrl rctrl lalt ralt lwin rwin`, left from right decided by the scan code for `VK_SHIFT` and by the extended flag for `VK_CONTROL`/`VK_MENU` — whether it was pressed or released, whether it reached the backend (`sent=1`) and what came back: `eaten` the engine consumed it, `forward` it went to the application, `pass` the TIP declined to decide, `result=none` a callback that never reached a backend decision. **Only these eight positions are named this way; every other key keeps the redaction it has always had**, so the line adds no content |
+| `ENGINE_STATE active=0\|1 im=<name> cid=<client context id> owner=<pid> after=mod-release\|key\|focus\|unknown` | **in the Host's log, not the TIP's** (`%LOCALAPPDATA%\fusion-host\fusion-host-<pid>.log`, `FUSION_HOST_DIAGNOSTICS=1`) — one line each time the engine's identity actually moved, because only fcitx5 knows which input method a context is on and whether it is active at all; the TIP sees preedit and commit frames, not engine state. `after=` names what moved it: a key release (how a Ctrl+Space-style toggle arrives), a key press, the context being bound (`focus`), or a candidate action (`unknown`). `cid=` is the id that client process uses for its own context and `owner=` its pid, which is what joins this line to the process's TIP log |
+| `OPENCLOSE old=open new=closed source=self\|other` (PR #57) | the thread's `GUID_COMPARTMENT_KEYBOARD_OPENCLOSE` compartment changed, and who changed it: `self` is Fusion's own write (marked around the write), `other` is anything else — another input method, the language bar, the framework. The compartment is per **thread**, so this line carries no context id and its `tid=` prefix is its identity. A `HARD_POLICY openclose=closed` with no `OPENCLOSE` line above it says the change predates this TIP instance advising the sink; `source=other` names whom to ask |
 
 **Cleanup:** exit every process of the diagnostic browser (including a background instance it leaves behind) **and**
 close the Command Prompt window that set the variable. Exiting the browser does **not** clear `FUSION_TSF_DIAGNOSTICS`
@@ -402,6 +425,48 @@ was set by mistake, remove it at User scope and confirm it is empty:
 [Environment]::SetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS',$null,'User')
 [Environment]::GetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS','User')
 ```
+
+### R52 capture: the WeChat colon and the lost Chinese (troubleshooting, no fix attached)
+
+R52 has **no cause yet**, and nothing here promises these steps will find one. They exist so that the next occurrence can be
+read at all: on the build before PR #57 the log could not say which modifier was pressed, whether the engine's own state
+moved, or who closed the OpenClose compartment — and the reported symptom (`:` does not come out, Chinese is lost, then
+`HARD_POLICY openclose=closed` repeats) turns on exactly those three. Run this on `+8c37702` or any later build; on an older
+build the lines you need are simply absent, and the capture tells you nothing new.
+
+1. Leave both variables set for this user, then sign out and back in so every application — including one that would
+   otherwise keep the log settings it started with — runs with them. The Host half is the shipped script, which also
+   verifies the new Host actually received it:
+
+   ```
+   powershell -ExecutionPolicy Bypass -File "<version dir>\host-diagnostics.ps1" -Enable
+   ```
+
+   The TIP half is the user variable: `[Environment]::SetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS','1','User')`.
+2. Use WeChat normally. When the colon fails or Chinese is lost, **do not restart WeChat** — the restart destroys the one
+   log that contains the moment, and the process would keep whichever `FusionTsf.dll` it loaded at start-up anyway.
+3. Note the time to the second, then read WeChat's pid in 任务管理器 → 详细信息 (WeChat runs several processes; take the one
+   whose window you were typing into, or send them all).
+4. Send both files with their paths written out:
+   - `%LOCALAPPDATA%\fusion-tsf\fusion-tsf-<pid>.log` — that process's own TIP log. Its `ts=` values are milliseconds since
+     the process started, so the clock time you noted is what locates the window inside it.
+   - `%LOCALAPPDATA%\fusion-host\fusion-host-<host pid>.log` — the Host log (`FusionHost.exe` is in the same Task Manager
+     tab). `ENGINE_STATE` lives here, and its `cid=`/`owner=` are what join a line in it to a line in the first file.
+5. What is being looked for, stated plainly so that a negative is still an answer: a `mod=` line whose `sent=`/`result=`
+   disagrees with the letters around it; `ENGINE_STATE active=0`, or an `im=` that is not the method you chose, between two
+   lines where you were still typing Chinese; an `OPENCLOSE … source=other` you did not cause; or **no `KEY_ARRIVAL` at
+   all** in that window, which would mean the keystrokes never reached the TIP and the question belongs to the application
+   or to Windows rather than to Fusion.
+6. When the round is over, turn both back off — the product default is off, and a stray variable makes every future report
+   carry logs you did not mean to collect:
+
+   ```
+   powershell -ExecutionPolicy Bypass -File "<version dir>\host-diagnostics.ps1" -Disable
+   ```
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable('FUSION_TSF_DIAGNOSTICS',$null,'User')
+   ```
 
 ### The Fusion tray (U7 — installed as `0.0.0-wp7+0094269`)
 
@@ -503,7 +568,8 @@ No daily report is required, and no feedback is needed for a day without problem
     gap: measured 2026-10-28 on the installed `+51467cf`, it happened 151 times in one browser process's log. The fix
     keeps the popup at the last position that did resolve (`ANCHOR_PROBE stage=ok source=last-good`) and re-places it as
     soon as the application lays the text out (`source=layout-change`, in a read-only session that writes no text) —
-    fusion-windows PR #56, packaged as `fusion-0.0.0-winui3+5565972-setup.exe`. That build also places the page that
+    fusion-windows PR #56, first packaged as `fusion-0.0.0-winui3+5565972-setup.exe` and carried by the build to install
+    now, `fusion-0.0.0-winui3+8c37702-setup.exe`. That build also places the page that
     has **no** anchor yet: it is deferred (`hidden reason=no-anchor deferred=1`), its window is created hidden so the
     layout notification has something to place, and it appears as soon as the layout arrives instead of waiting for the
     next key. And a page you have **stopped** looking at stays stopped: the same build gives every hide one door and
@@ -541,10 +607,12 @@ No daily report is required, and no feedback is needed for a day without problem
   **D090** is the owner's decision of 2026-10-28 that
   answers it — the popup is owned by the document's own window (`GetActiveView` → `GetWnd`, falling back to the focus
   window) and kept topmost, as Microsoft's SampleIME and CorvusSKK do, in **every** application rather than only in the
-  immersive box. It is implemented, unit-tested and packaged in fusion-windows PR #56 as
-  `fusion-0.0.0-winui3+5565972-setup.exe` (105 297 413 B, SHA-256
-  `5E13035ACEE758786188FC88777A9749D2D0DFB64148C97C062AECE56CB0598C`, unsigned), **not yet installed or owner-checked**;
-  the `+407a0ce` build it supersedes must not be installed — it re-shows a candidate window the user already dismissed.
+  immersive box. It is implemented and unit-tested in fusion-windows PR #56; the build to install now is
+  `fusion-0.0.0-winui3+8c37702-setup.exe` (105 310 350 B, SHA-256
+  `78D4FE28B0AE2DFBC0EF11098059BDBC980E56F926FB344FBAC265ACA529674F`, unsigned), which carries that PR plus R51's reset —
+  **not yet installed or owner-checked**. Its `+5565972`-only predecessor (105 297 413 B, SHA-256
+  `5E13035ACEE758786188FC88777A9749D2D0DFB64148C97C062AECE56CB0598C`) is superseded by it; the `+407a0ce` build both
+  supersede must not be installed — it re-shows a candidate window the user already dismissed.
   One thing that build no longer does is hide the page when the application reports no window at all: it is shown
   unowned and still topmost, and the diagnostic line says `owner-source=none`. Hiding it was a regression against the
   build before the owner work, which displayed the popup in that case.
@@ -562,7 +630,8 @@ No daily report is required, and no feedback is needed for a day without problem
   point at its own start before handing it to `StartComposition`, and a zero-length range cannot be replaced. **Fixed in
   fusion-windows PR #56**: the composition now starts on the range exactly as TSF returned it, so the first write
   replaces the selection; an empty selection is the same range either way, so ordinary typing is unchanged. The fix is
-  built and packaged (`fusion-0.0.0-winui3+5565972-setup.exe`) and has **not** been executed against a real document —
+  built and packaged (first as `fusion-0.0.0-winui3+5565972-setup.exe`, and again in the build to install now,
+  `fusion-0.0.0-winui3+8c37702-setup.exe`) and has **not** been executed against a real document —
   no test on this machine drives a non-empty selection, and registering the TIP here is not allowed. Until that build is
   installed: select, then press Delete or type the word without a selection.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s

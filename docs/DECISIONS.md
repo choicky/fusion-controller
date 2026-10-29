@@ -859,8 +859,9 @@ hidden between the post and the delivery left hidden with its `FENCE kind=reposi
 placed for the first time, a deferred page then hidden refused, and the no-anchor and no-page branches;
 `tsf_anchor_probe` adds the deferred-then-placed case and the four `popup_may_be_placed` combinations; the full native
 suite, built and run on the **5700X** from the head above, prints **97 registered, 95 passed, 2 skipped by design, 0
-failed**; **packaged** — `fusion-0.0.0-winui3+5565972-setup.exe`, identity in the Stage 6 plan's packaged row
-(`+407a0ce` is superseded and is not the build to test); **owner-tested — not yet.**
+failed**; **packaged** — first as `fusion-0.0.0-winui3+5565972-setup.exe`, and that code is inside the current package
+`fusion-0.0.0-winui3+8c37702-setup.exe`, which is the build to test (identity in the Stage 6 plan's packaged row;
+`+407a0ce` is superseded and is not a build to test); **owner-tested — not yet.**
 D089's status keeps the same split: the search box's connection half is measured, its visible-candidates half is what
 #56's checklist step 3 answers for the first time.
 
