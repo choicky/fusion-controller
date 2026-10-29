@@ -233,6 +233,13 @@ context uses — so the Host refuses that save and says it wrote nothing. The wi
 finished. 停止等待 stops that; the edit then stays unsaved until you save again. Only a refusal is retried — a timeout, a
 dropped connection or an uncertain write is reported and left to you, and a page that already saved is not sent again.
 
+**Who the wait is waiting for (R51).** The build the owner ran could say it was waiting and nothing more, which left no
+window to go back and finish. From fusion-windows PR #56 the same bar also names the process:
+`等待：SearchHost.exe (pid 16772) 还有未完成的输入` when that application still holds a composition, and
+`… 还有未处理完的按键` when the Host is still working through its keystrokes; a process the Host cannot name is shown by
+pid alone. The identity comes from the pipe connection that bound that context, and nothing about what was typed travels
+with it — no preedit, no keys, no candidates. On the build installed now the bar still stops at the first sentence.
+
 If a write's outcome is uncertain — the reply was lost, the connection dropped, or the Host said
 so — the window says the change **may have applied**, re-reads the configuration and shows what the Host actually has; edits
 the reread does not confirm stay pending. It never silently retries.
@@ -375,10 +382,15 @@ URLs or page content. The lines that decide the next step:
 |---|---|
 | `ANCHOR_PROBE stage=ok source=composition` | the composition range had layout and supplied the anchor |
 | `ANCHOR_PROBE stage=ok source=composition-caret` | the composition range had no layout; the caret supplied the anchor (PR #25) |
-| `ANCHOR_PROBE stage=text-ext source=composition hr=0x80040206` | `TS_E_NOLAYOUT` — neither the composition range nor the caret fallback had layout for that keystroke, so the page is hidden and stays hidden until the next key re-probes it (R46). Measured 2026-10-28 in the owner's browser log: every `hidden reason=no-anchor` sits directly after one of these, 142 of 151 right after `COMPOSITION_START` and 9 after a mid-composition batch |
+| `ANCHOR_PROBE stage=text-ext source=composition hr=0x80040206` | `TS_E_NOLAYOUT` — neither the composition range nor the caret fallback had layout for that keystroke. **Before PR #56** that hid the page until the next key: measured 2026-10-28 in the owner's browser log, every `hidden reason=no-anchor` sat directly after one of these, 142 of 151 right after `COMPOSITION_START` and 9 after a mid-composition batch (R46). **On PR #56** the line still appears and the page stays where it was — see the `source=last-good` row |
+| `ANCHOR_PROBE stage=ok source=last-good hr=0x80040206 anchor=x,y` | this keystroke had no layout, so the page is kept at the last anchor that resolved **for this context** instead of being hidden (R46's fix, PR #56) |
+| `ANCHOR_PROBE stage=ok source=layout-change range=… rect=…` | the application finished laying this text out, the layout notification came back, and the page moved to the new rectangle. The re-probe ran in a read-only session and wrote no text (PR #56) |
 | `ANCHOR_PROBE stage=no-active-view` / `stage=no-range` | the context had no active view, or the selection returned no range — the anchor was not even attempted |
-| `CANDIDATE_VIEW hidden reason=no-anchor` / `no-page` | nothing to anchor to (R46's symptom — the failing probe is above it) / no candidate page to show |
-| `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility. R49's step 4 measured exactly this in the taskbar search box (`stage=ok source=composition rect=1024,2101,1039,2132 clipped=0` with nothing visible): the popup has no owner window and is not topmost, so the flyout covers it; the fix is to own the popup to the document's window and make it topmost (the owner's decision of 2026-10-28, to be recorded as D090) |
+| `CANDIDATE_VIEW shown owner=0x… owner-source=view\|focus\|none rect=l,t,r,b topmost=1 immersive=0\|1\|-1` | one line per show, from PR #56 on: the window the popup is owned by, whether that came from the context's view, from the focus, or from neither (`none` — the page is then shown unowned and still topmost), the rectangle it was placed at, and the immersive flag — which **no behaviour depends on** and which `-1` when there was no thread manager to ask. If this line is present, its rect matches where the anchor resolved, and the window still cannot be seen, what is left is the z-order band, not the anchor: that is R49's open question and it goes back as a decision, not a hack (`immersive` is why the line carries the flag at all) |
+| `CANDIDATE_VIEW hidden reason=no-anchor deferred=1` / `no-page` | nothing to anchor to yet (R46's symptom on the build before PR #56 — the failing probe is above it) / no candidate page to show. `deferred=1` means the page is waiting for the layout notification that can still place it: the popup was created hidden for that message, and a `shown` line follows once the anchor resolves. **The wait ends at any hide** — every product-path hide goes through one door (`TextService::hide_candidate_page`), which clears the flag, so a page hidden by a focus change, a teardown, a composition end or an empty projection is not left waiting for the layout that would bring it back |
+| `FENCE kind=reposition hidden cid=…` | a re-place request (the layout notification's re-probe, or the `WM_APP` reposition it posts) reached a page that is off screen and **not** waiting for an anchor, so it was refused and nothing moved (PR #56 at `5565972`). One line per refusal, and the normal thing to see after a focus change: a queued message must not re-show a candidate window the user already dismissed, least of all an owned, topmost one landing over the application now in front. It is not a fault and does not mean a candidate was lost: the next key that projects a page shows it again through the normal path. Seeing it while a window **does** reappear on its own — with no new key — is the thing to report |
+| `LAYOUT_SINK advise-failed hr=…` | the context would not accept the layout notification, so the page will only move on the next keystroke. Placement and input keep working; nothing else changes (PR #56) |
+| `stage=ok` and still no visible window | the anchor is fine and the defect is in placement or visibility. R49's step 4 measured exactly this in the taskbar search box (`stage=ok source=composition rect=1024,2101,1039,2132 clipped=0` with nothing visible): the popup had no owner window and was not topmost, so the flyout covered it. PR #56 owns it to the document's window and tops it (D090); on that build the `shown` line above is the one to read |
 
 **Cleanup:** exit every process of the diagnostic browser (including a background instance it leaves behind) **and**
 close the Command Prompt window that set the variable. Exiting the browser does **not** clear `FUSION_TSF_DIAGNOSTICS`
@@ -484,13 +496,20 @@ No daily report is required, and no feedback is needed for a day without problem
     candidate-window code at all — and is kept as a measurement of those builds, not of this package. The individual
     fields of that table were **not** re-checked one by one; the recovery rests on the owner's report for normal Firefox
     and Edge use.
-  - **Remaining limit (R46 — cause now measured, fix in progress):** in web content there are two moments when neither
-    the composition range nor the caret has layout yet — the **first keystroke of a composition**, and the **first
-    keystroke after you pick a candidate mid-word** — and at those moments the popup disappears for the rest of that
-    word until you type one more key, which brings it back. It is not only a one-key gap: measured 2026-10-28 on the
-    installed `+51467cf`, it happened 151 times in one browser process's log. The fix keeps the popup at the last
-    position that did resolve and re-places it as soon as the page lays out — the same PR that owns the popup to the
-    document's window. Meanwhile: one more keystroke brings the window back.
+  - **Remaining limit (R46 — cause measured, fix built and packaged, owner check pending):** in web content there are
+    two moments when neither the composition range nor the caret has layout yet — the **first keystroke of a
+    composition**, and the **first keystroke after you pick a candidate mid-word** — and at those moments the popup
+    disappears for the rest of that word until you type one more key, which brings it back. It is not only a one-key
+    gap: measured 2026-10-28 on the installed `+51467cf`, it happened 151 times in one browser process's log. The fix
+    keeps the popup at the last position that did resolve (`ANCHOR_PROBE stage=ok source=last-good`) and re-places it as
+    soon as the application lays the text out (`source=layout-change`, in a read-only session that writes no text) —
+    fusion-windows PR #56, packaged as `fusion-0.0.0-winui3+5565972-setup.exe`. That build also places the page that
+    has **no** anchor yet: it is deferred (`hidden reason=no-anchor deferred=1`), its window is created hidden so the
+    layout notification has something to place, and it appears as soon as the layout arrives instead of waiting for the
+    next key. And a page you have **stopped** looking at stays stopped: the same build gives every hide one door and
+    refuses a re-place for a page that is off screen for any other reason (`FENCE kind=reposition hidden cid=…`), so a
+    layout that finishes late can no longer put a candidate window back over the application you moved to. **On the
+    build you have installed now, the workaround is unchanged: one more keystroke brings the window back.**
   - **If a field ever shows no popup again:** restart the browser first (see the next bullet) and then, if you want to
     report it, run the optional capture in §5 "R25 browser capture" — it gives the exact steps, the log location and
     what to report.
@@ -518,15 +537,34 @@ No daily report is required, and no feedback is needed for a day without problem
   box's own log records the link succeeding and the anchor resolving. **What does not work is the candidate window:
   nothing appears**, so a search whose answer is not the first candidate cannot be finished in the box yet. The log
   says the window was created and placed, so the popup exists where the flyout is drawn and the owner sees only the
-  flyout: Fusion's popup has
-  no owner window, is not topmost, and every raise uses `HWND_TOP`. **The owner's decision of 2026-10-28 fixes it** —
-  the popup is owned by the document's own window and kept topmost, as Microsoft's SampleIME and CorvusSKK do —
-  implemented in fusion-windows `fix/candidate-owner-layout`, to be recorded as D090. Until that build is installed and
-  the box checked on it, use the box only where the first candidate is the one you want, or type in an application
-  window where the popup is visible. Win+R, the editors and the browsers are unaffected either way.
+  flyout: on that installed build Fusion's popup has no owner window, is not topmost, and every raise uses `HWND_TOP`.
+  **D090** is the owner's decision of 2026-10-28 that
+  answers it — the popup is owned by the document's own window (`GetActiveView` → `GetWnd`, falling back to the focus
+  window) and kept topmost, as Microsoft's SampleIME and CorvusSKK do, in **every** application rather than only in the
+  immersive box. It is implemented, unit-tested and packaged in fusion-windows PR #56 as
+  `fusion-0.0.0-winui3+5565972-setup.exe` (105 297 413 B, SHA-256
+  `5E13035ACEE758786188FC88777A9749D2D0DFB64148C97C062AECE56CB0598C`, unsigned), **not yet installed or owner-checked**;
+  the `+407a0ce` build it supersedes must not be installed — it re-shows a candidate window the user already dismissed.
+  One thing that build no longer does is hide the page when the application reports no window at all: it is shown
+  unowned and still topmost, and the diagnostic line says `owner-source=none`. Hiding it was a regression against the
+  build before the owner work, which displayed the popup in that case.
+  Until that build is installed and the box checked on it, use the box only where the first candidate is the one you
+  want, or type in an application window where the popup is visible. Win+R, the editors and the browsers are unaffected
+  either way — but ownership is also what makes the popup stop floating over a different application, so after
+  installing that build the popup should disappear when its own application window is minimised or closed.
   **One session is reported where the box went quiet while typing.** No cause is established for it, and the log named
   with that report belongs to a non-AppContainer process rather than to `SearchHost`; the R49 row of
-  `docs/windows-stage6-plan.md` keeps the measurements.
+  `docs/windows-stage6-plan.md` keeps the measurements. The next checklist asks which key stalled and roughly how long,
+  because "the box went quiet" is not yet a measured fact about any specific code path.
+- **Typing over selected text did not replace it (R50).** With committed text selected, a 双拼 syllable composed at the
+  start of the selection and left the selection in place, instead of the first candidate replacing it the way the other
+  input methods do. The cause is in this product, not in the application: `apply_state_text` collapsed the selection to a
+  point at its own start before handing it to `StartComposition`, and a zero-length range cannot be replaced. **Fixed in
+  fusion-windows PR #56**: the composition now starts on the range exactly as TSF returned it, so the first write
+  replaces the selection; an empty selection is the same range either way, so ordinary typing is unchanged. The fix is
+  built and packaged (`fusion-0.0.0-winui3+5565972-setup.exe`) and has **not** been executed against a real document —
+  no test on this machine drives a non-empty selection, and registering the TIP here is not allowed. Until that build is
+  installed: select, then press Delete or type the word without a selection.
 - **Notepad-- 3.4 crashed on Win+Space with the 76bc009 package** (R35). The cause was the TIP binding to Notepad--'s
   own older `MSVCP140.dll`, not the input behaviour; fusion-windows PR #21 removed the CRT mutex that triggered it, and
   the owner confirmed on the repair package that switching to Fusion no longer crashes. That covers the activation crash
