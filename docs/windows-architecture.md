@@ -409,6 +409,31 @@ ledger fence 到显式 terminal、unbind Host context、递增 entry generation 
   每次 teardown 记 `CONTEXT_TEARDOWN … clean=1`，且关闭持有 open composition 的文档时**不**投递
   `OnCompositionTerminated`）。
 
+**组合结束 ⇒ 后端不得留在组合里（2026-10-29，R51；实现 fusion-windows PR #57，
+`fix/r51-reset-and-r52-diag`）。** TIP 一侧不再持有某 context 的组合之后，Host 一侧那份 preedit 与仍在跑的按键不会再有
+人去结束它；而结束组合的这些路径原本只在这个 context 的**下一次按键**上补做 reset，所以后续焦点、后续保存可以一直等一
+个不会来的按键（Stage 6 计划 R51）。规则固定为：**没有任何 context 可以带着一个待发的 backend reset 离开下面任何一条
+路径**——`OnCompositionTerminated`、焦点离开、被 pop（上面 D083 那条）、`Deactivate`，以及各自的 teardown 门。
+
+执行方式受 §8 约束，不在这些回调里直接调 backend：`OnCompositionTerminated` 手里已经握着 `ecWrite`（文档已锁），而
+reset 是一次阻塞的、必须排队到 Fcitx 循环上的管道往返，§8「不在等待 IPC 时持有 TSF document lock」优先。所以回调只做
+两件事——在该 context 的 entry 上记下意图，然后 `PostMessageW` 到本线程自己的 message-only 窗口（类
+`FusionTsfDeferredReset`）——reset 在该线程的下一次消息循环里、edit session 之外真正发出。为此固定四条边界：
+
+- 意图携带 entry 与它当时的 generation：entry 已 teardown、generation 已动的迟到投递被栅栏挡掉并记
+  `FENCE kind=deferred-reset stale-entry`，因为 teardown 门已替它跑过 reset；
+- 队列有界（32，同一 entry+generation 合并成一条），满或投递失败既不重试也不阻塞——意图仍留在 entry 上，由下一条边界门
+  读走；`handling_key_` 为真时整批重新排队并重新请求唤醒，reset 不会插进一次按键的 ownership 中间；
+- 窗口或投递不可用是**可见的降级**而不是静默：写 `BACKEND_RESET window=create-failed win32=… deferred=unavailable`
+  （`class-unavailable`、`post-failed` 同理），此时仍在 `Deactivate` 与 teardown 门 flush；
+- 真正跑起来的每一次 reset 写一行 `BACKEND_RESET reason=terminated|focus-out|pop|deactivate cid=… ok=0|1`——`reason`
+  命名是哪条边界，`ok` 是 Host 的答复（键路径已有自己的行，不重复打印）；这一行就是「什么都没发生」与「发生了但被拒
+  绝」之间的区别。
+
+这条不改变本节的原则：focus 本身仍不是 semantic discontinuity，被带回干净态的是**组合已经结束**的那个 context 的
+backend 状态，Epoch 与 semantic incarnation 都不因它推进。链接断开与客户端退出也不属于这条——那两种情况由 §13 的 Host
+侧 unbind 全部 context 处理，重连时绑的是新 context。
+
 **仍 OPEN / UNFROZEN。** 除上述被 pop 的栈成员边界之外，哪些 TSF lifecycle event 构成 semantic discontinuity
 仍须由真实执行取证：transitory context、context reuse/discontinuity、async 请求 pending 时的自然销毁/停用，
 以及 Notepad 之外应用的 lifecycle 序列均未取证。0.5B–0.5D 只观察到受控的 deactivation fence、销毁 context 上的
