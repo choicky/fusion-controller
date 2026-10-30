@@ -651,13 +651,39 @@ No daily report is required, and no feedback is needed for a day without problem
   be taken back later in the same key press — which is what an application deciding on that first answer would drop.
   What WeChat itself does was **not** captured, so treat the fix as implemented, not as a proven cure. fusion-windows
   PR #34 claims those keys only while they really are engine work (a composition, a candidate page, unfinished work) and
-  keeps them engine-owned while composing; every other key keeps the admission it had before, including the function
+  keeps them engine-owned while composing; every other key kept the admission it had before, including the function
   keys you may have bound as Fcitx global hotkeys — the first version of the fix would have blocked those.
+  **R53 narrows that promise:** the stopgap in fusion-windows PR #59 leaves the whole function row, Apps, PrintScreen and
+  Pause to the application whenever nothing is composing, so a binding you made to one of those keys no longer reaches
+  Fcitx in that state — the R53 bullet below says what you get back and what it costs.
   **Owner-confirmed on 2026-10-22:** after installing the package built from that change, the owner reports the WeChat
   editing keys work again. That confirmation covers these keys in WeChat; it is not a claim about every key in every
   application, and it does not turn the WeChat-side mechanism into a measured fact — it was never captured. If a key is
   ever lost again, take the ordinary per-process capture from §5 and read its log: a key the TIP still claims is followed
   by a `CLASSIFY` line, while a key left to the application shows `TEST_KEY` alone.
+- **Explorer: `F2` renamed nothing and `F5` refreshed nothing; Notepad++: the letters stopped appearing after the `Shift`
+  toggle to English** (R53, owner report 2026-10-30). Same mechanism as the two bullets above, one state further out:
+  Fusion claimed the key in its first answer, the engine then only handed it back, and an application that decides from
+  that first answer never delivers the key itself — so the key was claimed and lost. fusion-windows PR #59 is a
+  **stopgap, not the redesign**: that first answer now refuses a key when the engine has reported itself off for that
+  window, and refuses the character-less keys the idle engine is measured handing back — the function row `F1`–`F24`,
+  Apps, PrintScreen, Pause, and the browser/volume/media block. On a build carrying it (`0.0.0-winui3+153e4a7` or later):
+  - `F2` should rename and `F5` should refresh in Explorer again, in 双拼 and in English alike, and the letters, digits
+    and punctuation you type after tapping `Shift` should go into the document instead of vanishing. `F5` in Notepad and
+    `F11`/`F12` in a browser belong to the application again while nothing is composed. Every one of those is a step of
+    that PR's owner checklist; none is confirmed on a real application yet.
+  - **The first letter after each `Shift` toggle may need pressing twice.** The on/off state Fusion reads travels only on
+    a key the engine actually answered, and the `Shift` that turns Chinese off is answered while Chinese is still on, so
+    the one key right after it is still claimed the old way. From the next key onwards the answer is correct. Known limit
+    of the stopgap, not a new defect.
+  - **A Fcitx hotkey you bind to one of those keys stops working while nothing is composing**, in the applications that
+    decide from the first answer. Fcitx's own defaults bind none of them, which is measured here; reconciling a personal
+    binding with a working `F2` is the redesign's job, not this stopgap's.
+  - `ScrollLock` still types an `e`. Windows sends `ScrollLock` and the letter `E` as the same virtual key, so this build
+    cannot refuse one without refusing the other; unchanged here, and on the measurement list.
+  - **Status: implemented, measured against the pinned engine, not yet confirmed in a real application.** If a key is
+    still dead on a build carrying it, take the ordinary per-process capture from §5 and report four things: which key,
+    which application, Chinese or English, and whether something was being composed at that moment.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
@@ -682,9 +708,11 @@ No daily report is required, and no feedback is needed for a day without problem
   click into a text field and tap the key the settings page shows. Whether a window is in the switched-off (English) state is
   judged by **that window's own input context**: a background window that is switched off passes its typed characters straight
   to the application even while another window is still composing in Chinese, and it is not read off whichever window most
-  recently had focus. In the English state your other configured keys keep working: a key you bound
-  to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
-  composed. A lone `Shift` does not commit raw input either, and
+  recently had focus. In the English state, since the R53 stopgap (fusion-windows PR #59), the only key Fusion still takes
+  is a lone `Shift`: a key you bound to 切换输入法 (for example `F6`) no longer turns Chinese back on in an application that
+  decides the key's owner from that first answer, because claiming it there is what lost the keys in the first place. Tap
+  `Shift` again, or use `Win`+`Space`, to come back. Before that change such a binding did reach Fcitx, and the redesign of
+  the key-admission rule is what restores it properly. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
   **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
