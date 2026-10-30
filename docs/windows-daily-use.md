@@ -667,20 +667,28 @@ No daily report is required, and no feedback is needed for a day without problem
   that first answer never delivers the key itself — so the key was claimed and lost. fusion-windows PR #59 is a
   **stopgap, not the redesign**: that first answer now refuses a key when the engine has reported itself off for that
   window, and refuses the character-less keys the idle engine is measured handing back — the function row `F1`–`F24`,
-  Apps, PrintScreen, Pause, and the browser/volume/media block. On a build carrying it (`0.0.0-winui3+153e4a7` or later):
+  Apps, PrintScreen, Pause, ScrollLock, and the browser/volume/media block. On a build carrying it
+  (`0.0.0-winui3+4348769` or later):
   - `F2` should rename and `F5` should refresh in Explorer again, in 双拼 and in English alike, and the letters, digits
     and punctuation you type after tapping `Shift` should go into the document instead of vanishing. `F5` in Notepad and
     `F11`/`F12` in a browser belong to the application again while nothing is composed. Every one of those is a step of
     that PR's owner checklist; none is confirmed on a real application yet.
-  - **The first letter after each `Shift` toggle may need pressing twice.** The on/off state Fusion reads travels only on
-    a key the engine actually answered, and the `Shift` that turns Chinese off is answered while Chinese is still on, so
-    the one key right after it is still claimed the old way. From the next key onwards the answer is correct. Known limit
-    of the stopgap, not a new defect.
+  - **The first letter after each `Shift` toggle arrives** — the "press it twice" limit of the first head is fixed in
+    the same PR (`+4348769`). That key is still claimed, because the state Fusion reads travels only on a key the engine
+    answered and the `Shift` that turns Chinese off is answered while Chinese is still on; but the engine hands it back,
+    and the shell now delivers that character itself, once, exactly as it already did for a key the engine declines.
+    Only a key that carries a character is delivered this way: `Return`, `Esc`, `Tab` and the function keys keep the
+    route they had.
+  - **Clicking a candidate with the mouse no longer stops Chinese input** (`+4348769`). A selection, a page turn and a
+    cursor move are not key events and carry no engine state; before that fix one click made Fusion read "the engine is
+    off", so every letter after it went in as English until you pressed `Shift`.
   - **A Fcitx hotkey you bind to one of those keys stops working while nothing is composing**, in the applications that
     decide from the first answer. Fcitx's own defaults bind none of them, which is measured here; reconciling a personal
     binding with a working `F2` is the redesign's job, not this stopgap's.
-  - `ScrollLock` still types an `e`. Windows sends `ScrollLock` and the letter `E` as the same virtual key, so this build
-    cannot refuse one without refusing the other; unchanged here, and on the measurement list.
+  - `ScrollLock` no longer types an `e`, and it no longer needs a workaround: `VK_SCROLL` is `0x91` in `winuser.h`, not
+    `0x45` — `0x45` is the letter `E` — so the earlier note that the two were one key was simply wrong. ScrollLock now
+    belongs to the keys refused while nothing is composing, like `F2` and `F5`, and the keyboard's ScrollLock light still
+    toggles.
   - **Status: implemented, measured against the pinned engine, not yet confirmed in a real application.** If a key is
     still dead on a build carrying it, take the ordinary per-process capture from §5 and report four things: which key,
     which application, Chinese or English, and whether something was being composed at that moment.
