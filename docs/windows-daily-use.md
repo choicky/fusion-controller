@@ -667,12 +667,13 @@ No daily report is required, and no feedback is needed for a day without problem
   that first answer never delivers the key itself — so the key was claimed and lost. fusion-windows PR #59 is a
   **stopgap, not the redesign**: that first answer now refuses a key when the engine has reported itself off for that
   window, and refuses the character-less keys the idle engine is measured handing back — the function row `F1`–`F24`,
-  Apps, PrintScreen, Pause, ScrollLock, and the browser/volume/media block. On a build carrying it
-  (`0.0.0-winui3+4348769` or later):
-  - `F2` should rename and `F5` should refresh in Explorer again, in 双拼 and in English alike, and the letters, digits
-    and punctuation you type after tapping `Shift` should go into the document instead of vanishing. `F5` in Notepad and
-    `F11`/`F12` in a browser belong to the application again while nothing is composed. Every one of those is a step of
-    that PR's owner checklist; none is confirmed on a real application yet.
+  Apps, PrintScreen, Pause, ScrollLock, and the browser/volume/media block. **The owner verified this on
+  `0.0.0-winui3+4348769` on 2026-11-01** — the seven checks below — and a later head, `+46191e7`, carries one more fix
+  (the Host-restart case) that is packaged and not yet installed. On a build carrying it:
+  - **`F2` renames and `F5` refreshes in Explorer again**, in 双拼 and in English alike, and the letters, digits and
+    punctuation you type after tapping `Shift` go into the document instead of vanishing; `F5` in Notepad and
+    `F11`/`F12` in a browser belong to the application again while nothing is composed. **Confirmed by the owner on
+    `+4348769`, 2026-11-01**, together with Notepad++, Notepad and the search box.
   - **The first letter after each `Shift` toggle arrives** — the "press it twice" limit of the first head is fixed in
     the same PR (`+4348769`). That key is still claimed, because the state Fusion reads travels only on a key the engine
     answered and the `Shift` that turns Chinese off is answered while Chinese is still on; but the engine hands it back,
@@ -689,9 +690,15 @@ No daily report is required, and no feedback is needed for a day without problem
     `0x45` — `0x45` is the letter `E` — so the earlier note that the two were one key was simply wrong. ScrollLock now
     belongs to the keys refused while nothing is composing, like `F2` and `F5`, and the keyboard's ScrollLock light still
     toggles.
-  - **Status: implemented, measured against the pinned engine, not yet confirmed in a real application.** If a key is
-    still dead on a build carrying it, take the ordinary per-process capture from §5 and report four things: which key,
-    which application, Chinese or English, and whether something was being composed at that moment.
+  - **If the Host restarts while you are working, the next key still types** (`+46191e7`). Fusion learns whether the
+    engine is on from the Host that answered; after a restart that answer belonged to a Host that no longer exists, and
+    a window that never typed again kept treating itself as English. The answer now travels with the Host identity, so
+    the first key after a restart goes to the new engine.
+  - **Status: implemented, measured against the pinned engine, and owner-verified on `+4348769` (2026-11-01).** What is
+    still open is listed above — a character-less key as the very first key after a toggle, a personal Fcitx binding on
+    one of rule 2's keys, and the key matrix's own list. If a key is still dead on a build carrying it, take the
+    ordinary per-process capture from §5 and report four things: which key, which application, Chinese or English, and
+    whether something was being composed at that moment.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
