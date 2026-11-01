@@ -253,8 +253,8 @@ composition.** An application that keeps its preedit behind a lost focus keeps i
 `BACKEND_RESET` line is written for that focus change, and a save that names that process is a save waiting for a real
 thing to end.
 
-**Both halves are on the machine now, and the owner's run of 2026-10-30 is what says so.** The installed build is
-`0.0.0-winui3+8c37702` (installed 2026-10-30 at 11:40:32). First test: a 双拼 syllable typed in Firefox and left
+**Both halves are on the machine now, and the owner's run of 2026-10-30 on `0.0.0-winui3+8c37702` (installed that day at
+11:40:32) is what says so.** The machine has since moved to `0.0.0-winui3+6d03ac1` (2026-11-01), which carries both. First test: a 双拼 syllable typed in Firefox and left
 uncommitted, focus then moved to another field, then the 按键 page saved — the save went through at once, the bar never
 said `等待`, and the next syllable typed back in that field was clean, so a wait no longer outlives an input the
 application ended; on the build before #57 the same sequence waited until that browser exited. The second test, in
@@ -451,7 +451,7 @@ either** — that round only added lines — so an occurrence is not expected to
 capturing. These steps exist so that the next occurrence can be read at all: on the build before PR #57 the log could
 not say which modifier was pressed, whether the engine's own state moved, or who closed the OpenClose compartment — and
 the reported symptom (`:` does not come out, Chinese is lost, then `HARD_POLICY openclose=closed` repeats) turns on
-exactly those three. Run this on `+8c37702` or any later build — that is the build installed on the owner's machine now;
+exactly those three. Run this on `+8c37702` or any later build — the machine now runs `0.0.0-winui3+6d03ac1`;
 on an older build the lines you need are simply absent, and the capture tells you nothing new.
 
 1. Leave both variables set for this user, then sign out and back in so every application — including one that would
@@ -629,18 +629,19 @@ No daily report is required, and no feedback is needed for a day without problem
   **D090** is the owner's decision of 2026-10-28 that
   answers it — the popup is owned by the document's own window (`GetActiveView` → `GetWnd`, falling back to the focus
   window) and kept topmost, as Microsoft's SampleIME and CorvusSKK do, in **every** application rather than only in the
-  immersive box. It is implemented and unit-tested in fusion-windows PR #56, and the build that carries it **is installed
-  on the owner's machine**: `fusion-0.0.0-winui3+8c37702-setup.exe` (105 310 350 B, SHA-256
-  `78D4FE28B0AE2DFBC0EF11098059BDBC980E56F926FB344FBAC265ACA529674F`, unsigned), installed 2026-10-30 at 11:40:32. It
-  carries that PR plus R51's reset, and the owner verified R51 on it the same day (the R51 row of
-  `docs/windows-stage6-plan.md`). **What is still not reported is the search box itself** — the popup's visibility
+  immersive box. It is implemented and unit-tested in fusion-windows PR #56, and the build that first carried it —
+  `fusion-0.0.0-winui3+8c37702-setup.exe` (105 310 350 B, SHA-256
+  `78D4FE28B0AE2DFBC0EF11098059BDBC980E56F926FB344FBAC265ACA529674F`, unsigned) — was installed 2026-10-30 at 11:40:32;
+  it carried that PR plus R51's reset, and the owner verified R51 on it the same day (the R51 row of
+  `docs/windows-stage6-plan.md`). Every later head descends from it, and the machine now runs
+  `0.0.0-winui3+6d03ac1` (2026-11-01). **What is still not reported is the search box itself** — the popup's visibility
   there is the check that is outstanding. Its `+5565972`-only predecessor (105 297 413 B, SHA-256
   `5E13035ACEE758786188FC88777A9749D2D0DFB64148C97C062AECE56CB0598C`) is superseded by it; the `+407a0ce` build both
   supersede must not be installed — it re-shows a candidate window the user already dismissed.
   One thing that build no longer does is hide the page when the application reports no window at all: it is shown
   unowned and still topmost, and the diagnostic line says `owner-source=none`. Hiding it was a regression against the
   build before the owner work, which displayed the popup in that case.
-  That build is installed and the box is the part still outstanding, so until it is checked there, use the box only where
+  The installed build carries it and the box is the part still outstanding, so until it is checked there, use the box only where
   the first candidate is the one you want, or type in an application window where the popup is visible. Win+R, the editors and the browsers are unaffected
   either way — but ownership is also what makes the popup stop floating over a different application, so on this build the
   popup should disappear when its own application window is minimised or closed. The owner's 2026-10-30 daily-use
@@ -656,8 +657,8 @@ No daily report is required, and no feedback is needed for a day without problem
   point at its own start before handing it to `StartComposition`, and a zero-length range cannot be replaced. **Fixed in
   fusion-windows PR #56**: the composition now starts on the range exactly as TSF returned it, so the first write
   replaces the selection; an empty selection is the same range either way, so ordinary typing is unchanged. The fix is
-  built and packaged (first as `fusion-0.0.0-winui3+5565972-setup.exe`, and again in the build installed now,
-  `fusion-0.0.0-winui3+8c37702-setup.exe`, which the owner installed 2026-10-30) and has **not** been executed against a
+  built and packaged (first as `fusion-0.0.0-winui3+5565972-setup.exe`, and again in every later build, including the installed
+  `fusion-0.0.0-winui3+6d03ac1-setup.exe`) and has **not** been executed against a
   real document here — no test on this machine drives a non-empty selection, and registering the TIP here is not allowed.
   **It is on the machine, so what is owed is the behaviour itself:** select committed text, type two 双拼 keys, and the
   selection must be gone, replaced by the first candidate. If the selected text survives the syllable, that is this row
@@ -679,13 +680,54 @@ No daily report is required, and no feedback is needed for a day without problem
   be taken back later in the same key press — which is what an application deciding on that first answer would drop.
   What WeChat itself does was **not** captured, so treat the fix as implemented, not as a proven cure. fusion-windows
   PR #34 claims those keys only while they really are engine work (a composition, a candidate page, unfinished work) and
-  keeps them engine-owned while composing; every other key keeps the admission it had before, including the function
+  keeps them engine-owned while composing; every other key kept the admission it had before, including the function
   keys you may have bound as Fcitx global hotkeys — the first version of the fix would have blocked those.
+  **R53 narrows that promise:** the stopgap in fusion-windows PR #59 leaves the whole function row, Apps, PrintScreen and
+  Pause to the application whenever nothing is composing, so a binding you made to one of those keys no longer reaches
+  Fcitx in that state — the R53 bullet below says what you get back and what it costs.
   **Owner-confirmed on 2026-10-22:** after installing the package built from that change, the owner reports the WeChat
   editing keys work again. That confirmation covers these keys in WeChat; it is not a claim about every key in every
   application, and it does not turn the WeChat-side mechanism into a measured fact — it was never captured. If a key is
   ever lost again, take the ordinary per-process capture from §5 and read its log: a key the TIP still claims is followed
   by a `CLASSIFY` line, while a key left to the application shows `TEST_KEY` alone.
+- **Explorer: `F2` renamed nothing and `F5` refreshed nothing; Notepad++: the letters stopped appearing after the `Shift`
+  toggle to English** (R53, owner report 2026-10-30). Same mechanism as the two bullets above, one state further out:
+  Fusion claimed the key in its first answer, the engine then only handed it back, and an application that decides from
+  that first answer never delivers the key itself — so the key was claimed and lost. fusion-windows PR #59 is a
+  **stopgap, not the redesign**: that first answer now refuses a key when the engine has reported itself off for that
+  window, and refuses the character-less keys the idle engine is measured handing back — the function row `F1`–`F24`,
+  Apps, PrintScreen, Pause, ScrollLock, and the browser/volume/media block. **The owner verified this on
+  `0.0.0-winui3+4348769` on 2026-11-01** — the seven checks below — and a later head, `+46191e7`, carries one more fix
+  (the Host-restart case) that is packaged and not yet installed. On a build carrying it:
+  - **`F2` renames and `F5` refreshes in Explorer again**, in 双拼 and in English alike, and the letters, digits and
+    punctuation you type after tapping `Shift` go into the document instead of vanishing; `F5` in Notepad and
+    `F11`/`F12` in a browser belong to the application again while nothing is composed. **Confirmed by the owner on
+    `+4348769`, 2026-11-01**, together with Notepad++, Notepad and the search box.
+  - **The first letter after each `Shift` toggle arrives** — the "press it twice" limit of the first head is fixed in
+    the same PR (`+4348769`). That key is still claimed, because the state Fusion reads travels only on a key the engine
+    answered and the `Shift` that turns Chinese off is answered while Chinese is still on; but the engine hands it back,
+    and the shell now delivers that character itself, once, exactly as it already did for a key the engine declines.
+    Only a key that carries a character is delivered this way: `Return`, `Esc`, `Tab` and the function keys keep the
+    route they had.
+  - **Clicking a candidate with the mouse no longer stops Chinese input** (`+4348769`). A selection, a page turn and a
+    cursor move are not key events and carry no engine state; before that fix one click made Fusion read "the engine is
+    off", so every letter after it went in as English until you pressed `Shift`.
+  - **A Fcitx hotkey you bind to one of those keys stops working while nothing is composing**, in the applications that
+    decide from the first answer. Fcitx's own defaults bind none of them, which is measured here; reconciling a personal
+    binding with a working `F2` is the redesign's job, not this stopgap's.
+  - `ScrollLock` no longer types an `e`, and it no longer needs a workaround: `VK_SCROLL` is `0x91` in `winuser.h`, not
+    `0x45` — `0x45` is the letter `E` — so the earlier note that the two were one key was simply wrong. ScrollLock now
+    belongs to the keys refused while nothing is composing, like `F2` and `F5`, and the keyboard's ScrollLock light still
+    toggles.
+  - **If the Host restarts while you are working, the next key still types** (`+46191e7`). Fusion learns whether the
+    engine is on from the Host that answered; after a restart that answer belonged to a Host that no longer exists, and
+    a window that never typed again kept treating itself as English. The answer now travels with the Host identity, so
+    the first key after a restart goes to the new engine.
+  - **Status: implemented, measured against the pinned engine, and owner-verified on `+4348769` (2026-11-01).** What is
+    still open is listed above — a character-less key as the very first key after a toggle, a personal Fcitx binding on
+    one of rule 2's keys, and the key matrix's own list. If a key is still dead on a build carrying it, take the
+    ordinary per-process capture from §5 and report four things: which key, which application, Chinese or English, and
+    whether something was being composed at that moment.
 - A new application window should start with Fusion open (U6, owner decision 2026-10-19; implemented in fusion-windows
   PR #20 and **awaiting its first real-window confirmation**). Check with Fusion already selected (see §1). If a new
   window still starts closed, press Ctrl+Space once and report it with the time and the application.
@@ -710,9 +752,11 @@ No daily report is required, and no feedback is needed for a day without problem
   click into a text field and tap the key the settings page shows. Whether a window is in the switched-off (English) state is
   judged by **that window's own input context**: a background window that is switched off passes its typed characters straight
   to the application even while another window is still composing in Chinese, and it is not read off whichever window most
-  recently had focus. In the English state your other configured keys keep working: a key you bound
-  to 切换输入法 (for example `F6`) still reaches Fcitx and turns Chinese back on — the state only stops *text* from being
-  composed. A lone `Shift` does not commit raw input either, and
+  recently had focus. In the English state, since the R53 stopgap (fusion-windows PR #59), the only key Fusion still takes
+  is a lone `Shift`: a key you bound to 切换输入法 (for example `F6`) no longer turns Chinese back on in an application that
+  decides the key's owner from that first answer, because claiming it there is what lost the keys in the first place. Tap
+  `Shift` again, or use `Win`+`Space`, to come back. Before that change such a binding did reach Fcitx, and the redesign of
+  the key-admission rule is what restores it properly. A lone `Shift` does not commit raw input either, and
   numpad Enter behaves as ordinary `Return` because Windows delivers it as the same virtual key. The list manages the two
   methods this runtime defines (pinyin, shuangpin); dictionaries, addons and `External` tools are not included.
   **Known behaviour:** every Shift key-down is consumed by the TSF service so the engine can see a lone press; a Shift release
