@@ -106,7 +106,7 @@ Reviewer's leaning: **A**, measured first.
   Notepad++, Explorer, Edge, Firefox, WeChat, Word, VS Code, search box); the T latency
   distribution; and whether any host breaks.
 
-> **Status, 2026-11-01.** The first item is done: `tests/key_matrix.cpp` measures 4 824 cells and
+> **Status, 2026-11-01.** The first item is done: `tests/key_matrix.cpp` measures 5 220 cells and
 > the result is in `docs/windows-key-matrix.md`. The second item is only half done: the T/K
 > pairing counters are implemented and unit-tested (`tests/key_pairing.cpp`,
 > `src/tsf/key_pairing.cpp`) and write one content-free `KEY_PAIRING` line per 200 keys and on

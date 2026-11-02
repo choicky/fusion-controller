@@ -723,16 +723,18 @@ No daily report is required, and no feedback is needed for a day without problem
     engine is on from the Host that answered; after a restart that answer belonged to a Host that no longer exists, and
     a window that never typed again kept treating itself as English. The answer now travels with the Host identity, so
     the first key after a restart goes to the new engine.
-  - **The whole keyboard was measured, and the limits above are now a counted list** (2026-11-01). 4 824 cells — every
+  - **The whole keyboard was measured, and the limits above are now a counted list** (2026-11-01). 5 220 cells — every
     key a keyboard produces, in six states, with and without modifiers — were run against the pinned engine. What the
     stopgap promises holds cell by cell: an idle `F2`/`F5` is the application's, a letter in the English state is the
     application's, and the first key after the toggle arrives exactly once. What is left is one large shape and one
     small one. **Large: while you are composing, the function row is still claimed and still handed back**, so `F5` or
     `F12` pressed with a pinyin string on screen does nothing in an application that decides from the first answer —
     finish or cancel the composition first. `Escape`, `Tab`, `Insert`, `PageUp`/`PageDown` have the same shape when
-    nothing is composing, and so do Home/End/arrows with `Shift` while composing. **Small: no Ctrl chord ever reaches
-    Fcitx**, so a Fcitx binding on `Ctrl+Space`, `Ctrl+;`, `Ctrl+.`, `Ctrl+1..9`, `Ctrl+Return`, `Ctrl+Backspace`,
-    `Ctrl+Delete` or `Ctrl+Left/Right` does not work through Fusion. Both lists are in `docs/windows-key-matrix.md`.
+    nothing is composing, and so do Home/End/arrows with `Shift` while composing; the numeric keypad with `NumLock`
+    off is those same keys, so `Numpad 0`, `Numpad 9` and `Numpad 3` inherit the `Insert`/`PgUp`/`PgDn` gap. **Small:
+    no Ctrl chord ever reaches Fcitx**, so a Fcitx binding on `Ctrl+Space`, `Ctrl+;`, `Ctrl+.`, `Ctrl+1..9`,
+    `Ctrl+Return`, `Ctrl+Backspace`, `Ctrl+Delete` or `Ctrl+Left/Right` does not work through Fusion. Both lists are
+    in `docs/windows-key-matrix.md`.
   - **A character-less key as the very first key after a toggle is not lost** — the earlier note said it was, and the
     matrix says otherwise: the toggle ends the composition, so rule 2 already refuses `Return`, `Esc`, `Tab` and the
     function keys in that state. Only a key that *carries* a character needed the delivery fix.

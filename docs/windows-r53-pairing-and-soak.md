@@ -196,8 +196,25 @@ guesses, and this document does not claim a number for it.
 cannot show the profile directory it scans is the one the Host writes.
 
 A read-only backup of the owner's profile was taken before any further work
-(`~/worktmp/fusion-windows/r53-key-matrix/fcitx5-backup-20261102`, 7 files, 20 267 bytes). Nothing
-in `%APPDATA%\Fcitx5` has been edited or deleted; the cleanup decision is the owner's.
+(`~/worktmp/fusion-windows/r53-key-matrix/fcitx5-backup-20261102`, 7 files, 20 267 bytes), and the
+owner decided the cleanup on 2026-11-02.
+
+What was removed, and the proof. The 18 lines whose **first-seen** timestamp falls in
+10:57:17–10:58:12 were deleted from `pinyin/mixed_english_user.tsv` — those words and no others,
+matched on the word **and** the timestamp so that nothing the owner typed could be caught by
+accident. Nothing else in that file changed: it went from 31 lines (header + 30 entries) to 13
+(header + 12), `diff -u` against the backup shows exactly 18 deletions and no addition or
+modification, and every surviving line is byte-identical to the backup. The file's SHA-256 was
+`1A00857E5596E3BDFBF953041234CDFD16C34558700F50B7CF735512338D058C` before and
+`6672927FD0D2552E3AB08D9897A3F48E46A87814C74ABCF3FB32007006F3CD14` after (415 B). The owner's own
+twelve entries — `cd`, `codex`, `dns`, `etf`, `firefox`, `im`, `tm`, `vix`, `wez`, `windows`, `wok`,
+`word` — are unchanged, and the file still sorts and still starts with `#schema=1`.
+
+No other file was touched. `mixed_english_user.tsv` is the only entry under `%APPDATA%\Fcitx5`
+whose last-write time is 18:03:02; the other six carry the production Host's own periodic save at
+17:56:51, with exactly the sizes they had at 10:56:52. That save is written from the state the
+production Host loaded at **10:26:45**, before the incident, so those files were never exposed to
+the harness's writes and need no action.
 
 ### 4.2 The run
 
