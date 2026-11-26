@@ -208,7 +208,7 @@ Auxiliary Filter:
 
 这 19 组是本项目的 authoritative target set。扩展到集合之外必须另行作出明确决定。
 
-实现方向仍复用现有上游 paired-punctuation mechanism；不得因此引入 structured candidate API、Pinyin/Table paired-punctuation plumbing、新 punctuation state machine、LibIME/Fcitx core/Android candidate protocol 修改。19 组目标及其历史实验保留为产品边界参考；D066 已将实验扩展移出当前首发范围并恢复发布 pin 的 upstream 基线。未来若重新开启该扩展，必须另行作出决定并完成适用的 source/runtime 验证；当前状态见 `docs/first-release-baseline.md` §2/§6。
+实现方向仍复用现有上游 paired-punctuation mechanism；不得因此引入 structured candidate API、Pinyin/Table paired-punctuation plumbing、新 punctuation state machine、LibIME/Fcitx core/Android candidate protocol 修改。19 组目标及其历史实验保留为产品边界参考；D066 已将实验扩展移出当前首发范围并恢复发布 pin 的 upstream 基线。未来若重新开启该扩展，必须另行作出决定并完成适用的 source/runtime 验证；冻结首发范围见 `docs/first-release-baseline.md` §2/§6；首发后的共享引擎映射记录见 [ROADMAP](ROADMAP.md#current-state)。
 
 ## 6. 词库与语言模型
 
