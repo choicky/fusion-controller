@@ -67,21 +67,33 @@ VERIFIED / COMPLETE. The accepted r4 behavior, bounded mixed search, separate Ch
 
 ## Current next
 
-The Windows settings surface is the **WinUI 3 client**, and it is the only settings client in the current owner-test package: that build has the Qt client switched off (`FUSION_WITH_SETTINGS_UI=OFF`), so the rollback path is the **previous package**, not a second executable in this one. The owner replaced the **presentation layer** (D087: Fusion-owned C# + WinUI 3, task-oriented navigation, same official configuration semantics and Host protocol). The new client is **implemented, compiled, tested and packaged**, and is installed in the owner-test line. Individual owner acceptance results are tracked in the Stage 6 plan. Its current per-level state, its check counts and the identity of the current owner-test package — size, full SHA-256 and manifest verification — are maintained in `docs/windows-stage6-plan.md`, which is the single detailed record for them: that plan names the package to install and lists the superseded ones. The plan’s installed row records the owner’s installed build separately from the latest packaged build. The D087/D088 coverage inventory recorded 97 official items plus one Windows presentation item in `evidence/settings-winui3-2026-10-21/migration-inventory.md`, and the blocker is in the same directory; reusable configtool adaptations are in owner-fork PR `choicky/fcitx5-configtool#2` (`windows/fusion-settings`, pinned at `abc2c6644b030d761d3d5e7c27c888af019e63f0`). The endpoint correction that fixes the owner-observed empty settings window is fusion-windows PR #28 on `fix/settings-pipe-endpoint`, with the reconciled documentation on `docs/settings-pipe-endpoint-fix`. **Stage A** — global configuration plus input-method list management on the same official widget surface — is implemented on fusion-windows PR #29, built in Release on Windows 7700, validated against an isolated Host + GUI, and packaged as `fusion-0.0.0-settings+fe65d08.zip` (after the test-isolation closure batch); it is **not installed, not registered and not owner-accepted**, and the live-TSF keyboard check was not run. The corrected `fusion-0.0.0-settings+5271848.zip` and `+2e28a88` stay available for rollback. Neither ZIP is an installation or an owner acceptance. The EXE installer — the second D085 item — is **implemented, built, delivered and owner-accepted** as
+The Windows settings surface is the **WinUI 3 client** (D087), a Fusion-owned
+C# + WinUI 3 presentation with task-oriented navigation over the official Fcitx
+configuration semantics and Host protocol. The owner-test package ships only
+this client (`FUSION_WITH_SETTINGS_UI=OFF`). For the installed build, acceptance
+by feature, and the package to use, see the **installed**, **owner-accepted**
+and **packaged** rows in the [Stage 6 plan's settings record](windows-stage6-plan.md#7-owner-decisions-scope-requirements-and-positioning).
+Use the plan's **installer State by level** record for the EXE package and
+rollback guidance. The D087/D088 coverage inventory recorded 97 official items plus one Windows presentation item in `evidence/settings-winui3-2026-10-21/migration-inventory.md`, and the blocker is in the same directory; reusable configtool adaptations are in owner-fork PR `choicky/fcitx5-configtool#2` (`windows/fusion-settings`, pinned at `abc2c6644b030d761d3d5e7c27c888af019e63f0`). The endpoint correction that fixes the owner-observed empty settings window is fusion-windows PR #28 on `fix/settings-pipe-endpoint`, with the reconciled documentation on `docs/settings-pipe-endpoint-fix`. **Historical Stage A Qt package.** Fusion-Windows PR #29 added
+global configuration and input-method list management on the upstream-derived
+widget surface. The Release build on the 7700 was validated with an isolated
+Host and GUI and packaged as `fusion-0.0.0-settings+fe65d08.zip` after the
+test-isolation fixes. At that checkpoint the ZIP had not been installed,
+registered or owner-accepted, and the live-TSF keyboard check had not run.
+`fusion-0.0.0-settings+5271848.zip` and `fusion-0.0.0-settings+2e28a88.zip`
+were rollback artifacts for the earlier Qt test line. The EXE installer — the second D085 item — was built, delivered and owner-accepted as
 `fusion-0.0.0-winui3+3325514-setup.exe` (unsigned, U4 untouched): one EXE that carries the owner-test package, runs that
 package's own `install.ps1`/`uninstall.ps1`, and adds the Chinese wizard and the Windows "installed apps" entry with its
 version and uninstall command. **Its first real install failed.** The owner ran `+c2a5ee1` on 2026-10-23 and it stopped at
 exit 1 in `Add-Type` — NSIS had unpacked its own native `System.dll` into the working directory it gave PowerShell, and
 `Add-Type` resolved the default reference to that file — before `install.ps1` wrote a line, so nothing on the machine
-changed. The EXE now starts both scripts in an empty working directory and picks the installed version's `uninstall.ps1`
+changed. The corrected EXE starts both scripts in an empty working directory and picks the installed version's `uninstall.ps1`
 instead of the alphabetically first one; the failure was reproduced and the fix verified with read-only probes and the
 payload's own `-VerifyOnly`. `+c2a5ee1` cannot install and is superseded. **The next build, `+3325514`, passed the
 owner's five checks on 2026-10-23** — install over the zip-installed `+43a832f`, Chinese input in Notepad, the
 "已安装的应用" entry with that version, uninstall keeping user data, and a reinstall that kept learning data and
-settings — so the installer is now the accepted route and `+3325514` is the accepted installer build and the rollback;
-the build to install now is the one the plan's *State by level* names. No isolated install was executed by
-me — this machine has no Windows Sandbox or clean VM, and installing on the owner's machine is not authorized. Its state by level, the artifact identity and the
-remaining open items are in `docs/windows-stage6-plan.md`. The only other
+settings. The installer batch had no isolated installation run because the validation
+machine lacked Windows Sandbox or a clean VM. The only other
 explicitly open/deferred items are:
 
 - Self-hosted real endpoint/device checkpoint, deferred and non-blocking until suitable environment/conditions exist.
