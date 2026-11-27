@@ -7,6 +7,12 @@ referenced evidence documents or Git history. Historical decisions are retained
 when their rationale or supersession remains useful; a superseded clause is
 not current authority.
 
+### Related decisions
+
+- **Punctuation:** [D051](#d051--paired-punctuation) records the paused experiment and its surviving requirements boundary. [D061 / D066](#d061--d066--punctuation-and-rc-supersession) records the reversal of the first-release pin decision.
+- **Windows architecture:** [D072](#d072--windows-boundary) establishes the architecture authority. [D082](#d082--advanced-windows-native-architecture--faithful-fcitx5-port) scopes the semantic-authority change. [D083](#d083--stage-4-closure-and-onpopcontext-scope) scopes the popped-context lifecycle change.
+- **Windows settings:** [D085](#d085--windows-next-work-after-the-minimal-tray-official-settings-ui-then-the-exe-installer-partial-supersession-of-u1s-selection-method-and-of-the-broad-settings-ui-exclusion) governs order, installer form and user data. [D086](#d086--scoped-windows-settings-executable-licence-and-upstream-integration) governs the upstream-derived executable's licence. [D087](#d087--windows-settings-ui-fusion-owned-c--winui-3-presentation-supersedes-d085s-presentation-clause-only) governs presentation. [D088](#d088--windows-candidate-presentation-configuration-narrow-supersession-of-d085d087s-no-additional-configuration-store-for-presentation-only) governs the candidate-layout storage exception.
+
 ## D001–D021 — project and initial architecture
 
 ### D001 — Android first
@@ -69,12 +75,9 @@ must not change the trigger/session contract.
 
 ### D017 — ASR and post-processing separation
 ASR ends at Raw Transcript. Optional TextPostProcessor is independently
-configurable and fully disableable. The provider-neutral seam is implemented
-and retained by Android PR #15; configured processor/provider is NONE/null/
-disabled, so the current product path is ASR → Raw Transcript → IME.
-The tested 0.6B–1B Local-LLM route is STOPPED after the quality gate failed;
-llama.cpp/JNI/GGUF runtime was removed. Cloud LLM is not implemented/planned.
-A concrete processor requires a separate decision/task.
+configurable and fully disableable. A concrete processor requires a
+separate decision/task. See [ROADMAP](ROADMAP.md#current-state) for the
+configured product path and Android PR #15 for closure evidence.
 
 ### D018 — auditable Voice data flow
 Voice routing, lifecycle, receiving party, fallback, and termination must be
@@ -198,25 +201,18 @@ abnormal/error Model Manager paths are COMPLETE / DEVICE VERIFIED. Fixed-
 upstream download/distribution approval is distinct from independent
 provenance, license, and NOTICE evidence: the latter remains itemized and
 incomplete where `docs/THIRD_PARTY_LICENSES.md` says so. This evidence debt is
-not a blanket download or release blocker; do not start a new audit in this
-status-reconciliation task.
+not a blanket download or release blocker.
 
 ### D051 — paired punctuation
-The experimental paired-punctuation extension is PAUSED and excluded from the
-first-release product scope by D066. Do not treat its historical experiment as
-a current product task.
+The expanded paired-punctuation experiment is **PAUSED**. Its 19-pair target,
+upstream mechanism and implementation limits are recorded in
+[REQUIREMENTS §5.1](REQUIREMENTS.md#51-成对标点目标d051). Reopening the expansion
+requires a separate decision and applicable source/runtime validation.
 
-**Current pin state (recorded 2026-10-25; this is not a new decision).** The
-addon `fusion` line re-introduced a narrowed two-line extension after the D068
-baseline: `modules/punctuation/punc.mb.zh_CN` gains `« « »` and `‹ ‹ ›`
-(addons PR #9, `d04a4ac` + `2ede2f2`), 43 lines in total. That commit is an
-ancestor of every Android release pin from `v0.1.3-fusion.10` (`c42ab54`)
-through the current `2145c4b`, and of the current Windows pin, so both products
-already ship it. The `first-release-baseline.md` row's "41-line upstream
-baseline" describes the frozen D068 first-release artifact (`47401b04`), not
-the current pin; D060 keeps that row unchanged. Whether to accept the narrowed
-extension or revert it is undecided here. Reverting would change the shared
-engine for both products, so it is not part of the fusion.14 ASR/release batch.
+[D066](#d061--d066--punctuation-and-rc-supersession) excluded the experiment
+from the first release. The later two-line shared-engine mapping is a shipped
+observation, with neither acceptance nor reversion decided in this record.
+See [ROADMAP](ROADMAP.md#current-state) for that observation.
 
 ### D052–D053 — MoQi downstream boundary
 MoQi remains downstream-only. Upstream contribution work is closed/non-blocking;
@@ -271,10 +267,17 @@ post-D068 status; current post-release state and next work belong in
 `docs/ROADMAP.md` and later accepted decisions.
 
 ### D061 / D066 — punctuation and RC supersession
-D061’s acceptance of the expanded punctuation pin was superseded by D066:
-D051 is outside first-release scope, the release pin is `47401b04`, and RC.1
-was rejected. These are historical release-boundary decisions, not current
-punctuation work.
+**D061 (2026-10-05) — superseded by D066.** D061 accepted the expanded
+46-line punctuation table in pin `9b3448e6` for the first release, with
+bounded runtime regression checks as validation debt.
+
+**D066 (2026-10-05) — accepted first-release correction.** D062's two failed
+RC.1 checks exposed inclusion of an experiment outside first-release scope.
+The owner excluded D051, rejected RC.1 and required a new RC.2 artifact and
+SHA-256 for acceptance. The corrected pin `47401b04` restored the 41-line
+upstream table byte-for-byte while preserving MoQi. See the
+[frozen baseline](first-release-baseline.md) §6
+for the pin evidence and D068 for exact promotion of RC.2.
 
 ### D063–D064 — signed RC and debug identity
 Signed RC production uses the existing signing route or its CI fallback, puts
@@ -298,15 +301,15 @@ shared by local and CI Debug/Test builds and never used for Release/Signed RC.
 publishing `v0.1.3-fusion.14` from the existing draft without waiting for
 device acceptance. The published asset is the same locally built, D058-signed
 APK (SHA-256 `878c2930…`); publication did not rebuild, re-sign or regenerate
-it through CI. Device acceptance remains pending and is recorded as pending in
-`ROADMAP.md` and `asr-productization-acceptance.md`. This is a one-release
+it through CI. Device acceptance status is tracked in [ROADMAP](ROADMAP.md#current-state) and
+[the acceptance record](asr-productization-acceptance.md). This is a one-release
 exception: the exact-artifact promotion rule and the device gate remain in
 force for later releases.
 
 ### D068 — first release
 RC.2 was exactly promoted and the first Fusion Enhanced release was published.
 Release evidence is historical; post-release development state is tracked by
-the current baseline/ROADMAP.
+[ROADMAP](ROADMAP.md).
 
 ## D069–D080 — Mixed Input, governance, lexicon, and latest release
 
@@ -321,12 +324,14 @@ are not licenses to revive superseded Architecture A' or old ranking
 experiments; the normative architecture contract is in REQUIREMENTS.md §2.1.
 
 ### D072 — Windows boundary
-Windows Fusion is a separate product/research track with authority in
-`docs/windows-architecture.md`. D082 later sets the combined target
-(Windows-native architecture + faithful Fcitx5 port), separates Fcitx WHAT
-from Windows HOW, and makes a scoped supersession; D072's Windows mechanisms
-are otherwise unchanged. D083 closes Windows Stage 4 and partially supersedes
-the §9 open scope for the popped context-stack member.
+Accepted on 2026-10-07. Windows Fusion is a separate product/research track.
+[Windows architecture](windows-architecture.md) is its normative authority
+and supersedes the research snapshot. D082 narrows the provisional backend
+and independent Windows semantic-authority wording, including the associated
+key-admission direction. D083 resolves only the popped member of the §9
+context-stack scope. The other D072 Windows mechanisms and remaining open
+boundaries continue under the architecture authority, subject to later
+explicit decisions.
 
 ### D073–D075 — M2+/r4 closure
 D073’s M3-B proposal was not accepted. D074 preserves the mixed-input contract
@@ -458,18 +463,14 @@ because Windows predicted semantic ownership first, remains valid as history.
 One Fcitx key dispatch may legitimately produce an ordered sequence (e.g.
 `CommitText("你好")`, `SetPreedit("")`, `CommitText("，")`); the Windows port
 preserves that semantics and order unless a real TSF constraint proves a
-specific adaptation necessary. Merged fusion-windows PR #7 closed Stage 3C:
-the faithful frontend carries those ordered callbacks through the accepted
-Windows HOW machinery as separate ordered records/settlements, without a
-one-key-one-Effect invariant, a new FcitxTransaction semantic abstraction, or
-any change to mature Fcitx/chinese-addons/LibIME semantics. D082 is therefore
-implementation-supported, not revised. The earlier Change-Contract proposals
-(merging consumed + CommitText into one Effect, one physical key = one
-semantic Effect, folding ordered Fcitx callbacks to fit the envelope, a new
-FcitxTransaction abstraction) remain rejected. Current normative wording is in
-`docs/windows-architecture.md` (header, §1–§2, §15, §22–§23, §25). No product
-requirement change (REQUIREMENTS.md unchanged); no runtime behavior changed by
-this Decision.
+specific adaptation necessary. The merged Stage 3C result (fusion-windows PR #7) supports D082. The faithful
+frontend carries ordered callbacks as separate ordered records/settlements.
+The earlier proposals to merge consumed + CommitText into one Effect, require
+one semantic Effect per physical key, fold callbacks into the envelope or
+introduce a FcitxTransaction abstraction remain rejected. See
+[Windows architecture](windows-architecture.md) §1–§2, §15 and §22–§25 for
+normative wording and [ROADMAP Phase 8](ROADMAP.md#phase-8--additional-platforms)
+for closure status and evidence.
 
 ## D083 — Windows Stage 4 closure and the popped-context lifecycle boundary (partial supersession of the D072 §9 open scope)
 
@@ -518,9 +519,10 @@ audit, and closing a document that held an open composition delivers **no**
 (`focus ≠ semantic incarnation`; focus loss alone neither advances the epoch nor
 terminates a composition), as do A′, drain-before-PASS, the consumed-STATE →
 EFFECT watermark, EVENT/STATE/EFFECT, the product replay prohibition, and the
-thin-DLL/out-of-process Host separation. P0-A, P0-B and P0-D remain OPEN,
-including the user-visible disposition of work that a teardown or a Host crash
-leaves unresolved. This closure claims **no** multi-application out-of-process
+thin-DLL/out-of-process Host separation. At Stage 4 closure P0-A, P0-B and
+P0-D remained OPEN, including the user-visible disposition of work that a
+teardown or a Host crash leaves unresolved. D089 later excepted taskbar
+SearchHost from P0-D. This closure claims **no** multi-application out-of-process
 re-verification: the real-product-path application evidence is Notepad, Firefox
 contributes one incidental reconnect observation only, and Chromium/Edge remain
 DEFERRED UNKNOWN (`docs/windows-architecture.md` §7.6/§18); that breadth is
@@ -554,53 +556,44 @@ is part of the decision: no automatic restart and no hang detection. Implementat
 fusion-windows PR, so a moving implementation head never has to be edited into an accepted decision.
 
 **Not changed:** U2's scheduled-task start mechanism and its no-automatic-restart policy; U3 (diagnostics off by default,
-technical content only); U4 (signing/channel) stays open; P0-A/P0-B/P0-D remain OPEN. Current normative wording is in
+technical content only); U4 (signing/channel) stayed open. D084 left P0-A/P0-B/P0-D open; D089 later excepted taskbar SearchHost from P0-D. Current normative wording is in
 `docs/windows-architecture.md` (§10, §14) and `docs/windows-stage6-plan.md`.
 
 ## D085 — Windows next work after the minimal tray: official settings UI, then the EXE installer (partial supersession of U1's selection method and of the broad-settings-UI exclusion)
 
 Decided by the owner on 2026-10-20.
 
-**Order of the next work.** After the minimal U7 tray batch is closed, the next work is the **official settings UI**, and
-after it the **installer that packages it**. Nothing else is promoted ahead of those two, and neither starts without its
-own bounded execution instruction.
+**Order and deliverable.** Close the minimal U7 tray batch, then deliver
+the official settings UI, then the installer that packages it. Each
+implementation batch requires its own bounded instruction, and this decision
+advances no other work ahead of those batches. The installer
+deliverable is a single EXE. This decision leaves its framework and U4
+signing/channel undecided. See [ROADMAP](ROADMAP.md#current-next) for
+implementation and delivery state.
 
-**The installer deliverable is an EXE.** The Windows installer that carries the product to a user is a single **EXE** —
-not an MSI, and not a zip the user unpacks and runs a script from. The framework is **not** chosen by this decision and
-must not be assumed by the implementation.
+**U1 and settings scope.** The settings UI fronts the same Fcitx configuration
+used for file-based selection. D085 supersedes U1's file-only selection method
+to permit a UI and lifts the broad-settings exclusion only for the product's
+own settings surface. The UI covers what the product exposes; a general
+desktop-configuration product stays outside scope.
 
-**The settings UI reuses upstream first.** The UI prefers **reusing Fcitx5's own settings UI** and its configuration
-semantics over writing a Fusion-specific configuration surface. Whether that is feasible on Windows is **not
-established**: the upstream UI's Windows dependencies and the way it would communicate with this product's Host must be
-inspected before an implementation approach is chosen. A Fusion-written UI is a fallback, not the default, and it is not
-   authorized here. *(Partially superseded 2026-10-21 by D087: the presentation layer is now a Fusion-owned C# + WinUI 3 client.
-   Everything else in this decision — official configuration formats and storage, no additional configuration store
-   *(narrowed for Windows presentation settings by D088, 2026-10-22)*, the user-data policy,
-   the settings-before-EXE-installer order, the EXE deliverable form and U4 remaining open — remains effective.)*
+**Storage and user data.** Use official Fcitx configuration formats and
+standard per-user paths (`%APPDATA%\Fcitx5\{config,data}`). Keep engine
+and global values in their official sources. U1's prohibition on Fusion
+files, switches or registry keys bars an additional configuration store,
+subject only to the D088 candidate-layout exception. The prohibition on a
+Fusion-specific data location stands. Upgrade preserves user data; uninstall
+keeps it unless the user chooses removal.
 
-**Partial supersession.** Exactly two accepted statements are narrowed:
+**Presentation history.** D085 originally preferred adapting upstream
+Fcitx5's UI and withheld authorization for a Fusion-written UI. D086 scoped
+licence authorization for the bounded upstream-derived implementation.
+D087 superseded D085's presentation clause on 2026-10-21. The upstream
+adaptation investigation is retained in the [feasibility record](windows-settings-ui-feasibility.md).
 
-- **U1's "selection only through Fcitx's existing configuration files"** was a *no-UI* decision. It remains the
-  configuration model — the UI is a front end to those same files — but it no longer excludes a UI, and "no
-  Fusion-specific file, switch or registry key" now means no *additional* configuration store, not the absence of a UI.
-  *(That phrase is narrowed once more on 2026-10-22 by **D088**, for Windows presentation settings only: one Fusion-owned
-  Fcitx configuration may exist for how the Windows candidate window presents itself. It duplicates no engine or global
-  value, and every other constraint in this decision — official formats, per-user paths, no Fusion-specific data
-  location, the user-data policy — remains effective.)*
-- **The Stage 6 plan's exclusion of "a broad settings UI"** is superseded for this settings-UI work and only for it:
-  the UI is the product's own settings surface, not an attempt at a general desktop-configuration product.
-
-Everything else U1 fixed is **unchanged**: official Fcitx configuration formats, storage in Fcitx's standard per-user
-paths (`%APPDATA%\Fcitx5\{config,data}`), no Fusion-specific data location, upgrade keeps user data, and uninstall
-leaves it unless the user chooses removal.
-
-**Not decided.** Signing and the distribution channel stay **undecided** (U4 remains open), the installer framework is
-undecided, and the UI's exact scope is undecided beyond "official settings for what the product actually exposes".
-
-**Not changed.** Overall WP7 acceptance is unchanged — daily use still closes it, and the tray's first installed run is
-still the owner's check. U6's decision is unchanged. The minimal tray's scope is unchanged: no automatic restart, no hang
-detection, no new lifecycle framework. No implementation of the settings UI or of the EXE installer is authorized by this
-record; the work-package ordering is updated in `docs/windows-stage6-plan.md` and `docs/ROADMAP.md`.
+**Other boundaries retained.** D084 still governs WP7 acceptance, the tray's
+first installed run is the owner's check, and U6 and the minimal tray scope
+remain effective.
 
 ## D086 — scoped Windows settings executable licence and upstream integration
 
@@ -610,11 +603,16 @@ Accepted by the owner on 2026-10-20 through the bounded implementation instructi
 
 **Other components retain their own licenses.** `fcitx5-qt` modules retain their per-file licenses (LGPL-2.1-or-later for widgetsaddons and BSD-3-Clause for dbusaddons); the Qt shared libraries/plugin use their applicable upstream open-source license terms (the owner-test build selects the LGPL-3.0-only shared-library path and supplies the license texts/source-access instructions); pinned Fcitx/chinese-addons/LibIME runtime components retain their own upstream LGPL-2.1-or-later terms. The implementation must preserve these notices and check the actual linked/distributed dependency set; this decision does not blanket-license the product.
 
-**Relationship to D085.** D085 remains unchanged and continues to govern work order, Fcitx configuration semantics/data paths, and the separate EXE installer. This later scoped authorization removes D085's previously identified *licence prerequisite* for the bounded settings implementation; it does not itself authorize a public release, machine installation/registration, merge, selection of U4 signing/channel, or implementation of the EXE installer. D085's official-settings-UI-before-EXE-installer order remains current.
+**Relationship to D085 and D087.** D086 supplied the licence prerequisite
+for the bounded upstream-derived implementation. Its scope remains attached
+to that executable and derivative code after D087. This authorization covers
+neither public release, machine installation/registration, merge, selection
+of U4 signing/channel, nor EXE installer implementation. D085 governs work
+order, configuration and user data, with the D088 storage exception.
 
 **Upstream maintenance.** The owner-maintained `choicky/fcitx5-configtool` fork is the source home for reusable configtool UI adaptations, on a dedicated branch based on the pinned upstream 5.1.16 commit. The Windows product repository owns FusionHost transport, tray, packaging and source-pin/build integration. The single `fcitx5-qt` MSVC path-portability fix remains a separate, reviewable patch; no fork was authorized or created for fcitx5-qt by this decision.
 
-Implementation/package/validation state is tracked in the Stage 6 plan and product PRs, not in this Accepted Decision. U4, U6, WP7 and P0-A/P0-B/P0-D remain unchanged.
+D086 changed none of U4, U6, WP7 or the P0 boundaries.
 
 ## D087 — Windows settings UI: Fusion-owned C# + WinUI 3 presentation (supersedes D085's presentation clause only)
 
@@ -630,12 +628,11 @@ widget technology.
 lower-frequency settings under "More settings" sections rather than one advanced dump, and the interaction rules the
 owner stated for the key editor, shared Pinyin/Shuangpin state and saving.
 
-**Unchanged.** D085's **work order** (settings UI, then the EXE installer), its **EXE** deliverable form, official Fcitx
-configuration formats, storage in Fcitx's standard per-user paths, the prohibition on an additional Fusion configuration
-store *(narrowed on 2026-10-22 by **D088** for Windows presentation settings only; it stands unchanged for every engine
-and global value)*, the user-data policy (upgrade keeps data; uninstall leaves it unless chosen), and every other U1
-constraint. U4 (signing/channel) stays open; the installer framework stays undecided; no merge, installation,
-registration or publication is authorized by this record.
+**Surviving authority.** D085 governs work order, installer form,
+configuration formats and paths, and user data. D088 subsequently provides
+the single candidate-layout storage exception. D087 leaves U4 and the
+installer framework undecided and grants no merge, installation,
+registration or publication authority.
 
 **D086 is not changed.** Its scoped GPL-2.0-or-later authorization remains attached to the retained upstream-derived
 `FusionSettings.exe` and the `fcitx5-configtool`-derived sources. The new client is Fusion-owned code and does **not**
@@ -647,8 +644,9 @@ retained or retired is a packaging decision taken with its own evidence.
 configuration D088 authorizes, no TSF key-routing policy (the bare-Shift
 boundary stays unresolved), no EXE installer implementation, no machine installation.
 
-**Status.** The presentation change is **accepted**; implementation state is tracked in the Stage 6 plan and the product
-PRs, not here. The option-coverage design is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
+**Status.** The presentation change is **accepted**. See [ROADMAP](ROADMAP.md#current-next)
+and the linked Stage 6 record for implementation, and the
+[option-coverage inventory](../evidence/settings-winui3-2026-10-21/migration-inventory.md).
 
 ## D088 — Windows candidate-presentation configuration (narrow supersession of D085/D087's "no additional configuration store", for presentation only)
 
@@ -669,7 +667,7 @@ writer; the WinUI client edits it through the Host; the candidate renderer consu
 
 **Why not the official option.** Upstream's only candidate-layout option is `verticalCandidateList`, a member of
 `ClassicUIConfig` owned by the classicui addon (`classicui.h:129`, stored in `conf/classicui.conf`, read by that addon's own
-`reloadConfig()` at pinned fcitx5 `a7f2528`). This runtime does not build, ship or load classicui, and the Host serves only
+`reloadConfig()` at pinned fcitx5 `a7f2528`). At acceptance the runtime did not build, ship or load classicui, and the Host served only
 `global`, `inputmethod/pinyin` and `inputmethod/shuangpin`; `GlobalConfig` and the shipped addons have no layout option.
 Reusing that key would mean loading the Linux classic UI (explicitly excluded) or storing a value with no reader. The new
 configuration therefore uses its own namespace and never classicui's.
@@ -677,11 +675,12 @@ configuration therefore uses its own namespace and never classicui's.
 **Narrow supersession.** Exactly one statement is narrowed, and only for Windows presentation settings: D085's
 "*no Fusion-specific file, switch or registry key* … means no *additional* configuration store" and D087's unchanged
 "prohibition on an additional Fusion configuration store". For presentation, a Fusion-owned Fcitx configuration in Fcitx's
-own storage is permitted. **Everything else stands unchanged**: official Fcitx configuration formats, storage in Fcitx's
-standard per-user paths, no Fusion-specific *data* location, no duplicate store of any engine or global value, the
-user-data policy (upgrade keeps it; uninstall leaves it unless chosen), D087's presentation-technology decision, D086's
-scoped licence, and the settings-before-EXE-installer order. No engine-semantic change, no new key-routing policy, no
-matrix layout, no theme or font work, and no general configuration-framework expansion is authorized.
+own storage is permitted for the candidate layout only. D085 continues to
+govern the configuration formats and paths, user data and work order. D086
+and D087 continue to govern scoped licensing and presentation technology.
+D088 authorizes no duplicate engine or global value, engine-semantic
+change, new key-routing policy, matrix layout, theme or font work, or
+general configuration-framework expansion.
 
 **Precedence.** The stored preference is a **default**; an engine `CandidateLayoutHint` that names a layout wins. This is
 classicui's own rule (`inputwindow.cpp:598-603`, again at `938-943`) adopted verbatim, so a semantic hint (clipboard,
@@ -689,8 +688,10 @@ unicode, imselector) keeps working and no stored value can silently override one
 preserves the presentation shipped before the option existed — deliberately the opposite of classicui's default, because
 preserving existing behaviour outranks copying upstream's default.
 
-**Status.** Accepted. Implementation, compilation, isolated validation and packaging are tracked in the Stage 6 plan and
-the product PRs, not here. The option-coverage record is `evidence/settings-winui3-2026-10-21/migration-inventory.md`.
+**Status.** Accepted. See [ROADMAP](ROADMAP.md#current-next) and the linked
+Stage 6 record for implementation and delivery, and the
+[option-coverage inventory](../evidence/settings-winui3-2026-10-21/migration-inventory.md)
+for evidence.
 
 ## D089 — The taskbar search box is the one supported AppContainer client (narrow lifting of P0-D for that surface)
 
@@ -748,14 +749,11 @@ z-order against the immersive flyout — that was left to a separate decision, a
 the popup behind the flyout, which is the fact that separate decision now has to answer. `SetWindowBand`, undocumented
 APIs and similar hacks stay excluded here and there.
 
-**Status.** Accepted. Implementation, validation and packaging are tracked in the Stage 6 plan's R49 row and in the
-product PRs (#53 for the diagnostic, #55 for this decision), not here. **The owner ran the R49 checklist on the
-installed package on 2026-10-28 (the 5700X, `0.0.0-winui3+51467cf`): this decision's own scope is verified against a
-real AppContainer client — the box activates 双拼, the pipe is opened by `SearchHost`, the object-based identity check
-passes and a commit lands in the box.** What the same run found is that no candidate window is visible there; that is
-outside what D089 decides, and **D090** is the decision that answers it (candidate popup owned by the document's own
-window and topmost, implemented in fusion-windows PR #56). The TIP inside the search box is therefore not yet accepted
-as a usable surface: the connection half is measured, the visible-candidates half is not.
+**Status.** Accepted. The 2026-10-28 owner run on `0.0.0-winui3+51467cf`
+verified activation, connection and commit. The visible-candidates result
+was outside that verification and is governed by D090. See the
+[Stage 6 plan](windows-stage6-plan.md) R49 row and fusion-windows PRs #53
+and #55 for the diagnostic and product evidence.
 
 ## D090 — The candidate window is owned by the application it types into and kept topmost, in every application
 
@@ -845,25 +843,11 @@ and commit semantics are unchanged — no semantic channel is added. The anchor 
 (`TS_E_NOLAYOUT` keeps the last-good anchor; a layout notification re-probes in a read-only session) and the
 selection-replacement rule are recorded in §16 as presentation boundaries, not as decisions here.
 
-**Status.** Accepted. By layer, for fusion-windows PR #56 (branch `fix/candidate-owner-layout`, head `5565972`, on
-`main` at `286d861` — #53 and #55 are merged and were merged into the branch before this round's work; the review round's
-`407a0ce` is accepted apart from the one defect its follow-up fixes):
-**implemented** — owner resolution, `WS_EX_TOPMOST`, `HWND_TOPMOST` on every raise, owner-change and owner-death
-handling (`WM_NCDESTROY` clears the handle and then passes the message to `DefWindowProcW`), the three WinEvents, the
-`shown` line with `owner-source=view|focus|none`, the unowned-topmost fallback, the deferred page that a layout change
-now places, the one hide door and the delivery fence; **tested** — `candidate_window_layout` sections 34 and 34b read
-`GW_OWNER`, `WS_EX_TOPMOST` before and after show, the re-create on a changed owner, the null handle after the owner is
-destroyed, and the unowned case (window exists, `GW_OWNER` null, topmost set); section **35a–35e** delivers a real posted
-reposition into a real owned, topmost window and reads the product's own decision back — a visible page re-placed, a page
-hidden between the post and the delivery left hidden with its `FENCE kind=reposition hidden cid=…` line, a deferred page
-placed for the first time, a deferred page then hidden refused, and the no-anchor and no-page branches;
-`tsf_anchor_probe` adds the deferred-then-placed case and the four `popup_may_be_placed` combinations; the full native
-suite, built and run on the **5700X** from the head above, prints **97 registered, 95 passed, 2 skipped by design, 0
-failed**; **packaged** — first as `fusion-0.0.0-winui3+5565972-setup.exe`, and that code is inside every later package, including
-the installed `fusion-0.0.0-winui3+6d03ac1-setup.exe` (identity in the Stage 6 plan's packaged row; `+407a0ce` is
-superseded and is not a build to test); **owner-tested — not yet.**
-D089's status keeps the same split: the search box's connection half is measured, its visible-candidates half is what
-#56's checklist step 3 answers for the first time.
+**Status.** Accepted. See fusion-windows PR #56 (reviewed fix `5565972`)
+for the implementation and native test evidence, and the
+[Stage 6 plan](windows-stage6-plan.md) R49 row and state-by-level record
+for packaging and owner results. D089's connection verification and
+D090's visible-candidates verification are separate checks.
 
 ## Current authority rule
 

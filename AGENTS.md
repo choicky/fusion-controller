@@ -5,7 +5,7 @@
 ## 事实来源与设计核对
 
 - 开始设计或实现前，先按任务分类，识别相关需求/决策/当前路线图章节或主题专属权威，再阅读这些相关章节、指针及所涉及上游仓库的最新源码、公开接口和现有测试。完整历史决策、证据或研究仅在需要溯源、冲突仲裁或验证时按需读取；不得将本条机械解释为每个任务都必须读完整 `REQUIREMENTS.md`、`DECISIONS.md`、`ROADMAP.md` 与全部研究历史。
-- 判断当前预期行为时，按以下权威顺序读取：`REQUIREMENTS.md` 当前有效需求、`DECISIONS.md` 中最新且未被 superseded 的 Accepted decision、`ROADMAP.md` 当前 Phase/checkpoint，最后才参考历史记录。首个 Fusion Enhanced 发布的**当前产品基线 / 范围 / 功能状态矩阵以 `docs/first-release-baseline.md`（D060）为唯一 current-state 权威**；它与其指针取代任何旧的“当前实现/开发基线”表述。
+- 判断当前预期行为时，按以下权威顺序读取：`REQUIREMENTS.md` 当前有效需求、`DECISIONS.md` 中最新且未被 superseded 的 Accepted decision、`ROADMAP.md` 当前 Phase/checkpoint，最后才参考历史记录。首个 Fusion Enhanced 发布的冻结范围和功能状态矩阵以 `docs/first-release-baseline.md`（D060/D068）为准；首发后的实现状态和下一步见 `docs/ROADMAP.md`。
 - Windows 线的当前规范性架构权威为 `docs/windows-architecture.md`（D072）；`researching-notes` 中的 Windows 架构文档仅为研究叙述与历史，不作为当前权威。
 - 分支治理（canonical branches、命名空间、上游集成模型、gitlink 可达性与删除前置条件）的当前规范性权威为 `docs/branch-policy.md`（D076）；`evidence/branch-inventory-2026-10-11/` 与 `evidence/branch-governance-gate1-2026-10-11/` 仅为历史清点与迁移时点证据，不作为当前 policy 权威。
 - 不得把 `SUPERSEDED`、`PARTIALLY SUPERSEDED`、`HISTORICAL` 或 `DEPRECATED` 条目实现为当前行为；仅部分 supersede 旧决定时，旧决定原位置必须标明仍有效和不再规范的部分。看似 ACTIVE 的冲突不得自行推断。
@@ -33,9 +33,14 @@
 
 ## 修改边界
 
-- 优先复用 Fcitx5 及相关上游项目已有的接口、状态机、配置、UI 和测试基础设施。
-- 在证据证明上游能力不足前，不重新实现成熟功能，不扩大修改层级，不引入平行状态机或过度抽象。
-- fork 应保持最小、聚焦且便于审查；新增长期 fork 面之前，先说明上游限制、替代方案和维护成本。
+- **上游优先。** 上游实现或公开 API 能满足需求时直接复用，包括已有状态机、配置、UI 和测试基础设施。能力不足时，说明具体缺口，优先做最小的上游兼容扩展；复用与扩展均无法满足需求时，才采用最小替代实现。改动限于已有证据支持的层级和范围，避免平行状态机和过度抽象。fork 保持最小、聚焦且便于审查；扩展长期 fork 范围前，说明上游限制、替代方案和维护成本。
+- **复用项目已有能力。** 优先复用上游和项目已有功能。在可行时，将确实等价的行为归并到现有公开接口，并保持调用方可见行为和依赖方向。无关行为各自保留。
+- **单一权威与模块职责。** 每项事实、政策、配置值和实现职责各有一处权威归属。可调值放在所属配置中，以单一来源为准，并在读取或加载边界校验。每个模块承担一项内聚职责，模块间通过公开接口交互，接口须说明输入、输出和失败行为。采用前导下划线标识私有名称的语言中，这类名称限所属包内使用。
+- **就近组织。** 相关代码、配置和文档放在同一处或相邻位置。其他位置需要同一事实时，简洁引用权威来源。
+- **依赖方向。** 依照受 MIT Axiomatic Design 独立公理（Independence Axiom）启发的规则，层级顺序只在适用的架构权威中登记一次。跨层实现依赖向下，禁止任何长度的环，包括同层环。函数内的运行时导入计入依赖；仅供类型检查且运行时从不执行的导入不计入。可复用功能放在所有使用者都能到达的最低适用层；禁止为复用向上导入或通过函数内导入绕过依赖方向。
+- **渐进整理。** 新增顶层包时，在权威层级清单中登记。按实际职责边界拆分大文件，将结构移动和行为修改分开。仅移动结构时须保持行为；有适用的确定性回放设施时，验证输出逐字节一致；否则使用现有产品路径验证，并说明实际证据和验证局限。
+- **性能与稳定性。** 用代表性工作负载的测量指导性能优化和稳定性维护。性能改动须记录基线、指标、工作负载、测量结果及相关正确性检查。测量定位到算法瓶颈时，优先改进算法。
+- **兼容代码退役。** 在未来有明确范围的改动中，退役仅服务历史格式、路径或名称的兼容代码。改变受支持的持久化格式时，先定义一次性迁移与明确的完成条件，迁移完成后再移除旧读取器、转发路径或别名。在获授权迁移或退役前，保护现有用户数据和已接受的外部兼容承诺。
 - 保持触发入口、可配置实现和具体算法之间的既有架构边界；除非已有决定被正式修订，不把某个入口硬绑定到单一实现或供应商。
 - 引入第三方数据或代码时，固定并记录来源版本，保留许可证和再分发信息；测试数据必须来自已确认的固定来源。
 - Local ASR 模型的分发资格以 `DECISIONS.md` D059 的四项权利（bundle / mirror-rehost / 应用内 fixed-upstream 下载 / manual import）为单一权威记录，除非命中 D059 reopen conditions，不重开 A/B/C 研究阶段的分发结论或对当前三模型重复调查。
@@ -102,7 +107,7 @@ procedure / architecture / current phase-stage / next step 的语句，再对每
 
 Gate 1 或 Gate 2 通过时，若没有实际运行 compiler/build，必须写明 `STATIC REVIEW PASS; COMPILE UNVERIFIED`（或等价表述）。人工 compile-oriented audit 不能替代 compiler，也不能升级为 `compile validated`、`compile-safe` 或 `build verified`。
 
-本地能够验证的内容优先在本地验证；但必须先核对当前环境能力。缺少真实 build environment 时，不得假装完成 build validation，也不得为一次小任务盲目搭建重型环境，应明确记录 `COMPILE UNVERIFIED` 并选择可用的验证路由。当前环境事实是：OracleKR3 适合 Codex CLI/source review，但当前没有 `fcitx5-chinese-addons` native build environment；Windows development machine 可承担适用本地构建/测试；GitHub CI 是 authoritative Linux build/test validation。这些是当前路由事实，不是永久架构限制。
+本地能够验证的内容优先在本地验证；但必须先核对当前环境能力。缺少真实 build environment 时，不得假装完成 build validation，也不得为一次小任务盲目搭建重型环境，应明确记录 `COMPILE UNVERIFIED` 并选择可用的验证路由。按任务核对本机、Windows 开发机和适用 CI 的实际工具链与权限。
 
 CI 只能作为 source review、actual diff review 和可用本地验证之后的 staged/final validation，不得作为逐个发现基础编译错误的猜测性试错工具。CI 失败只有在根因明确、修复机械且仍在 Change Contract 内时才可自主修复；formatter-only repair、未完成 CI 或 static review 均不得被写成 Gate 3 PASS，也不得改变尚未完成的阶段结果。
 - 运行仓库可用且与改动相关的格式检查、静态检查、构建和测试；优先使用项目现有脚本与 CI 等价命令。

@@ -19,6 +19,9 @@ Everything here is measurement. **Nothing in this round changes what T or K answ
 `src/tsf/key_pairing.{hpp,cpp}` is a pure state machine — no TSF, no Windows types — and
 `tests/key_pairing.cpp` unit-tests it. `src/tsf/service.cpp` feeds it from the four key callbacks
 and writes one summary line. It is behind the existing `FUSION_TSF_DIAGNOSTICS` opt-in.
+On the repaired #60 head, every T is counted with the answer it actually gave on the re-entrant and
+other early-return paths, and an earlier unmatched TRUE survives a later FALSE for the same key;
+counters from the earlier `3960bc7` head undercount both shapes and must not be read for them.
 
 ### What is on each line
 
